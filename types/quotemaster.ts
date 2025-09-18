@@ -169,6 +169,43 @@ export const kitchenFormSchema = z.object({
   email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
 });
 
+// Enhanced Kitchen schemas for actions
+export const createKitchenSchema = z.object({
+  kitchenCode: z
+    .string()
+    .min(1, "Mã bếp là bắt buộc")
+    .max(50, "Mã bếp không được quá 50 ký tự")
+    .regex(/^[A-Z0-9_-]+$/, "Mã bếp chỉ được chứa chữ hoa, số, gạch ngang và gạch dưới"),
+  name: z
+    .string()
+    .min(1, "Tên bếp là bắt buộc")
+    .max(100, "Tên bếp không được quá 100 ký tự"),
+  region: z
+    .string()
+    .min(1, "Khu vực là bắt buộc")
+    .max(50, "Khu vực không được quá 50 ký tự"),
+  address: z
+    .string()
+    .min(1, "Địa chỉ là bắt buộc"),
+  managerName: z
+    .string()
+    .min(1, "Tên quản lý là bắt buộc")
+    .max(100, "Tên quản lý không được quá 100 ký tự"),
+  phone: z
+    .string()
+    .min(1, "Số điện thoại là bắt buộc")
+    .max(20, "Số điện thoại không được quá 20 ký tự")
+    .regex(/^[0-9\s\-\+\(\)]+$/, "Số điện thoại không hợp lệ"),
+  email: z
+    .string()
+    .email("Email không hợp lệ")
+    .max(255, "Email không được quá 255 ký tự"),
+});
+
+export const updateKitchenSchema = createKitchenSchema.extend({
+  id: z.number().min(1, "ID không hợp lệ"),
+});
+
 export const quotationFormSchema = z.object({
   period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Định dạng kỳ báo giá không hợp lệ (YYYY-MM-XX)"),
   supplierId: z.number().min(1, "Vui lòng chọn nhà cung cấp"),
@@ -204,6 +241,8 @@ export const kitchenDemandFormSchema = z.object({
 export type SupplierFormData = z.infer<typeof supplierFormSchema>;
 export type ProductFormData = z.infer<typeof productFormSchema>;
 export type KitchenFormData = z.infer<typeof kitchenFormSchema>;
+export type CreateKitchenInput = z.infer<typeof createKitchenSchema>;
+export type UpdateKitchenInput = z.infer<typeof updateKitchenSchema>;
 export type QuotationFormData = z.infer<typeof quotationFormSchema>;
 export type QuoteItemFormData = z.infer<typeof quoteItemFormSchema>;
 export type KitchenDemandFormData = z.infer<typeof kitchenDemandFormSchema>;

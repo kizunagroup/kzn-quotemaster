@@ -1,49 +1,12 @@
 "use server";
 
-import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
 import { teams, teamMembers, activityLogs, ActivityType } from "@/lib/db/schema";
 import { getUser, getUserWithTeam } from "@/lib/db/queries";
 import type { ActionState } from "@/lib/auth/middleware";
-
-// Zod Validation Schemas
-export const createKitchenSchema = z.object({
-  kitchenCode: z
-    .string()
-    .min(1, "Mã bếp là bắt buộc")
-    .max(50, "Mã bếp không được quá 50 ký tự")
-    .regex(/^[A-Z0-9_-]+$/, "Mã bếp chỉ được chứa chữ hoa, số, gạch ngang và gạch dưới"),
-  name: z
-    .string()
-    .min(1, "Tên bếp là bắt buộc")
-    .max(100, "Tên bếp không được quá 100 ký tự"),
-  region: z
-    .string()
-    .min(1, "Khu vực là bắt buộc")
-    .max(50, "Khu vực không được quá 50 ký tự"),
-  address: z
-    .string()
-    .min(1, "Địa chỉ là bắt buộc"),
-  managerName: z
-    .string()
-    .min(1, "Tên quản lý là bắt buộc")
-    .max(100, "Tên quản lý không được quá 100 ký tự"),
-  phone: z
-    .string()
-    .min(1, "Số điện thoại là bắt buộc")
-    .max(20, "Số điện thoại không được quá 20 ký tự")
-    .regex(/^[0-9\s\-\+\(\)]+$/, "Số điện thoại không hợp lệ"),
-  email: z
-    .string()
-    .email("Email không hợp lệ")
-    .max(255, "Email không được quá 255 ký tự"),
-});
-
-export const updateKitchenSchema = createKitchenSchema.extend({
-  id: z.number().min(1, "ID không hợp lệ"),
-});
+import { createKitchenSchema, updateKitchenSchema } from "@/types/quotemaster";
 
 // Helper function to check admin permissions
 async function checkAdminPermissions(): Promise<{ user: any; isAdmin: boolean; teamData?: any }> {
