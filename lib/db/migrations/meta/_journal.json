@@ -15,6 +15,13 @@
       "when": 1758187610841,
       "tag": "0001_rich_giant_man",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1758222008028,
+      "tag": "0002_friendly_timeslip",
+      "breakpoints": true
     }
   ]
 }

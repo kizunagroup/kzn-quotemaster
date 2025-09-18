@@ -48,10 +48,10 @@ export const teamMembers = pgTable('team_members', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   teamId: integer('team_id')
     .notNull()
-    .references(() => teams.id),
+    .references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   role: varchar('role', { length: 50 }).notNull(),
   joinedAt: timestamp('joined_at').notNull().defaultNow(),
 });
@@ -60,8 +60,8 @@ export const activityLogs = pgTable('activity_logs', {
   id: serial('id').primaryKey(),
   teamId: integer('team_id')
     .notNull()
-    .references(() => teams.id),
-  userId: integer('user_id').references(() => users.id),
+    .references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+  userId: integer('user_id').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   action: text('action').notNull(),
   timestamp: timestamp('timestamp').notNull().defaultNow(),
   ipAddress: varchar('ip_address', { length: 45 }),
@@ -71,12 +71,12 @@ export const invitations = pgTable('invitations', {
   id: serial('id').primaryKey(),
   teamId: integer('team_id')
     .notNull()
-    .references(() => teams.id),
+    .references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   email: varchar('email', { length: 255 }).notNull(),
   role: varchar('role', { length: 50 }).notNull(),
   invitedBy: integer('invited_by')
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   invitedAt: timestamp('invited_at').notNull().defaultNow(),
   status: varchar('status', { length: 20 }).notNull().default('pending'),
 });
@@ -114,14 +114,14 @@ export const quotations = pgTable('quotations', {
   id: serial('id').primaryKey(),
   quotationId: varchar('quotation_id', { length: 100 }).notNull().unique(),
   period: varchar('period', { length: 10 }).notNull(),
-  supplierId: integer('supplier_id').references(() => suppliers.id).notNull(),
-  teamId: integer('team_id').references(() => teams.id).notNull(),
+  supplierId: integer('supplier_id').references(() => suppliers.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
   region: varchar('region', { length: 50 }).notNull(),
   category: varchar('category', { length: 100 }).notNull(),
   quoteDate: timestamp('quote_date'),
   updateDate: timestamp('update_date'),
   status: varchar('status', { length: 20 }).default('pending').notNull(),
-  createdBy: integer('created_by').references(() => users.id).notNull(),
+  createdBy: integer('created_by').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -130,8 +130,8 @@ export const quotations = pgTable('quotations', {
 
 export const quoteItems = pgTable('quote_items', {
   id: serial('id').primaryKey(),
-  quotationId: integer('quotation_id').references(() => quotations.id, { onDelete: 'cascade' }).notNull(),
-  productId: integer('product_id').references(() => products.id).notNull(),
+  quotationId: integer('quotation_id').references(() => quotations.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  productId: integer('product_id').references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
   quantity: decimal('quantity', { precision: 12, scale: 2 }),
   initialPrice: decimal('initial_price', { precision: 12, scale: 2 }),
   negotiatedPrice: decimal('negotiated_price', { precision: 12, scale: 2 }),
@@ -142,7 +142,7 @@ export const quoteItems = pgTable('quote_items', {
   negotiationRounds: integer('negotiation_rounds').default(0),
   lastNegotiatedAt: timestamp('last_negotiated_at'),
   approvedAt: timestamp('approved_at'),
-  approvedBy: integer('approved_by').references(() => users.id),
+  approvedBy: integer('approved_by').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -152,9 +152,9 @@ export const quoteItems = pgTable('quote_items', {
 
 export const priceHistory = pgTable('price_history', {
   id: serial('id').primaryKey(),
-  productId: integer('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
-  supplierId: integer('supplier_id').references(() => suppliers.id, { onDelete: 'cascade' }).notNull(),
-  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }),
+  productId: integer('product_id').references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  supplierId: integer('supplier_id').references(() => suppliers.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   period: varchar('period', { length: 10 }).notNull(),
   price: decimal('price', { precision: 12, scale: 2 }).notNull(),
   priceType: varchar('price_type', { length: 20 }).notNull(),
@@ -164,14 +164,14 @@ export const priceHistory = pgTable('price_history', {
 
 export const kitchenPeriodDemands = pgTable('kitchen_period_demands', {
   id: serial('id').primaryKey(),
-  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
-  productId: integer('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  productId: integer('product_id').references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
   period: varchar('period', { length: 10 }).notNull(),
   quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
   unit: varchar('unit', { length: 50 }).notNull(),
   notes: text('notes'),
   status: varchar('status', { length: 20 }).default('active').notNull(),
-  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdBy: integer('created_by').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
@@ -360,5 +360,6 @@ export enum ActivityType {
   DELETE_SUPPLIER = 'DELETE_SUPPLIER',
   CREATE_KITCHEN = 'CREATE_KITCHEN',
   UPDATE_KITCHEN = 'UPDATE_KITCHEN',
+  DELETE_KITCHEN = 'DELETE_KITCHEN',
   SEED_DATABASE = 'SEED_DATABASE',
 }
