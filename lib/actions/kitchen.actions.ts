@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
 import { teams, teamMembers, activityLogs, ActivityType } from "@/lib/db/schema";
 import { getUser, getUserWithTeam } from "@/lib/db/queries";
@@ -172,12 +172,12 @@ export async function updateKitchen(
       return { error: "Bếp không tồn tại hoặc không phải là bếp hợp lệ." };
     }
 
-    // Check if kitchen code is taken by another kitchen
+    // Check if kitchen code is taken by another kitchen (only if it's being changed)
     if (existingKitchen[0].kitchenCode !== kitchenCode) {
       const kitchenCodeExists = await db
         .select()
         .from(teams)
-        .where(and(eq(teams.kitchenCode, kitchenCode), eq(teams.id, id)))
+        .where(and(eq(teams.kitchenCode, kitchenCode), ne(teams.id, id)))
         .limit(1);
 
       if (kitchenCodeExists.length > 0) {

@@ -203,7 +203,7 @@ export const createKitchenSchema = z.object({
 });
 
 export const updateKitchenSchema = createKitchenSchema.extend({
-  id: z.number().min(1, "ID không hợp lệ"),
+  id: z.coerce.number().min(1, "ID không hợp lệ"),
 });
 
 export const quotationFormSchema = z.object({
