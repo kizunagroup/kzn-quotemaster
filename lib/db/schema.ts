@@ -5,6 +5,8 @@ import {
   text,
   timestamp,
   integer,
+  decimal,
+  unique,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -17,6 +19,9 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
   deletedAt: timestamp('deleted_at'),
+  // QuoteMaster extensions
+  employeeCode: varchar('employee_code', { length: 50 }).unique(),
+  phone: varchar('phone', { length: 20 }),
 });
 
 export const teams = pgTable('teams', {
@@ -29,6 +34,14 @@ export const teams = pgTable('teams', {
   stripeProductId: text('stripe_product_id'),
   planName: varchar('plan_name', { length: 50 }),
   subscriptionStatus: varchar('subscription_status', { length: 20 }),
+  // QuoteMaster extensions for kitchen mapping
+  kitchenCode: varchar('kitchen_code', { length: 50 }).unique(),
+  region: varchar('region', { length: 50 }),
+  address: text('address'),
+  managerName: varchar('manager_name', { length: 100 }),
+  phone: varchar('phone', { length: 20 }),
+  email: varchar('email', { length: 255 }),
+  teamType: varchar('team_type', { length: 20 }).default('OFFICE').notNull(),
 });
 
 export const teamMembers = pgTable('team_members', {
@@ -68,15 +81,122 @@ export const invitations = pgTable('invitations', {
   status: varchar('status', { length: 20 }).notNull().default('pending'),
 });
 
+// QuoteMaster-specific tables
+export const suppliers = pgTable('suppliers', {
+  id: serial('id').primaryKey(),
+  supplierCode: varchar('supplier_code', { length: 50 }).notNull().unique(),
+  name: varchar('name', { length: 200 }).notNull(),
+  taxId: varchar('tax_id', { length: 50 }),
+  address: text('address'),
+  contactPerson: varchar('contact_person', { length: 100 }),
+  phone: varchar('phone', { length: 20 }),
+  email: varchar('email', { length: 255 }),
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const products = pgTable('products', {
+  id: serial('id').primaryKey(),
+  productCode: varchar('product_code', { length: 50 }).notNull().unique(),
+  name: varchar('name', { length: 200 }).notNull(),
+  specification: text('specification'),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  category: varchar('category', { length: 100 }).notNull(),
+  basePrice: decimal('base_price', { precision: 12, scale: 2 }),
+  baseQuantity: decimal('base_quantity', { precision: 10, scale: 2 }),
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const quotations = pgTable('quotations', {
+  id: serial('id').primaryKey(),
+  quotationId: varchar('quotation_id', { length: 100 }).notNull().unique(),
+  period: varchar('period', { length: 10 }).notNull(),
+  supplierId: integer('supplier_id').references(() => suppliers.id).notNull(),
+  teamId: integer('team_id').references(() => teams.id).notNull(),
+  region: varchar('region', { length: 50 }).notNull(),
+  category: varchar('category', { length: 100 }).notNull(),
+  quoteDate: timestamp('quote_date'),
+  updateDate: timestamp('update_date'),
+  status: varchar('status', { length: 20 }).default('pending').notNull(),
+  createdBy: integer('created_by').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  uniqueQuotePerTeamPerPeriod: unique().on(table.period, table.supplierId, table.teamId),
+}));
+
+export const quoteItems = pgTable('quote_items', {
+  id: serial('id').primaryKey(),
+  quotationId: integer('quotation_id').references(() => quotations.id, { onDelete: 'cascade' }).notNull(),
+  productId: integer('product_id').references(() => products.id).notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 2 }),
+  initialPrice: decimal('initial_price', { precision: 12, scale: 2 }),
+  negotiatedPrice: decimal('negotiated_price', { precision: 12, scale: 2 }),
+  approvedPrice: decimal('approved_price', { precision: 12, scale: 2 }),
+  vatPercentage: decimal('vat_percentage', { precision: 5, scale: 2 }).default('0'),
+  currency: varchar('currency', { length: 3 }).default('VND'),
+  pricePerUnit: decimal('price_per_unit', { precision: 12, scale: 2 }),
+  negotiationRounds: integer('negotiation_rounds').default(0),
+  lastNegotiatedAt: timestamp('last_negotiated_at'),
+  approvedAt: timestamp('approved_at'),
+  approvedBy: integer('approved_by').references(() => users.id),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  uniqueQuoteItem: unique().on(table.quotationId, table.productId),
+}));
+
+export const priceHistory = pgTable('price_history', {
+  id: serial('id').primaryKey(),
+  productId: integer('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  supplierId: integer('supplier_id').references(() => suppliers.id, { onDelete: 'cascade' }).notNull(),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }),
+  period: varchar('period', { length: 10 }).notNull(),
+  price: decimal('price', { precision: 12, scale: 2 }).notNull(),
+  priceType: varchar('price_type', { length: 20 }).notNull(),
+  region: varchar('region', { length: 50 }),
+  recordedAt: timestamp('recorded_at').defaultNow().notNull(),
+});
+
+export const kitchenPeriodDemands = pgTable('kitchen_period_demands', {
+  id: serial('id').primaryKey(),
+  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
+  productId: integer('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  period: varchar('period', { length: 10 }).notNull(),
+  quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  notes: text('notes'),
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  uniqueDemand: unique().on(table.teamId, table.productId, table.period),
+}));
+
+// Relations
 export const teamsRelations = relations(teams, ({ many }) => ({
+  // Template relations preserved
   teamMembers: many(teamMembers),
   activityLogs: many(activityLogs),
   invitations: many(invitations),
+  // QuoteMaster extensions
+  quotations: many(quotations),
+  demands: many(kitchenPeriodDemands),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
+  // Template relations preserved
   teamMembers: many(teamMembers),
   invitationsSent: many(invitations),
+  // QuoteMaster extensions
+  quotations: many(quotations),
+  createdDemands: many(kitchenPeriodDemands),
+  approvedQuoteItems: many(quoteItems),
 }));
 
 export const invitationsRelations = relations(invitations, ({ one }) => ({
@@ -112,6 +232,79 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
   }),
 }));
 
+// QuoteMaster relations
+export const suppliersRelations = relations(suppliers, ({ many }) => ({
+  quotations: many(quotations),
+  priceHistory: many(priceHistory),
+}));
+
+export const productsRelations = relations(products, ({ many }) => ({
+  quoteItems: many(quoteItems),
+  priceHistory: many(priceHistory),
+  demands: many(kitchenPeriodDemands),
+}));
+
+export const quotationsRelations = relations(quotations, ({ one, many }) => ({
+  supplier: one(suppliers, {
+    fields: [quotations.supplierId],
+    references: [suppliers.id],
+  }),
+  team: one(teams, {
+    fields: [quotations.teamId],
+    references: [teams.id],
+  }),
+  createdBy: one(users, {
+    fields: [quotations.createdBy],
+    references: [users.id],
+  }),
+  items: many(quoteItems),
+}));
+
+export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
+  quotation: one(quotations, {
+    fields: [quoteItems.quotationId],
+    references: [quotations.id],
+  }),
+  product: one(products, {
+    fields: [quoteItems.productId],
+    references: [products.id],
+  }),
+  approvedBy: one(users, {
+    fields: [quoteItems.approvedBy],
+    references: [users.id],
+  }),
+}));
+
+export const priceHistoryRelations = relations(priceHistory, ({ one }) => ({
+  product: one(products, {
+    fields: [priceHistory.productId],
+    references: [products.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [priceHistory.supplierId],
+    references: [suppliers.id],
+  }),
+  team: one(teams, {
+    fields: [priceHistory.teamId],
+    references: [teams.id],
+  }),
+}));
+
+export const kitchenPeriodDemandsRelations = relations(kitchenPeriodDemands, ({ one }) => ({
+  team: one(teams, {
+    fields: [kitchenPeriodDemands.teamId],
+    references: [teams.id],
+  }),
+  product: one(products, {
+    fields: [kitchenPeriodDemands.productId],
+    references: [products.id],
+  }),
+  createdBy: one(users, {
+    fields: [kitchenPeriodDemands.createdBy],
+    references: [users.id],
+  }),
+}));
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type Team = typeof teams.$inferSelect;
@@ -128,7 +321,22 @@ export type TeamDataWithMembers = Team & {
   })[];
 };
 
+// Type exports (Template + QuoteMaster)
+export type Supplier = typeof suppliers.$inferSelect;
+export type NewSupplier = typeof suppliers.$inferInsert;
+export type Product = typeof products.$inferSelect;
+export type NewProduct = typeof products.$inferInsert;
+export type Quotation = typeof quotations.$inferSelect;
+export type NewQuotation = typeof quotations.$inferInsert;
+export type QuoteItem = typeof quoteItems.$inferSelect;
+export type NewQuoteItem = typeof quoteItems.$inferInsert;
+export type PriceHistory = typeof priceHistory.$inferSelect;
+export type NewPriceHistory = typeof priceHistory.$inferInsert;
+export type KitchenPeriodDemand = typeof kitchenPeriodDemands.$inferSelect;
+export type NewKitchenPeriodDemand = typeof kitchenPeriodDemands.$inferInsert;
+
 export enum ActivityType {
+  // Template activities preserved
   SIGN_UP = 'SIGN_UP',
   SIGN_IN = 'SIGN_IN',
   SIGN_OUT = 'SIGN_OUT',
@@ -139,4 +347,18 @@ export enum ActivityType {
   REMOVE_TEAM_MEMBER = 'REMOVE_TEAM_MEMBER',
   INVITE_TEAM_MEMBER = 'INVITE_TEAM_MEMBER',
   ACCEPT_INVITATION = 'ACCEPT_INVITATION',
+  // QuoteMaster extensions
+  UPLOAD_QUOTE = 'UPLOAD_QUOTE',
+  APPROVE_QUOTE = 'APPROVE_QUOTE',
+  NEGOTIATE_QUOTE = 'NEGOTIATE_QUOTE',
+  CANCEL_QUOTE = 'CANCEL_QUOTE',
+  CREATE_PRODUCT = 'CREATE_PRODUCT',
+  UPDATE_PRODUCT = 'UPDATE_PRODUCT',
+  DELETE_PRODUCT = 'DELETE_PRODUCT',
+  CREATE_SUPPLIER = 'CREATE_SUPPLIER',
+  UPDATE_SUPPLIER = 'UPDATE_SUPPLIER',
+  DELETE_SUPPLIER = 'DELETE_SUPPLIER',
+  CREATE_KITCHEN = 'CREATE_KITCHEN',
+  UPDATE_KITCHEN = 'UPDATE_KITCHEN',
+  SEED_DATABASE = 'SEED_DATABASE',
 }

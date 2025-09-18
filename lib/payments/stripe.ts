@@ -7,9 +7,12 @@ import {
   updateTeamSubscription
 } from '@/lib/db/queries';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-04-30.basil'
-});
+// Conditionally initialize Stripe only if API key is provided
+export const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-04-30.basil'
+    })
+  : null;
 
 export async function createCheckoutSession({
   team,
@@ -18,6 +21,11 @@ export async function createCheckoutSession({
   team: Team | null;
   priceId: string;
 }) {
+  // Return early if Stripe is not configured
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.');
+  }
+
   const user = await getUser();
 
   if (!team || !user) {
@@ -47,6 +55,11 @@ export async function createCheckoutSession({
 }
 
 export async function createCustomerPortalSession(team: Team) {
+  // Return early if Stripe is not configured
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.');
+  }
+
   if (!team.stripeCustomerId || !team.stripeProductId) {
     redirect('/pricing');
   }
@@ -117,6 +130,12 @@ export async function createCustomerPortalSession(team: Team) {
 export async function handleSubscriptionChange(
   subscription: Stripe.Subscription
 ) {
+  // Return early if Stripe is not configured
+  if (!stripe) {
+    console.warn('Stripe is not configured. Skipping subscription change handling.');
+    return;
+  }
+
   const customerId = subscription.customer as string;
   const subscriptionId = subscription.id;
   const status = subscription.status;
@@ -147,6 +166,12 @@ export async function handleSubscriptionChange(
 }
 
 export async function getStripePrices() {
+  // Return empty array if Stripe is not configured
+  if (!stripe) {
+    console.warn('Stripe is not configured. Returning empty prices array.');
+    return [];
+  }
+
   const prices = await stripe.prices.list({
     expand: ['data.product'],
     active: true,
@@ -165,6 +190,12 @@ export async function getStripePrices() {
 }
 
 export async function getStripeProducts() {
+  // Return empty array if Stripe is not configured
+  if (!stripe) {
+    console.warn('Stripe is not configured. Returning empty products array.');
+    return [];
+  }
+
   const products = await stripe.products.list({
     active: true,
     expand: ['data.default_price']

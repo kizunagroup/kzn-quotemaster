@@ -92,10 +92,11 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
   ]);
 
   const redirectTo = formData.get('redirect') as string | null;
-  if (redirectTo === 'checkout') {
-    const priceId = formData.get('priceId') as string;
-    return createCheckoutSession({ team: foundTeam, priceId });
-  }
+  // Commented out Stripe checkout redirect - Stripe is conditionally disabled
+  // if (redirectTo === 'checkout') {
+  //   const priceId = formData.get('priceId') as string;
+  //   return createCheckoutSession({ team: foundTeam, priceId });
+  // }
 
   redirect('/dashboard');
 });
@@ -213,10 +214,11 @@ export const signUp = validatedAction(signUpSchema, async (data, formData) => {
   ]);
 
   const redirectTo = formData.get('redirect') as string | null;
-  if (redirectTo === 'checkout') {
-    const priceId = formData.get('priceId') as string;
-    return createCheckoutSession({ team: createdTeam, priceId });
-  }
+  // Commented out Stripe checkout redirect - Stripe is conditionally disabled
+  // if (redirectTo === 'checkout') {
+  //   const priceId = formData.get('priceId') as string;
+  //   return createCheckoutSession({ team: createdTeam, priceId });
+  // }
 
   redirect('/dashboard');
 });
