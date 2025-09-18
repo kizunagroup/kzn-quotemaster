@@ -7,8 +7,6 @@ import {
   integer,
   decimal,
   unique,
-  check,
-  sql,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -128,7 +126,6 @@ export const quotations = pgTable('quotations', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   uniqueQuotePerTeamPerPeriod: unique().on(table.period, table.supplierId, table.teamId),
-  periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
 }));
 
 export const quoteItems = pgTable('quote_items', {
@@ -151,13 +148,6 @@ export const quoteItems = pgTable('quote_items', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   uniqueQuoteItem: unique().on(table.quotationId, table.productId),
-  positiveQuantity: check('positive_quantity', sql`${table.quantity} > 0`),
-  nonNegativePrices: check('non_negative_prices', sql`
-    ${table.initialPrice} >= 0 AND
-    (${table.negotiatedPrice} >= 0 OR ${table.negotiatedPrice} IS NULL) AND
-    (${table.approvedPrice} >= 0 OR ${table.approvedPrice} IS NULL)
-  `),
-  validVatPercentage: check('valid_vat', sql`${table.vatPercentage} >= 0 AND ${table.vatPercentage} <= 100`),
 }));
 
 export const priceHistory = pgTable('price_history', {
@@ -170,11 +160,7 @@ export const priceHistory = pgTable('price_history', {
   priceType: varchar('price_type', { length: 20 }).notNull(),
   region: varchar('region', { length: 50 }),
   recordedAt: timestamp('recorded_at').defaultNow().notNull(),
-}, (table) => ({
-  nonNegativePrice: check('non_negative_price', sql`${table.price} >= 0`),
-  periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
-  validPriceType: check('valid_price_type', sql`${table.priceType} IN ('initial', 'negotiated', 'approved')`),
-}));
+});
 
 export const kitchenPeriodDemands = pgTable('kitchen_period_demands', {
   id: serial('id').primaryKey(),
@@ -190,9 +176,6 @@ export const kitchenPeriodDemands = pgTable('kitchen_period_demands', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   uniqueDemand: unique().on(table.teamId, table.productId, table.period),
-  positiveQuantity: check('positive_quantity', sql`${table.quantity} > 0`),
-  periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
-  validStatus: check('valid_status', sql`${table.status} IN ('active', 'inactive')`),
 }));
 
 // Relations
