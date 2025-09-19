@@ -63,11 +63,12 @@ export async function getKitchens() {
         phone: teams.phone,
         email: teams.email,
         teamType: teams.teamType,
+        status: teams.status,
         createdAt: teams.createdAt,
         updatedAt: teams.updatedAt,
       })
       .from(teams)
-      .where(eq(teams.teamType, 'KITCHEN'))
+      .where(and(eq(teams.teamType, 'KITCHEN'), eq(teams.status, 'active')))
       .orderBy(teams.createdAt);
 
     return kitchens;
@@ -128,6 +129,7 @@ export async function createKitchen(
         phone: phone?.trim() || null,
         email: email?.trim() || null,
         teamType: 'KITCHEN',
+        status: 'active',
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -279,22 +281,14 @@ export async function deleteKitchen(
     const existingKitchen = await db
       .select()
       .from(teams)
-      .where(and(eq(teams.id, id), eq(teams.teamType, 'KITCHEN')))
+      .where(and(eq(teams.id, id), eq(teams.teamType, 'KITCHEN'), eq(teams.status, 'active')))
       .limit(1);
 
     if (existingKitchen.length === 0) {
-      return { error: "Bếp không tồn tại hoặc không phải là bếp hợp lệ." };
+      return { error: "Bếp không tồn tại hoặc đã bị ngưng hoạt động." };
     }
 
-    // Soft delete by updating team type to indicate inactive
-    // We'll add a status column check - for now, we can't actually delete because of foreign key constraints
-    // This is a placeholder that maintains data integrity
-
-    // TODO: Implement proper soft delete when status column is confirmed in schema
-    // For now, we'll just return an error suggesting the kitchen should be archived instead
-    return { error: "Không thể xóa bếp do ràng buộc dữ liệu. Vui lòng liên hệ quản trị viên để lưu trữ bếp." };
-
-    /* Future implementation when status column is available:
+    // Soft delete by setting status to 'inactive'
     await db
       .update(teams)
       .set({
@@ -312,13 +306,12 @@ export async function deleteKitchen(
     });
 
     revalidatePath('/danh-muc/bep');
-    return { success: "Xóa bếp thành công." };
-    */
+    return { success: "Bếp đã được ngưng hoạt động thành công." };
   } catch (error) {
     console.error('Error deleting kitchen:', error);
     if (error instanceof Error) {
       return { error: error.message };
     }
-    return { error: "Không thể xóa bếp. Vui lòng thử lại." };
+    return { error: "Không thể ngưng hoạt động bếp. Vui lòng thử lại." };
   }
 }

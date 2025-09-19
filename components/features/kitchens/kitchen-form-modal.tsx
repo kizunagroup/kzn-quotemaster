@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import {
   createKitchenSchema,
   updateKitchenSchema,
@@ -59,7 +59,6 @@ export function KitchenFormModal({
   initialData,
   onSuccess,
 }: KitchenFormModalProps) {
-  const { toast } = useToast();
   const isEdit = !!initialData;
 
   // Determine which schema to use based on mode
@@ -138,7 +137,8 @@ export function KitchenFormModal({
         toast.success(result.success);
         // Reset form and close modal on success
         form.reset();
-        onSuccess?.(); // This will close the modal and refresh the data table
+        onClose(); // Close the dialog on success
+        onSuccess?.(); // Call additional success callback if provided
       } else {
         // Handle unexpected response structure
         toast.error("Phản hồi không hợp lệ từ server.");

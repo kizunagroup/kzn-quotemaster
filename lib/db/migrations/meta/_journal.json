@@ -22,6 +22,13 @@
       "when": 1758222008028,
       "tag": "0002_friendly_timeslip",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1758310148300,
+      "tag": "0003_groovy_shiver_man",
+      "breakpoints": true
     }
   ]
 }

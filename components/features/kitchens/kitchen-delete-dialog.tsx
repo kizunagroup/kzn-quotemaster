@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { deleteKitchen } from '@/lib/actions/kitchen.actions';
 
 // Type for kitchen data (matches the getKitchens return type)
@@ -25,6 +25,7 @@ interface KitchenData {
   phone: string | null;
   email: string | null;
   teamType: string | null;
+  status: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -42,7 +43,6 @@ export function KitchenDeleteDialog({
   kitchen,
   onSuccess,
 }: KitchenDeleteDialogProps) {
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleConfirm = async () => {
@@ -59,32 +59,17 @@ export function KitchenDeleteDialog({
       const result = await deleteKitchen({}, formData);
 
       if (result.error) {
-        toast({
-          variant: "destructive",
-          title: "Lỗi ngưng hoạt động bếp",
-          description: result.error,
-        });
+        toast.error(result.error);
       } else if (result.success) {
-        toast({
-          variant: "default",
-          title: "Thành công",
-          description: result.success,
-        });
-        onSuccess?.();
+        toast.success(result.success);
+        onClose(); // Close the dialog on success
+        onSuccess?.(); // Call additional success callback if provided
       } else {
-        toast({
-          variant: "destructive",
-          title: "Lỗi không xác định",
-          description: 'Phản hồi không hợp lệ từ server.',
-        });
+        toast.error('Phản hồi không hợp lệ từ server.');
       }
     } catch (error) {
       console.error('🔄 [API] Delete operation failed', error);
-      toast({
-        variant: "destructive",
-        title: "Lỗi hệ thống",
-        description: 'Có lỗi xảy ra khi ngưng hoạt động bếp. Vui lòng thử lại.',
-      });
+      toast.error('Có lỗi xảy ra khi ngưng hoạt động bếp. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }

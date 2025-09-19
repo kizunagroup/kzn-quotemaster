@@ -42,6 +42,7 @@ export const teams = pgTable('teams', {
   phone: varchar('phone', { length: 20 }),
   email: varchar('email', { length: 255 }),
   teamType: varchar('team_type', { length: 20 }).default('OFFICE').notNull(),
+  status: varchar('status', { length: 20 }).default('active').notNull(),
 });
 
 export const teamMembers = pgTable('team_members', {
