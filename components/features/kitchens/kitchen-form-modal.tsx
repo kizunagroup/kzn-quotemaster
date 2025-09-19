@@ -166,6 +166,7 @@ export function KitchenFormModal({
   return (
     <Dialog
       open={open}
+      modal={false}
     >
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>

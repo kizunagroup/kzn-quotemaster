@@ -75,39 +75,16 @@ export default function KitchenManagementPage() {
       timestamp: new Date().toISOString()
     });
 
-    // UI Freeze Detection: Check if UI becomes unresponsive
-    const uiTestStart = performance.now();
-    console.log('🔍 [UI-TEST] Pre-State-Change UI Test Starting');
-
-    React.startTransition(() => {
-      setActiveModal('none');
-      setModalData(null);
-
-      // Immediate post-state UI test
-      setTimeout(() => {
-        const uiTestEnd = performance.now();
-        console.log('🔍 [UI-TEST] Post-State-Change UI Test', {
-          timeTaken: `${uiTestEnd - uiTestStart}ms`,
-          status: 'responsive'
-        });
-      }, 0);
-    });
-
-    console.log('✅ [CHECKPOINT] Modal State Reset Complete');
-
-    // Delayed UI responsiveness check
-    setTimeout(() => {
-      console.log('🔍 [UI-TEST] Delayed UI Responsiveness Check (100ms)', {
-        timestamp: new Date().toISOString(),
-        status: 'if-you-see-this-ui-is-still-responsive'
-      });
-    }, 100);
-  }, [activeModal]);
+    // CRITICAL FIX: Immediate state reset without any React wrappers
+    setActiveModal('none');
+    setModalData(null);
+    console.log('✅ [CHECKPOINT] Modal State Reset Complete - DIRECT');
+  }, []);
 
   const handleSuccess = useCallback(() => {
     closeModal();
     refreshKitchens();
-  }, [closeModal, refreshKitchens]);
+  }, []);
 
   const handleEdit = useCallback((kitchen: Kitchen) => {
     console.log('🚨 [CHECKPOINT] Edit Flow Started', {
@@ -117,11 +94,11 @@ export default function KitchenManagementPage() {
       timestamp: new Date().toISOString()
     });
     openForm('edit', kitchen);
-  }, [openForm]);
+  }, []);
 
   const handleAddClick = useCallback(() => {
     openForm('create');
-  }, [openForm]);
+  }, []);
 
   const handlePageReload = useCallback(() => {
     window.location.reload();
@@ -136,14 +113,14 @@ export default function KitchenManagementPage() {
     alert('UI Test: The UI is responsive!');
   }, [activeModal]);
 
-  // Stable modal controller object
+  // Stable modal controller object - completely static references
   const modalController = useMemo(() => ({
     openForm,
     openDelete,
     closeModal,
     handleSuccess,
     handleEdit
-  }), [openForm, openDelete, closeModal, handleSuccess, handleEdit]);
+  }), []);
 
   // UI Freeze Detection Hook
   useEffect(() => {
