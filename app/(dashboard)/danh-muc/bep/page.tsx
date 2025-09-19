@@ -1,39 +1,107 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Upload, Download } from 'lucide-react';
 import { getKitchens } from '@/lib/actions/kitchen.actions';
 import { KitchenDataTable, type KitchenDataTableRef } from '@/components/features/kitchens/kitchen-data-table';
+import { KitchenFormModal } from '@/components/features/kitchens/kitchen-form-modal';
+import { KitchenDeleteDialog } from '@/components/features/kitchens/kitchen-delete-dialog';
+
+// Type definition for kitchen data
+interface Kitchen {
+  id: number;
+  kitchenCode: string | null;
+  name: string;
+  region: string | null;
+  address: string | null;
+  managerName: string | null;
+  phone: string | null;
+  email: string | null;
+  teamType: string | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
 
 export default function KitchenManagementPage() {
-  const [kitchens, setKitchens] = useState<any[]>([]);
+  // Data state
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dataTableRef = useRef<KitchenDataTableRef>(null);
 
-  // Fetch initial kitchen data
-  useEffect(() => {
-    const fetchKitchens = async () => {
-      try {
-        setLoading(true);
-        const data = await getKitchens();
-        setKitchens(data);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Không thể tải danh sách bếp');
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Modal state management - Centralized State Controller
+  const [activeModal, setActiveModal] = useState<'none' | 'form' | 'delete'>('none');
+  const [modalData, setModalData] = useState<Kitchen | null>(null);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
 
-    fetchKitchens();
+  // Data fetching functions - Stabilized with useCallback
+  const fetchKitchens = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await getKitchens();
+      setKitchens(data);
+      setError(null);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Không thể tải danh sách bếp';
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handleAddClick = () => {
-    dataTableRef.current?.openAddModal();
-  };
+  const refreshKitchens = useCallback(() => {
+    fetchKitchens();
+  }, [fetchKitchens]);
+
+  // Modal controller functions - Enhanced Toggle Pattern
+  const openForm = useCallback((mode: 'create' | 'edit', kitchen?: Kitchen) => {
+    setModalMode(mode);
+    setModalData(kitchen || null);
+    setActiveModal('form');
+  }, []);
+
+  const openDelete = useCallback((kitchen: Kitchen) => {
+    setModalData(kitchen);
+    setActiveModal('delete');
+  }, []);
+
+  const closeModal = useCallback(() => {
+    setActiveModal('none');
+    setModalData(null);
+  }, []);
+
+  const handleSuccess = useCallback(() => {
+    closeModal();
+    refreshKitchens();
+  }, [closeModal, refreshKitchens]);
+
+  const handleEdit = useCallback((kitchen: Kitchen) => {
+    openForm('edit', kitchen);
+  }, [openForm]);
+
+  const handleAddClick = useCallback(() => {
+    openForm('create');
+  }, [openForm]);
+
+  const handlePageReload = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  // Stable modal controller object - Production-Ready Template
+  const modalController = useMemo(() => ({
+    openForm,
+    openDelete,
+    closeModal,
+    handleSuccess,
+    handleEdit
+  }), [openForm, openDelete, closeModal, handleSuccess, handleEdit]);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchKitchens();
+  }, [fetchKitchens]);
 
   if (loading) {
     return (
@@ -75,7 +143,7 @@ export default function KitchenManagementPage() {
               </p>
               <Button
                 variant="outline"
-                onClick={() => window.location.reload()}
+                onClick={handlePageReload}
                 className="mt-4"
               >
                 Thử lại
@@ -124,10 +192,30 @@ export default function KitchenManagementPage() {
           <CardTitle>Danh sách Bếp</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Kitchen Data Table */}
-          <KitchenDataTable ref={dataTableRef} data={kitchens} />
+          <KitchenDataTable
+            ref={dataTableRef}
+            data={kitchens}
+            onEdit={modalController.handleEdit}
+            onDelete={modalController.openDelete}
+          />
         </CardContent>
       </Card>
+
+      {/* Kitchen Form Modal - Enhanced Toggle Pattern */}
+      <KitchenFormModal
+        open={activeModal === 'form'}
+        onClose={modalController.closeModal}
+        initialData={modalMode === 'edit' ? modalData : null}
+        onSuccess={modalController.handleSuccess}
+      />
+
+      {/* Kitchen Delete Dialog - Enhanced Toggle Pattern */}
+      <KitchenDeleteDialog
+        isOpen={activeModal === 'delete'}
+        onClose={modalController.closeModal}
+        kitchen={modalData}
+        onSuccess={modalController.handleSuccess}
+      />
     </section>
   );
 }

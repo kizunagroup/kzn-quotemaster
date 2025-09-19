@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -41,14 +42,14 @@ interface KitchenData {
 
 interface KitchenFormModalProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   initialData?: KitchenData | null;
   onSuccess?: () => void;
 }
 
 export function KitchenFormModal({
   open,
-  onOpenChange,
+  onClose,
   initialData,
   onSuccess,
 }: KitchenFormModalProps) {
@@ -120,33 +121,45 @@ export function KitchenFormModal({
       }
 
       if (result.error) {
-        toast.error(result.error);
+        toast({
+          variant: "destructive",
+          title: "Lỗi",
+          description: result.error,
+        });
       } else if (result.success) {
-        toast.success(result.success);
+        toast({
+          variant: "default",
+          title: "Thành công",
+          description: result.success,
+        });
         form.reset();
-        onOpenChange(false);
         onSuccess?.();
       }
     } catch (error) {
-      console.error('Error submitting kitchen form:', error);
-      toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
+      console.error('🔄 [API] Kitchen operation failed', error);
+      toast({
+        variant: "destructive",
+        title: "Lỗi hệ thống",
+        description: 'Có lỗi xảy ra. Vui lòng thử lại.',
+      });
     }
   };
 
-  const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) {
-      form.reset();
-    }
-    onOpenChange(newOpen);
+  const handleCancel = () => {
+    form.reset();
+    onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} modal={false}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? 'Chỉnh sửa Bếp' : 'Thêm Bếp Mới'}
           </DialogTitle>
+          <DialogDescription>
+            Điền thông tin chi tiết cho bếp. Các trường có dấu * là bắt buộc.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -285,7 +298,7 @@ export function KitchenFormModal({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleOpenChange(false)}
+                onClick={handleCancel}
                 disabled={form.formState.isSubmitting}
               >
                 Hủy
