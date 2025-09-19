@@ -1,12 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
 import { teams, teamMembers, activityLogs, ActivityType } from "@/lib/db/schema";
 import { getUser, getUserWithTeam } from "@/lib/db/queries";
 import type { ActionState } from "@/lib/auth/middleware";
 import { createKitchenSchema, updateKitchenSchema } from "@/types/quotemaster";
+
+// Helper function to normalize kitchen code for uniqueness validation
+function normalizeKitchenCode(code: string): string {
+  return code.trim().toUpperCase();
+}
 
 // Helper function to check admin permissions
 async function checkAdminPermissions(): Promise<{ user: any; isAdmin: boolean; teamData?: any }> {
@@ -92,28 +97,36 @@ export async function createKitchen(
 
     const { kitchenCode, name, region, address, managerName, phone, email } = validatedFields.data;
 
-    // Check if kitchen code already exists
+    // Normalize kitchen code for case-insensitive uniqueness check
+    const normalizedKitchenCode = normalizeKitchenCode(kitchenCode);
+
+    // Validate normalized code is not empty after trimming
+    if (!normalizedKitchenCode) {
+      return { error: "Mã bếp không được để trống." };
+    }
+
+    // Check if kitchen code already exists (case-insensitive)
     const existingKitchen = await db
       .select()
       .from(teams)
-      .where(eq(teams.kitchenCode, kitchenCode))
+      .where(sql`UPPER(TRIM(${teams.kitchenCode})) = ${normalizedKitchenCode}`)
       .limit(1);
 
     if (existingKitchen.length > 0) {
       return { error: "Mã bếp đã tồn tại. Vui lòng chọn mã khác." };
     }
 
-    // Create new kitchen team
+    // Create new kitchen team with normalized kitchen code
     const [newKitchen] = await db
       .insert(teams)
       .values({
-        name,
-        kitchenCode,
-        region,
-        address,
-        managerName,
-        phone,
-        email,
+        name: name.trim(),
+        kitchenCode: normalizedKitchenCode,
+        region: region?.trim() || null,
+        address: address?.trim() || null,
+        managerName: managerName?.trim() || null,
+        phone: phone?.trim() || null,
+        email: email?.trim() || null,
         teamType: 'KITCHEN',
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -161,6 +174,14 @@ export async function updateKitchen(
 
     const { id, kitchenCode, name, region, address, managerName, phone, email } = validatedFields.data;
 
+    // Normalize kitchen code for case-insensitive uniqueness check
+    const normalizedKitchenCode = normalizeKitchenCode(kitchenCode);
+
+    // Validate normalized code is not empty after trimming
+    if (!normalizedKitchenCode) {
+      return { error: "Mã bếp không được để trống." };
+    }
+
     // Check if kitchen exists and is a kitchen team
     const existingKitchen = await db
       .select()
@@ -172,30 +193,38 @@ export async function updateKitchen(
       return { error: "Bếp không tồn tại hoặc không phải là bếp hợp lệ." };
     }
 
-    // Check if kitchen code is taken by another kitchen (only if it's being changed)
-    if (existingKitchen[0].kitchenCode !== kitchenCode) {
+    // Check if kitchen code is taken by another kitchen (case-insensitive, excluding current kitchen)
+    const currentNormalizedCode = normalizeKitchenCode(existingKitchen[0].kitchenCode || '');
+
+    // Only check for duplicates if the normalized code has actually changed
+    if (currentNormalizedCode !== normalizedKitchenCode) {
       const kitchenCodeExists = await db
         .select()
         .from(teams)
-        .where(and(eq(teams.kitchenCode, kitchenCode), ne(teams.id, id)))
+        .where(
+          and(
+            sql`UPPER(TRIM(${teams.kitchenCode})) = ${normalizedKitchenCode}`,
+            ne(teams.id, id)
+          )
+        )
         .limit(1);
 
       if (kitchenCodeExists.length > 0) {
-        return { error: "Mã bếp đã được sử dụng bởi bếp khác." };
+        return { error: "Mã bếp đã tồn tại. Vui lòng chọn mã khác." };
       }
     }
 
-    // Update kitchen
+    // Update kitchen with normalized and trimmed values
     await db
       .update(teams)
       .set({
-        name,
-        kitchenCode,
-        region,
-        address,
-        managerName,
-        phone,
-        email,
+        name: name.trim(),
+        kitchenCode: normalizedKitchenCode,
+        region: region?.trim() || null,
+        address: address?.trim() || null,
+        managerName: managerName?.trim() || null,
+        phone: phone?.trim() || null,
+        email: email?.trim() || null,
         updatedAt: new Date(),
       })
       .where(eq(teams.id, id));
