@@ -19,7 +19,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Search, ChevronLeft, ChevronRight, Edit, PowerOff } from 'lucide-react';
-import { KitchenFormModal } from './kitchen-form-modal';
 
 // Type definition for kitchen data based on the getKitchens return type
 interface Kitchen {
@@ -38,6 +37,8 @@ interface Kitchen {
 
 interface KitchenDataTableProps {
   data: Kitchen[];
+  onEdit: (kitchen: Kitchen) => void;
+  onDelete: (kitchen: Kitchen) => void;
 }
 
 export interface KitchenDataTableRef {
@@ -46,13 +47,11 @@ export interface KitchenDataTableRef {
 
 const ITEMS_PER_PAGE = 10;
 
-export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDataTableProps>(({ data }, ref) => {
+export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDataTableProps>(({ data, onEdit, onDelete }, ref) => {
+  console.log('📱 [COMPONENT] KitchenDataTable rendered', { dataCount: data.length, hasOnEdit: !!onEdit, hasOnDelete: !!onDelete });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Modal state management
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingKitchen, setEditingKitchen] = useState<Kitchen | null>(null);
 
   // Filter data based on search term (kitchen name)
   const filteredData = useMemo(() => {
@@ -73,34 +72,19 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const handleEdit = (kitchenId: number) => {
-    const kitchen = data.find(k => k.id === kitchenId);
-    if (kitchen) {
-      setEditingKitchen(kitchen);
-      setIsFormModalOpen(true);
-    }
+  const handleEdit = (kitchen: Kitchen) => {
+    console.log('📱 [COMPONENT] User action', { action: 'edit_click', kitchenId: kitchen.id });
+    onEdit(kitchen);
   };
 
-  const handleDeactivate = (kitchenId: number) => {
-    console.log('Deactivate kitchen with ID:', kitchenId);
-    // TODO: Connect to deactivation modal
+  const handleDeactivate = (kitchen: Kitchen) => {
+    console.log('📱 [COMPONENT] User action', { action: 'delete_click', kitchenId: kitchen.id });
+    onDelete(kitchen);
   };
 
   const handleAddNew = () => {
-    setEditingKitchen(null);
-    setIsFormModalOpen(true);
-  };
-
-  const handleFormSuccess = () => {
-    // Refresh data or trigger parent refresh
-    window.location.reload(); // Simple refresh for now
-  };
-
-  const handleFormModalClose = (open: boolean) => {
-    setIsFormModalOpen(open);
-    if (!open) {
-      setEditingKitchen(null);
-    }
+    console.log('📱 [COMPONENT] User action', { action: 'add_click' });
+    // This functionality is now handled by parent via imperative handle
   };
 
   const goToPage = (page: number) => {
@@ -199,14 +183,14 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() => handleEdit(kitchen.id)}
+                          onClick={() => handleEdit(kitchen)}
                           className="cursor-pointer"
                         >
                           <Edit className="mr-2 h-4 w-4" />
                           Sửa
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => handleDeactivate(kitchen.id)}
+                          onClick={() => handleDeactivate(kitchen)}
                           className="cursor-pointer text-red-600"
                         >
                           <PowerOff className="mr-2 h-4 w-4" />
@@ -279,14 +263,6 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
           </div>
         </div>
       )}
-
-      {/* Kitchen Form Modal */}
-      <KitchenFormModal
-        open={isFormModalOpen}
-        onOpenChange={handleFormModalClose}
-        initialData={editingKitchen}
-        onSuccess={handleFormSuccess}
-      />
     </div>
   );
 });

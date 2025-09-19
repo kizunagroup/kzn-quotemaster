@@ -43,111 +43,77 @@ export function KitchenDeleteDialog({
   kitchen,
   onSuccess,
 }: KitchenDeleteDialogProps) {
-  console.log('🗑️ [DELETE DIALOG] Component rendered');
-  console.log('🗑️ [DELETE DIALOG] Props:', { isOpen, kitchen: kitchen?.id, onClose: !!onClose, onSuccess: !!onSuccess });
+  console.log('📱 [COMPONENT] KitchenDeleteDialog rendered', { isOpen, kitchenId: kitchen?.id, hasOnClose: !!onClose, hasOnSuccess: !!onSuccess });
 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleConfirm = async () => {
-    console.log('🗑️ [DELETE DIALOG] handleConfirm called');
-    console.log('🗑️ [DELETE DIALOG] Kitchen to delete:', kitchen);
+    console.log('📱 [COMPONENT] User action', { action: 'confirm_delete', kitchenId: kitchen?.id });
 
     if (!kitchen) {
-      console.warn('🗑️ [DELETE DIALOG] No kitchen provided, aborting');
+      console.warn('📱 [COMPONENT] No kitchen provided, aborting delete');
       return;
     }
 
-    console.log('🗑️ [DELETE DIALOG] Setting loading state to true');
     setIsLoading(true);
 
     try {
-      console.log('🗑️ [DELETE DIALOG] Creating FormData...');
       const formData = new FormData();
       formData.append('id', kitchen.id.toString());
 
-      console.log('🗑️ [DELETE DIALOG] FormData entries:');
-      for (const [key, value] of formData.entries()) {
-        console.log(`🗑️ [DELETE DIALOG] FormData: ${key} = ${value}`);
-      }
+      console.log('📱 [COMPONENT] Calling deleteKitchen server action', { kitchenId: kitchen.id });
 
-      console.log('🗑️ [DELETE DIALOG] Calling deleteKitchen server action...');
-      console.log('🗑️ [DELETE DIALOG] Kitchen ID being passed:', kitchen.id);
-
-      let result;
-      try {
-        result = await deleteKitchen({}, formData);
-        console.log('🗑️ [DELETE DIALOG] deleteKitchen result:', result);
-      } catch (deleteError) {
-        console.error('❌ [DELETE DIALOG] Error calling deleteKitchen:', deleteError);
-        console.error('❌ [DELETE DIALOG] Delete error stack:', deleteError instanceof Error ? deleteError.stack : 'No stack trace');
-        throw deleteError;
-      }
-
-      console.log('🗑️ [DELETE DIALOG] Processing server action result...');
+      const result = await deleteKitchen({}, formData);
+      console.log('📱 [COMPONENT] Delete server action result', { success: result.success, error: result.error });
 
       if (result.error) {
-        console.log('❌ [DELETE DIALOG] Server returned error:', result.error);
-        // Show destructive error toast and keep dialog open
+        console.log('📱 [COMPONENT] Delete operation failed', { error: result.error });
         toast({
           variant: "destructive",
           title: "Lỗi ngưng hoạt động bếp",
           description: result.error,
         });
-        // DO NOT close dialog on error - user needs to see the error and can try again later
-        console.log('🗑️ [DELETE DIALOG] Keeping dialog open due to error');
+        // Keep dialog open on error - user can try again
       } else if (result.success) {
-        console.log('✅ [DELETE DIALOG] Server returned success:', result.success);
+        console.log('📱 [COMPONENT] Delete operation succeeded', { success: result.success });
         toast({
           variant: "default",
           title: "Thành công",
           description: result.success,
         });
-        console.log('🗑️ [DELETE DIALOG] Closing dialog and calling onSuccess...');
-        onClose();
-        onSuccess?.();
+        onSuccess?.(); // Call parent success handler instead of managing dialog state
       } else {
-        console.warn('⚠️ [DELETE DIALOG] Unexpected result format:', result);
+        console.warn('📱 [COMPONENT] Unexpected server response format', { result });
         toast({
           variant: "destructive",
           title: "Lỗi không xác định",
           description: 'Phản hồi không hợp lệ từ server.',
         });
-        // Keep dialog open for unexpected results too
-        console.log('🗑️ [DELETE DIALOG] Keeping dialog open due to unexpected result');
       }
     } catch (error) {
-      console.error('❌ [DELETE DIALOG] Error in handleConfirm:', error);
-      console.error('❌ [DELETE DIALOG] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('📱 [COMPONENT] Error in delete operation:', error);
       toast({
         variant: "destructive",
         title: "Lỗi hệ thống",
         description: 'Có lỗi xảy ra khi ngưng hoạt động bếp. Vui lòng thử lại.',
       });
-      // Keep dialog open on client-side errors too
-      console.log('🗑️ [DELETE DIALOG] Keeping dialog open due to client error');
+      // Keep dialog open on client-side errors
     } finally {
-      console.log('🗑️ [DELETE DIALOG] Setting loading state to false');
       setIsLoading(false);
     }
   };
 
   const handleCancel = () => {
-    console.log('🗑️ [DELETE DIALOG] handleCancel called');
-    console.log('🗑️ [DELETE DIALOG] isLoading:', isLoading);
-
+    console.log('📱 [COMPONENT] User action', { action: 'cancel_delete' });
     if (!isLoading) {
-      console.log('🗑️ [DELETE DIALOG] Closing dialog (not loading)');
       onClose();
-    } else {
-      console.log('🗑️ [DELETE DIALOG] Cannot close dialog while loading');
     }
   };
 
   const handleOpenChange = (open: boolean) => {
-    console.log('🗑️ [DELETE DIALOG] handleOpenChange called with:', open);
+    console.log('📱 [COMPONENT] Dialog open change', { open, isLoading });
     if (!open && !isLoading) {
-      console.log('🗑️ [DELETE DIALOG] Dialog closing via handleOpenChange');
       onClose();
     }
   };
