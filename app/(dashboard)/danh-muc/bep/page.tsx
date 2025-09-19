@@ -31,12 +31,12 @@ export default function KitchenManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const dataTableRef = useRef<KitchenDataTableRef>(null);
 
-  // Modal state management - Centralized State Controller
+  // Modal state management - Centralized Controller Pattern
   const [activeModal, setActiveModal] = useState<'none' | 'form' | 'delete'>('none');
   const [modalData, setModalData] = useState<Kitchen | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
 
-  // Data fetching functions - Stabilized with useCallback
+  // Stabilized data functions
   const fetchKitchens = useCallback(async () => {
     try {
       setLoading(true);
@@ -55,7 +55,7 @@ export default function KitchenManagementPage() {
     fetchKitchens();
   }, [fetchKitchens]);
 
-  // Modal controller functions - Enhanced Toggle Pattern
+  // Modal controller functions - Production-Ready Modal Architecture
   const openForm = useCallback((mode: 'create' | 'edit', kitchen?: Kitchen) => {
     setModalMode(mode);
     setModalData(kitchen || null);
@@ -81,7 +81,7 @@ export default function KitchenManagementPage() {
     openForm('edit', kitchen);
   }, [openForm]);
 
-  const handleAddClick = useCallback(() => {
+  const handleAdd = useCallback(() => {
     openForm('create');
   }, [openForm]);
 
@@ -95,10 +95,11 @@ export default function KitchenManagementPage() {
     openDelete,
     closeModal,
     handleSuccess,
-    handleEdit
-  }), [openForm, openDelete, closeModal, handleSuccess, handleEdit]);
+    handleEdit,
+    handleAdd
+  }), [openForm, openDelete, closeModal, handleSuccess, handleEdit, handleAdd]);
 
-  // Initial data fetch
+  // Initialize data
   useEffect(() => {
     fetchKitchens();
   }, [fetchKitchens]);
@@ -168,7 +169,7 @@ export default function KitchenManagementPage() {
           <Button
             variant="default"
             className="bg-orange-500 hover:bg-orange-600 text-white"
-            onClick={handleAddClick}
+            onClick={modalController.handleAdd}
           >
             <Plus className="w-4 h-4 mr-2" />
             Thêm
@@ -201,7 +202,7 @@ export default function KitchenManagementPage() {
         </CardContent>
       </Card>
 
-      {/* Kitchen Form Modal - Enhanced Toggle Pattern */}
+      {/* Modals - Production-Ready Modal Architecture */}
       <KitchenFormModal
         open={activeModal === 'form'}
         onClose={modalController.closeModal}
@@ -209,7 +210,6 @@ export default function KitchenManagementPage() {
         onSuccess={modalController.handleSuccess}
       />
 
-      {/* Kitchen Delete Dialog - Enhanced Toggle Pattern */}
       <KitchenDeleteDialog
         isOpen={activeModal === 'delete'}
         onClose={modalController.closeModal}

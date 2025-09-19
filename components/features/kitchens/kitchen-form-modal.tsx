@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2 } from 'lucide-react';
+import React, { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -18,12 +19,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/use-toast';
-import { createKitchenSchema, updateKitchenSchema, type CreateKitchenInput, type UpdateKitchenInput } from '@/types/quotemaster';
-import { createKitchen, updateKitchen } from '@/lib/actions/kitchen.actions';
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  createKitchenSchema,
+  updateKitchenSchema,
+  type CreateKitchenInput,
+  type UpdateKitchenInput,
+} from "@/types/quotemaster";
+import { createKitchen, updateKitchen } from "@/lib/actions/kitchen.actions";
 
 // Type for kitchen data (matches the getKitchens return type)
 interface KitchenData {
@@ -58,18 +64,20 @@ export function KitchenFormModal({
 
   // Determine which schema to use based on mode
   const schema = isEdit ? updateKitchenSchema : createKitchenSchema;
-  type FormData = typeof isEdit extends true ? UpdateKitchenInput : CreateKitchenInput;
+  type FormData = typeof isEdit extends true
+    ? UpdateKitchenInput
+    : CreateKitchenInput;
 
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      kitchenCode: '',
-      name: '',
-      region: '',
-      address: '',
-      managerName: '',
-      phone: '',
-      email: '',
+      kitchenCode: "",
+      name: "",
+      region: "",
+      address: "",
+      managerName: "",
+      phone: "",
+      email: "",
       ...(isEdit && { id: initialData?.id }),
     } as FormData,
   });
@@ -80,24 +88,24 @@ export function KitchenFormModal({
       // Edit mode - populate form with existing data
       form.reset({
         id: initialData.id,
-        kitchenCode: initialData.kitchenCode || '',
-        name: initialData.name || '',
-        region: initialData.region || '',
-        address: initialData.address || '',
-        managerName: initialData.managerName || '',
-        phone: initialData.phone || '',
-        email: initialData.email || '',
+        kitchenCode: initialData.kitchenCode || "",
+        name: initialData.name || "",
+        region: initialData.region || "",
+        address: initialData.address || "",
+        managerName: initialData.managerName || "",
+        phone: initialData.phone || "",
+        email: initialData.email || "",
       } as FormData);
     } else if (open && !initialData) {
       // Create mode - reset to empty form
       form.reset({
-        kitchenCode: '',
-        name: '',
-        region: '',
-        address: '',
-        managerName: '',
-        phone: '',
-        email: '',
+        kitchenCode: "",
+        name: "",
+        region: "",
+        address: "",
+        managerName: "",
+        phone: "",
+        email: "",
       } as FormData);
     }
   }, [open, initialData, form]);
@@ -136,11 +144,11 @@ export function KitchenFormModal({
         onSuccess?.();
       }
     } catch (error) {
-      console.error('🔄 [API] Kitchen operation failed', error);
+      console.error("🔄 [API] Kitchen operation failed", error);
       toast({
         variant: "destructive",
         title: "Lỗi hệ thống",
-        description: 'Có lỗi xảy ra. Vui lòng thử lại.',
+        description: "Có lỗi xảy ra. Vui lòng thử lại.",
       });
     }
   };
@@ -154,9 +162,7 @@ export function KitchenFormModal({
     <Dialog open={open} modal={false}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>
-            {isEdit ? 'Chỉnh sửa Bếp' : 'Thêm Bếp Mới'}
-          </DialogTitle>
+          <DialogTitle>{isEdit ? "Chỉnh sửa Bếp" : "Thêm Bếp Mới"}</DialogTitle>
           <DialogDescription>
             Điền thông tin chi tiết cho bếp. Các trường có dấu * là bắt buộc.
           </DialogDescription>
@@ -173,10 +179,7 @@ export function KitchenFormModal({
                   <FormItem>
                     <FormLabel>Mã bếp *</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Ví dụ: BEP001"
-                        {...field}
-                      />
+                      <Input placeholder="Ví dụ: BEP001" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -191,10 +194,7 @@ export function KitchenFormModal({
                   <FormItem>
                     <FormLabel>Tên bếp *</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Nhập tên bếp"
-                        {...field}
-                      />
+                      <Input placeholder="Nhập tên bếp" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -209,10 +209,7 @@ export function KitchenFormModal({
                   <FormItem>
                     <FormLabel>Khu vực *</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Nhập khu vực"
-                        {...field}
-                      />
+                      <Input placeholder="Nhập khu vực" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -227,10 +224,7 @@ export function KitchenFormModal({
                   <FormItem>
                     <FormLabel>Quản lý *</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Tên người quản lý"
-                        {...field}
-                      />
+                      <Input placeholder="Tên người quản lý" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -245,10 +239,7 @@ export function KitchenFormModal({
                   <FormItem>
                     <FormLabel>Số điện thoại *</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="0123456789"
-                        {...field}
-                      />
+                      <Input placeholder="0123456789" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -283,18 +274,15 @@ export function KitchenFormModal({
                 <FormItem>
                   <FormLabel>Địa chỉ *</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Nhập địa chỉ đầy đủ"
-                      {...field}
-                    />
+                    <Input placeholder="Nhập địa chỉ đầy đủ" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Form Actions */}
-            <div className="flex justify-end space-x-2 pt-4">
+            {/* Form Actions - Now using DialogFooter */}
+            <DialogFooter className="pt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -311,15 +299,13 @@ export function KitchenFormModal({
                 {form.formState.isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isEdit ? 'Đang cập nhật...' : 'Đang tạo...'}
+                    {isEdit ? "Đang cập nhật..." : "Đang tạo..."}
                   </>
                 ) : (
-                  <>
-                    {isEdit ? 'Cập nhật' : 'Tạo mới'}
-                  </>
+                  <>{isEdit ? "Cập nhật" : "Tạo mới"}</>
                 )}
               </Button>
-            </div>
+            </DialogFooter>
           </form>
         </Form>
       </DialogContent>

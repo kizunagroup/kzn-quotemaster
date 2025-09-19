@@ -80,7 +80,7 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
   };
 
   const handleAddNew = () => {
-    // This functionality is now handled by parent via imperative handle
+    // This functionality is fully handled by parent via centralized controller
   };
 
   const goToPage = (page: number) => {
