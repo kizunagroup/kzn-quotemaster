@@ -52,6 +52,8 @@ export function KitchenFormModal({
   initialData,
   onSuccess,
 }: KitchenFormModalProps) {
+  console.log('📱 [COMPONENT] KitchenFormModal rendered', { open, hasInitialData: !!initialData });
+
   const { toast } = useToast();
   const isEdit = !!initialData;
 
@@ -75,8 +77,11 @@ export function KitchenFormModal({
 
   // Reset form when modal opens/closes or initialData changes
   useEffect(() => {
+    console.log('📱 [COMPONENT] Props updated', { open, initialDataId: initialData?.id });
+
     if (open && initialData) {
       // Edit mode - populate form with existing data
+      console.log('📱 [COMPONENT] Setting form to edit mode', { kitchenId: initialData.id });
       form.reset({
         id: initialData.id,
         kitchenCode: initialData.kitchenCode || '',
@@ -89,6 +94,7 @@ export function KitchenFormModal({
       } as FormData);
     } else if (open && !initialData) {
       // Create mode - reset to empty form
+      console.log('📱 [COMPONENT] Setting form to create mode');
       form.reset({
         kitchenCode: '',
         name: '',
@@ -102,6 +108,8 @@ export function KitchenFormModal({
   }, [open, initialData, form]);
 
   const onSubmit = async (values: FormData) => {
+    console.log('📱 [COMPONENT] User action', { action: 'form_submit', mode: isEdit ? 'edit' : 'create' });
+
     try {
       const formData = new FormData();
 
@@ -120,28 +128,22 @@ export function KitchenFormModal({
       }
 
       if (result.error) {
+        console.log('📱 [COMPONENT] Form submission failed', { error: result.error });
         toast.error(result.error);
       } else if (result.success) {
+        console.log('📱 [COMPONENT] Form submission succeeded', { success: result.success });
         toast.success(result.success);
         form.reset();
-        onOpenChange(false);
-        onSuccess?.();
+        onSuccess?.(); // Call parent success handler instead of managing modal state
       }
     } catch (error) {
-      console.error('Error submitting kitchen form:', error);
+      console.error('📱 [COMPONENT] Error submitting kitchen form:', error);
       toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
     }
   };
 
-  const handleOpenChange = (newOpen: boolean) => {
-    if (!newOpen) {
-      form.reset();
-    }
-    onOpenChange(newOpen);
-  };
-
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
@@ -285,7 +287,10 @@ export function KitchenFormModal({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => handleOpenChange(false)}
+                onClick={() => {
+                  console.log('📱 [COMPONENT] User action', { action: 'cancel_click' });
+                  onOpenChange(false);
+                }}
                 disabled={form.formState.isSubmitting}
               >
                 Hủy

@@ -6,33 +6,95 @@ import { Button } from '@/components/ui/button';
 import { Plus, Upload, Download } from 'lucide-react';
 import { getKitchens } from '@/lib/actions/kitchen.actions';
 import { KitchenDataTable, type KitchenDataTableRef } from '@/components/features/kitchens/kitchen-data-table';
+import { KitchenFormModal } from '@/components/features/kitchens/kitchen-form-modal';
+import { KitchenDeleteDialog } from '@/components/features/kitchens/kitchen-delete-dialog';
+
+// Type definition for kitchen data
+interface Kitchen {
+  id: number;
+  kitchenCode: string | null;
+  name: string;
+  region: string | null;
+  address: string | null;
+  managerName: string | null;
+  phone: string | null;
+  email: string | null;
+  teamType: string | null;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
 
 export default function KitchenManagementPage() {
-  const [kitchens, setKitchens] = useState<any[]>([]);
+  // Data state
+  const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const dataTableRef = useRef<KitchenDataTableRef>(null);
 
+  // Unified modal state management
+  const [activeModal, setActiveModal] = useState<'none' | 'form' | 'delete'>('none');
+  const [modalData, setModalData] = useState<Kitchen | null>(null);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+
+  // Unified Modal Controller
+  const modalController = {
+    openForm: (mode: 'create' | 'edit', kitchen?: Kitchen) => {
+      console.log('🎯 [MODAL] Opening form modal', { mode, kitchenId: kitchen?.id });
+      setModalMode(mode);
+      setModalData(kitchen || null);
+      setActiveModal('form');
+    },
+
+    openDelete: (kitchen: Kitchen) => {
+      console.log('🎯 [MODAL] Opening delete modal', { kitchenId: kitchen.id });
+      setModalData(kitchen);
+      setActiveModal('delete');
+    },
+
+    closeModal: () => {
+      console.log('🎯 [MODAL] Closing active modal', { current: activeModal });
+      setActiveModal('none');
+      setModalData(null);
+      // Cleanup happens here, not in child components
+    },
+
+    handleSuccess: () => {
+      console.log('🎯 [MODAL] Modal action succeeded, refreshing data');
+      modalController.closeModal();
+      refreshKitchens(); // Single data refresh point
+    }
+  };
+
+  // Data fetching functions
+  const fetchKitchens = async () => {
+    try {
+      console.log('🔄 [DATA] Fetching kitchens data');
+      setLoading(true);
+      const data = await getKitchens();
+      setKitchens(data);
+      setError(null);
+      console.log('🔄 [DATA] Kitchens data loaded successfully', { count: data.length });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Không thể tải danh sách bếp';
+      console.error('🔄 [DATA] Error fetching kitchens:', errorMessage);
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const refreshKitchens = () => {
+    console.log('🔄 [DATA] Refresh triggered', { reason: 'modal_success' });
+    fetchKitchens();
+  };
+
   // Fetch initial kitchen data
   useEffect(() => {
-    const fetchKitchens = async () => {
-      try {
-        setLoading(true);
-        const data = await getKitchens();
-        setKitchens(data);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Không thể tải danh sách bếp');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchKitchens();
   }, []);
 
   const handleAddClick = () => {
-    dataTableRef.current?.openAddModal();
+    modalController.openForm('create');
   };
 
   if (loading) {
@@ -125,9 +187,34 @@ export default function KitchenManagementPage() {
         </CardHeader>
         <CardContent>
           {/* Kitchen Data Table */}
-          <KitchenDataTable ref={dataTableRef} data={kitchens} />
+          <KitchenDataTable
+            ref={dataTableRef}
+            data={kitchens}
+            onEdit={(kitchen) => modalController.openForm('edit', kitchen)}
+            onDelete={(kitchen) => modalController.openDelete(kitchen)}
+          />
         </CardContent>
       </Card>
+
+      {/* Kitchen Form Modal */}
+      <KitchenFormModal
+        open={activeModal === 'form'}
+        onOpenChange={(open) => {
+          if (!open) {
+            modalController.closeModal();
+          }
+        }}
+        initialData={modalMode === 'edit' ? modalData : null}
+        onSuccess={modalController.handleSuccess}
+      />
+
+      {/* Kitchen Delete Dialog */}
+      <KitchenDeleteDialog
+        isOpen={activeModal === 'delete'}
+        onClose={modalController.closeModal}
+        kitchen={modalData}
+        onSuccess={modalController.handleSuccess}
+      />
     </section>
   );
 }
