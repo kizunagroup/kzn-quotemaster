@@ -128,28 +128,25 @@ export function KitchenFormModal({
         result = await createKitchen({}, formData);
       }
 
+      // Handle server action response
       if (result.error) {
-        toast({
-          variant: "destructive",
-          title: "Lỗi",
-          description: result.error,
-        });
+        // Display error toast and keep modal open
+        toast.error(result.error);
+        // DO NOT close modal on error - user needs to fix the issue
       } else if (result.success) {
-        toast({
-          variant: "default",
-          title: "Thành công",
-          description: result.success,
-        });
+        // Display success toast
+        toast.success(result.success);
+        // Reset form and close modal on success
         form.reset();
-        onSuccess?.();
+        onSuccess?.(); // This will close the modal and refresh the data table
+      } else {
+        // Handle unexpected response structure
+        toast.error("Phản hồi không hợp lệ từ server.");
       }
     } catch (error) {
       console.error("🔄 [API] Kitchen operation failed", error);
-      toast({
-        variant: "destructive",
-        title: "Lỗi hệ thống",
-        description: "Có lỗi xảy ra. Vui lòng thử lại.",
-      });
+      toast.error("Có lỗi hệ thống xảy ra. Vui lòng thử lại.");
+      // Keep modal open on system errors so user can retry
     }
   };
 
