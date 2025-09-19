@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, Upload, Download } from 'lucide-react';
@@ -31,71 +31,140 @@ export default function KitchenManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const dataTableRef = useRef<KitchenDataTableRef>(null);
 
-  // Unified modal state management
+  // Modal state management
   const [activeModal, setActiveModal] = useState<'none' | 'form' | 'delete'>('none');
   const [modalData, setModalData] = useState<Kitchen | null>(null);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
 
-  // Unified Modal Controller
-  const modalController = {
-    openForm: (mode: 'create' | 'edit', kitchen?: Kitchen) => {
-      console.log('🎯 [MODAL] Opening form modal', { mode, kitchenId: kitchen?.id });
-      setModalMode(mode);
-      setModalData(kitchen || null);
-      setActiveModal('form');
-    },
-
-    openDelete: (kitchen: Kitchen) => {
-      console.log('🎯 [MODAL] Opening delete modal', { kitchenId: kitchen.id });
-      setModalData(kitchen);
-      setActiveModal('delete');
-    },
-
-    closeModal: () => {
-      console.log('🎯 [MODAL] Closing active modal', { current: activeModal });
-      setActiveModal('none');
-      setModalData(null);
-      // Cleanup happens here, not in child components
-    },
-
-    handleSuccess: () => {
-      console.log('🎯 [MODAL] Modal action succeeded, refreshing data');
-      modalController.closeModal();
-      refreshKitchens(); // Single data refresh point
-    }
-  };
-
   // Data fetching functions
-  const fetchKitchens = async () => {
+  const fetchKitchens = useCallback(async () => {
     try {
-      console.log('🔄 [DATA] Fetching kitchens data');
       setLoading(true);
       const data = await getKitchens();
       setKitchens(data);
       setError(null);
-      console.log('🔄 [DATA] Kitchens data loaded successfully', { count: data.length });
+      console.log('🔄 [DATA] Data loaded successfully', { count: data.length });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Không thể tải danh sách bếp';
-      console.error('🔄 [DATA] Error fetching kitchens:', errorMessage);
       setError(errorMessage);
+      console.error('🔄 [DATA] Data fetch failed', errorMessage);
     } finally {
       setLoading(false);
     }
-  };
-
-  const refreshKitchens = () => {
-    console.log('🔄 [DATA] Refresh triggered', { reason: 'modal_success' });
-    fetchKitchens();
-  };
-
-  // Fetch initial kitchen data
-  useEffect(() => {
-    fetchKitchens();
   }, []);
 
-  const handleAddClick = () => {
-    modalController.openForm('create');
-  };
+  const refreshKitchens = useCallback(() => {
+    fetchKitchens();
+  }, [fetchKitchens]);
+
+  // Modal controller functions
+  const openForm = useCallback((mode: 'create' | 'edit', kitchen?: Kitchen) => {
+    setModalMode(mode);
+    setModalData(kitchen || null);
+    setActiveModal('form');
+  }, []);
+
+  const openDelete = useCallback((kitchen: Kitchen) => {
+    setModalData(kitchen);
+    setActiveModal('delete');
+  }, []);
+
+  const closeModal = useCallback(() => {
+    console.log('🚨 [CHECKPOINT] Modal Close Initiated', {
+      currentModal: activeModal,
+      timestamp: new Date().toISOString()
+    });
+
+    // UI Freeze Detection: Check if UI becomes unresponsive
+    const uiTestStart = performance.now();
+    console.log('🔍 [UI-TEST] Pre-State-Change UI Test Starting');
+
+    React.startTransition(() => {
+      setActiveModal('none');
+      setModalData(null);
+
+      // Immediate post-state UI test
+      setTimeout(() => {
+        const uiTestEnd = performance.now();
+        console.log('🔍 [UI-TEST] Post-State-Change UI Test', {
+          timeTaken: `${uiTestEnd - uiTestStart}ms`,
+          status: 'responsive'
+        });
+      }, 0);
+    });
+
+    console.log('✅ [CHECKPOINT] Modal State Reset Complete');
+
+    // Delayed UI responsiveness check
+    setTimeout(() => {
+      console.log('🔍 [UI-TEST] Delayed UI Responsiveness Check (100ms)', {
+        timestamp: new Date().toISOString(),
+        status: 'if-you-see-this-ui-is-still-responsive'
+      });
+    }, 100);
+  }, [activeModal]);
+
+  const handleSuccess = useCallback(() => {
+    closeModal();
+    refreshKitchens();
+  }, [closeModal, refreshKitchens]);
+
+  const handleEdit = useCallback((kitchen: Kitchen) => {
+    console.log('🚨 [CHECKPOINT] Edit Flow Started', {
+      action: 'edit_button_click',
+      kitchenId: kitchen.id,
+      kitchenName: kitchen.name,
+      timestamp: new Date().toISOString()
+    });
+    openForm('edit', kitchen);
+  }, [openForm]);
+
+  const handleAddClick = useCallback(() => {
+    openForm('create');
+  }, [openForm]);
+
+  const handlePageReload = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const handleUITest = useCallback(() => {
+    console.log('🎯 [UI-TEST] Test Button Clicked - UI is RESPONSIVE', {
+      timestamp: new Date().toISOString(),
+      activeModal,
+      status: 'UI-working-normally'
+    });
+    alert('UI Test: The UI is responsive!');
+  }, [activeModal]);
+
+  // Stable modal controller object
+  const modalController = useMemo(() => ({
+    openForm,
+    openDelete,
+    closeModal,
+    handleSuccess,
+    handleEdit
+  }), [openForm, openDelete, closeModal, handleSuccess, handleEdit]);
+
+  // UI Freeze Detection Hook
+  useEffect(() => {
+    if (activeModal === 'none') {
+      // This runs when modal closes - test if UI is responsive
+      const testTimeout = setTimeout(() => {
+        console.log('🔍 [UI-TEST] useEffect Modal Close Detection', {
+          activeModal,
+          timestamp: new Date().toISOString(),
+          message: 'UI-still-responsive-after-modal-close'
+        });
+      }, 50);
+
+      return () => clearTimeout(testTimeout);
+    }
+  }, [activeModal]);
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchKitchens();
+  }, [fetchKitchens]);
 
   if (loading) {
     return (
@@ -137,7 +206,7 @@ export default function KitchenManagementPage() {
               </p>
               <Button
                 variant="outline"
-                onClick={() => window.location.reload()}
+                onClick={handlePageReload}
                 className="mt-4"
               >
                 Thử lại
@@ -159,6 +228,14 @@ export default function KitchenManagementPage() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            variant="default"
+            className="bg-red-500 hover:bg-red-600 text-white"
+            onClick={handleUITest}
+          >
+            🎯 Test UI
+          </Button>
+
           <Button
             variant="default"
             className="bg-orange-500 hover:bg-orange-600 text-white"
@@ -186,12 +263,11 @@ export default function KitchenManagementPage() {
           <CardTitle>Danh sách Bếp</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Kitchen Data Table */}
           <KitchenDataTable
             ref={dataTableRef}
             data={kitchens}
-            onEdit={(kitchen) => modalController.openForm('edit', kitchen)}
-            onDelete={(kitchen) => modalController.openDelete(kitchen)}
+            onEdit={modalController.handleEdit}
+            onDelete={modalController.openDelete}
           />
         </CardContent>
       </Card>
@@ -199,11 +275,7 @@ export default function KitchenManagementPage() {
       {/* Kitchen Form Modal */}
       <KitchenFormModal
         open={activeModal === 'form'}
-        onOpenChange={(open) => {
-          if (!open) {
-            modalController.closeModal();
-          }
-        }}
+        onClose={modalController.closeModal}
         initialData={modalMode === 'edit' ? modalData : null}
         onSuccess={modalController.handleSuccess}
       />

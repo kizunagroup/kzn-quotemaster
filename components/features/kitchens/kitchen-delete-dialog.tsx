@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import {
   AlertDialog,
@@ -43,16 +43,25 @@ export function KitchenDeleteDialog({
   kitchen,
   onSuccess,
 }: KitchenDeleteDialogProps) {
-  console.log('📱 [COMPONENT] KitchenDeleteDialog rendered', { isOpen, kitchenId: kitchen?.id, hasOnClose: !!onClose, hasOnSuccess: !!onSuccess });
-
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleConfirm = async () => {
-    console.log('📱 [COMPONENT] User action', { action: 'confirm_delete', kitchenId: kitchen?.id });
+  // Handle Escape key press to close dialog (since we removed onOpenChange)
+  useEffect(() => {
+    if (!isOpen) return;
 
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isLoading) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => document.removeEventListener('keydown', handleEscapeKey);
+  }, [isOpen, isLoading, onClose]);
+
+  const handleConfirm = async () => {
     if (!kitchen) {
-      console.warn('📱 [COMPONENT] No kitchen provided, aborting delete');
       return;
     }
 
@@ -62,29 +71,22 @@ export function KitchenDeleteDialog({
       const formData = new FormData();
       formData.append('id', kitchen.id.toString());
 
-      console.log('📱 [COMPONENT] Calling deleteKitchen server action', { kitchenId: kitchen.id });
-
       const result = await deleteKitchen({}, formData);
-      console.log('📱 [COMPONENT] Delete server action result', { success: result.success, error: result.error });
 
       if (result.error) {
-        console.log('📱 [COMPONENT] Delete operation failed', { error: result.error });
         toast({
           variant: "destructive",
           title: "Lỗi ngưng hoạt động bếp",
           description: result.error,
         });
-        // Keep dialog open on error - user can try again
       } else if (result.success) {
-        console.log('📱 [COMPONENT] Delete operation succeeded', { success: result.success });
         toast({
           variant: "default",
           title: "Thành công",
           description: result.success,
         });
-        onSuccess?.(); // Call parent success handler instead of managing dialog state
+        onSuccess?.();
       } else {
-        console.warn('📱 [COMPONENT] Unexpected server response format', { result });
         toast({
           variant: "destructive",
           title: "Lỗi không xác định",
@@ -92,34 +94,27 @@ export function KitchenDeleteDialog({
         });
       }
     } catch (error) {
-      console.error('📱 [COMPONENT] Error in delete operation:', error);
+      console.error('🔄 [API] Delete operation failed', error);
       toast({
         variant: "destructive",
         title: "Lỗi hệ thống",
         description: 'Có lỗi xảy ra khi ngưng hoạt động bếp. Vui lòng thử lại.',
       });
-      // Keep dialog open on client-side errors
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleCancel = () => {
-    console.log('📱 [COMPONENT] User action', { action: 'cancel_delete' });
     if (!isLoading) {
       onClose();
     }
   };
 
-  const handleOpenChange = (open: boolean) => {
-    console.log('📱 [COMPONENT] Dialog open change', { open, isLoading });
-    if (!open && !isLoading) {
-      onClose();
-    }
-  };
-
   return (
-    <AlertDialog open={isOpen} onOpenChange={handleOpenChange}>
+    <AlertDialog
+      open={isOpen}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Xác nhận ngưng hoạt động</AlertDialogTitle>

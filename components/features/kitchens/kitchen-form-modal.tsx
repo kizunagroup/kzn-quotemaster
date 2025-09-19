@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -41,19 +42,17 @@ interface KitchenData {
 
 interface KitchenFormModalProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   initialData?: KitchenData | null;
   onSuccess?: () => void;
 }
 
 export function KitchenFormModal({
   open,
-  onOpenChange,
+  onClose,
   initialData,
   onSuccess,
 }: KitchenFormModalProps) {
-  console.log('📱 [COMPONENT] KitchenFormModal rendered', { open, hasInitialData: !!initialData });
-
   const { toast } = useToast();
   const isEdit = !!initialData;
 
@@ -77,11 +76,8 @@ export function KitchenFormModal({
 
   // Reset form when modal opens/closes or initialData changes
   useEffect(() => {
-    console.log('📱 [COMPONENT] Props updated', { open, initialDataId: initialData?.id });
-
     if (open && initialData) {
       // Edit mode - populate form with existing data
-      console.log('📱 [COMPONENT] Setting form to edit mode', { kitchenId: initialData.id });
       form.reset({
         id: initialData.id,
         kitchenCode: initialData.kitchenCode || '',
@@ -94,7 +90,6 @@ export function KitchenFormModal({
       } as FormData);
     } else if (open && !initialData) {
       // Create mode - reset to empty form
-      console.log('📱 [COMPONENT] Setting form to create mode');
       form.reset({
         kitchenCode: '',
         name: '',
@@ -107,9 +102,25 @@ export function KitchenFormModal({
     }
   }, [open, initialData, form]);
 
-  const onSubmit = async (values: FormData) => {
-    console.log('📱 [COMPONENT] User action', { action: 'form_submit', mode: isEdit ? 'edit' : 'create' });
+  // Handle Escape key press to close modal (since we removed onOpenChange)
+  useEffect(() => {
+    if (!open) return;
 
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        console.log('🚨 [CHECKPOINT] Escape Key Pressed', {
+          action: 'escape_key_close',
+          timestamp: new Date().toISOString()
+        });
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => document.removeEventListener('keydown', handleEscapeKey);
+  }, [open, onClose]);
+
+  const onSubmit = async (values: FormData) => {
     try {
       const formData = new FormData();
 
@@ -128,27 +139,42 @@ export function KitchenFormModal({
       }
 
       if (result.error) {
-        console.log('📱 [COMPONENT] Form submission failed', { error: result.error });
         toast.error(result.error);
       } else if (result.success) {
-        console.log('📱 [COMPONENT] Form submission succeeded', { success: result.success });
         toast.success(result.success);
         form.reset();
-        onSuccess?.(); // Call parent success handler instead of managing modal state
+        onSuccess?.();
       }
     } catch (error) {
-      console.error('📱 [COMPONENT] Error submitting kitchen form:', error);
+      console.error('🔄 [API] Kitchen operation failed', error);
       toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
     }
   };
 
+  const handleCancel = () => {
+    console.log('🚨 [CHECKPOINT] Cancel Button Clicked', {
+      action: 'cancel_button_click',
+      mode: isEdit ? 'edit' : 'create',
+      timestamp: new Date().toISOString()
+    });
+    form.reset();
+    console.log('🚨 [CHECKPOINT] Form Reset Complete - Calling onClose');
+    onClose();
+    console.log('✅ [CHECKPOINT] onClose Called Successfully');
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+    >
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? 'Chỉnh sửa Bếp' : 'Thêm Bếp Mới'}
           </DialogTitle>
+          <DialogDescription>
+            Điền thông tin chi tiết cho bếp. Các trường có dấu * là bắt buộc.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -287,10 +313,7 @@ export function KitchenFormModal({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  console.log('📱 [COMPONENT] User action', { action: 'cancel_click' });
-                  onOpenChange(false);
-                }}
+                onClick={handleCancel}
                 disabled={form.formState.isSubmitting}
               >
                 Hủy

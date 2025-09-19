@@ -48,7 +48,6 @@ export interface KitchenDataTableRef {
 const ITEMS_PER_PAGE = 10;
 
 export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDataTableProps>(({ data, onEdit, onDelete }, ref) => {
-  console.log('📱 [COMPONENT] KitchenDataTable rendered', { dataCount: data.length, hasOnEdit: !!onEdit, hasOnDelete: !!onDelete });
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -73,17 +72,14 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
   }, [searchTerm]);
 
   const handleEdit = (kitchen: Kitchen) => {
-    console.log('📱 [COMPONENT] User action', { action: 'edit_click', kitchenId: kitchen.id });
     onEdit(kitchen);
   };
 
   const handleDeactivate = (kitchen: Kitchen) => {
-    console.log('📱 [COMPONENT] User action', { action: 'delete_click', kitchenId: kitchen.id });
     onDelete(kitchen);
   };
 
   const handleAddNew = () => {
-    console.log('📱 [COMPONENT] User action', { action: 'add_click' });
     // This functionality is now handled by parent via imperative handle
   };
 
