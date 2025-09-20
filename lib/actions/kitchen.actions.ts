@@ -315,3 +315,34 @@ export async function deleteKitchen(
     return { error: "Không thể ngưng hoạt động bếp. Vui lòng thử lại." };
   }
 }
+
+// Get unique regions from existing kitchens for combobox
+export async function getKitchenRegions(): Promise<string[]> {
+  try {
+    const { isAdmin } = await checkAdminPermissions();
+
+    if (!isAdmin) {
+      throw new Error("Unauthorized: Only administrators can view kitchen regions.");
+    }
+
+    // Query distinct regions from teams where teamType is KITCHEN
+    const regions = await db
+      .selectDistinct({ region: teams.region })
+      .from(teams)
+      .where(and(
+        eq(teams.teamType, 'KITCHEN'),
+        sql`${teams.region} IS NOT NULL AND TRIM(${teams.region}) != ''`
+      ));
+
+    // Filter out null/empty values and return flat array of strings
+    return regions
+      .map(row => row.region?.trim())
+      .filter((region): region is string => !!region && region.length > 0)
+      .sort(); // Sort alphabetically for better UX
+
+  } catch (error) {
+    console.error('Error fetching kitchen regions:', error);
+    // Return empty array on error to prevent UI crashes
+    return [];
+  }
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
@@ -29,7 +29,8 @@ import {
   type CreateKitchenInput,
   type UpdateKitchenInput,
 } from "@/types/quotemaster";
-import { createKitchen, updateKitchen } from "@/lib/actions/kitchen.actions";
+import { createKitchen, updateKitchen, getKitchenRegions } from "@/lib/actions/kitchen.actions";
+import { RegionCombobox } from "./region-combobox";
 
 // Type for kitchen data (matches the getKitchens return type)
 interface KitchenData {
@@ -60,6 +61,7 @@ export function KitchenFormModal({
   onSuccess,
 }: KitchenFormModalProps) {
   const isEdit = !!initialData;
+  const [regions, setRegions] = useState<string[]>([]);
 
   // Determine which schema to use based on mode
   const schema = isEdit ? updateKitchenSchema : createKitchenSchema;
@@ -80,6 +82,18 @@ export function KitchenFormModal({
       ...(isEdit && { id: initialData?.id }),
     } as FormData,
   });
+
+  // Fetch regions when modal opens
+  useEffect(() => {
+    if (open) {
+      getKitchenRegions()
+        .then(setRegions)
+        .catch((error) => {
+          console.error('Error fetching regions:', error);
+          setRegions([]); // Fallback to empty array
+        });
+    }
+  }, [open]);
 
   // Reset form when modal opens/closes or initialData changes
   useEffect(() => {
@@ -206,7 +220,13 @@ export function KitchenFormModal({
                   <FormItem>
                     <FormLabel>Khu vực *</FormLabel>
                     <FormControl>
-                      <Input placeholder="Nhập khu vực" {...field} />
+                      <RegionCombobox
+                        regions={regions}
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                        placeholder="Chọn hoặc nhập khu vực..."
+                        disabled={form.formState.isSubmitting}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
