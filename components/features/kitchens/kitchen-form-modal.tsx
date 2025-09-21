@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -26,16 +26,23 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 import {
   createKitchen,
   updateKitchen,
+  getRegions,
 } from '@/lib/actions/kitchen.actions';
 import {
   createKitchenSchema,
@@ -43,6 +50,7 @@ import {
 } from '@/lib/schemas/kitchen.schemas';
 import type { Kitchen } from '@/lib/hooks/use-kitchens';
 import { ManagerCombobox } from './manager-combobox';
+import { cn } from '@/lib/utils';
 
 // Form validation schemas
 const createFormSchema = createKitchenSchema;
@@ -62,6 +70,9 @@ export function KitchenFormModal({
   kitchen,
 }: KitchenFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [regions, setRegions] = useState<string[]>([]);
+  const [regionsLoading, setRegionsLoading] = useState(false);
+  const [regionComboboxOpen, setRegionComboboxOpen] = useState(false);
   const isEditMode = Boolean(kitchen);
 
   // Form setup with conditional schema based on mode
@@ -73,10 +84,34 @@ export function KitchenFormModal({
       region: '',
       address: '',
       managerId: undefined,
-      status: 'active',
       ...(isEditMode && kitchen && { id: kitchen.id }),
     },
   });
+
+  // Fetch regions when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const fetchRegions = async () => {
+        setRegionsLoading(true);
+        try {
+          const result = await getRegions();
+          if (Array.isArray(result)) {
+            setRegions(result);
+          } else {
+            console.error('Failed to fetch regions:', result.error);
+            setRegions([]);
+          }
+        } catch (error) {
+          console.error('Error fetching regions:', error);
+          setRegions([]);
+        } finally {
+          setRegionsLoading(false);
+        }
+      };
+
+      fetchRegions();
+    }
+  }, [isOpen]);
 
   // Reset form when modal opens/closes or kitchen changes
   useEffect(() => {
@@ -90,7 +125,6 @@ export function KitchenFormModal({
           region: kitchen.region || '',
           address: kitchen.address || '',
           managerId: kitchen.managerId || undefined,
-          status: kitchen.status === 'active' ? 'active' : 'inactive',
         });
       } else {
         // Reset form for create mode
@@ -100,7 +134,6 @@ export function KitchenFormModal({
           region: '',
           address: '',
           managerId: undefined,
-          status: 'active',
         });
       }
     }
@@ -201,52 +234,85 @@ export function KitchenFormModal({
                 )}
               />
 
-              {/* Region */}
+              {/* Region Combobox */}
               <FormField
                 control={form.control}
                 name="region"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Khu vực *</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="VD: Hà Nội"
-                        {...field}
-                        disabled={isSubmitting}
-                      />
-                    </FormControl>
+                    <Popover open={regionComboboxOpen} onOpenChange={setRegionComboboxOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={regionComboboxOpen}
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            disabled={isSubmitting || regionsLoading}
+                          >
+                            {regionsLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Đang tải...
+                              </>
+                            ) : (
+                              field.value || "Chọn hoặc nhập khu vực..."
+                            )}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command>
+                          <CommandInput
+                            placeholder="Tìm kiếm hoặc nhập khu vực mới..."
+                            onValueChange={(searchValue) => {
+                              // Allow custom input - update field value as user types
+                              if (searchValue) {
+                                field.onChange(searchValue);
+                              }
+                            }}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              <div className="py-3 px-2 text-sm">
+                                Không tìm thấy khu vực. Nhập để tạo mới.
+                              </div>
+                            </CommandEmpty>
+                            {regions.length > 0 && (
+                              <CommandGroup>
+                                {regions.map((region) => (
+                                  <CommandItem
+                                    key={region}
+                                    value={region}
+                                    onSelect={(currentValue) => {
+                                      field.onChange(currentValue);
+                                      setRegionComboboxOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        field.value === region ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    {region}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            )}
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {/* Status */}
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Trạng thái</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                      disabled={isSubmitting}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn trạng thái" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="active">Hoạt động</SelectItem>
-                        <SelectItem value="inactive">Tạm dừng</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
             </div>
 
             {/* Manager Selection */}

@@ -23,11 +23,6 @@ export const createKitchenSchema = z.object({
   managerId: z
     .number()
     .positive('ID quản lý không hợp lệ'),
-  status: z
-    .enum(['active', 'inactive'], {
-      errorMap: () => ({ message: 'Trạng thái phải là "Hoạt động" hoặc "Tạm dừng"' })
-    })
-    .default('active'),
 });
 
 export const updateKitchenSchema = z.object({
@@ -55,11 +50,6 @@ export const updateKitchenSchema = z.object({
   managerId: z
     .number()
     .positive('ID quản lý không hợp lệ')
-    .optional(),
-  status: z
-    .enum(['active', 'inactive'], {
-      errorMap: () => ({ message: 'Trạng thái phải là "Hoạt động" hoặc "Tạm dừng"' })
-    })
     .optional(),
 });
 

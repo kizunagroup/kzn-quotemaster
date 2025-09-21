@@ -162,7 +162,7 @@ export async function createKitchen(data: CreateKitchenInput) {
         address: validatedData.address?.trim() || null,
         managerId: validatedData.managerId, // NORMALIZED: Reference to users table
         teamType: 'KITCHEN',
-        status: validatedData.status,
+        status: 'active', // Default status for new kitchens
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -346,12 +346,13 @@ export async function deleteKitchen(data: DeleteKitchenInput) {
       return { error: 'Bếp này đã được xóa trước đó' };
     }
 
-    // 4. Perform soft delete by setting deletedAt timestamp
+    // 4. Perform soft delete by setting deletedAt timestamp AND status to inactive
     // Note: managerId is preserved for audit trail
     const deletedKitchen = await db
       .update(teams)
       .set({
         deletedAt: new Date(),
+        status: 'inactive', // Set status to inactive for consistent source of truth
         updatedAt: new Date(),
       })
       .where(eq(teams.id, validatedData.id))
@@ -371,6 +372,38 @@ export async function deleteKitchen(data: DeleteKitchenInput) {
   } catch (error) {
     console.error('Delete kitchen error:', error);
     return { error: 'Có lỗi xảy ra khi xóa bếp. Vui lòng thử lại.' };
+  }
+}
+
+// Server action to get distinct regions from kitchens
+export async function getRegions(): Promise<string[] | { error: string }> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Query distinct regions from teams table where teamType is KITCHEN
+    const regions = await db
+      .selectDistinct({ region: teams.region })
+      .from(teams)
+      .where(
+        and(
+          eq(teams.teamType, 'KITCHEN'),
+          isNull(teams.deletedAt) // Only get regions from active kitchens
+        )
+      )
+      .orderBy(teams.region);
+
+    // 3. Return array of region strings
+    return regions
+      .map(r => r.region)
+      .filter(region => region && region.trim() !== ''); // Filter out null/empty regions
+
+  } catch (error) {
+    console.error('Get regions error:', error);
+    return { error: 'Có lỗi xảy ra khi tải danh sách khu vực. Vui lòng thử lại.' };
   }
 }
 
