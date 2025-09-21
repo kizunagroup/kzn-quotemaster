@@ -270,11 +270,9 @@ export function KitchenFormModal({
                         <Command>
                           <CommandInput
                             placeholder="Tìm kiếm hoặc nhập khu vực mới..."
+                            value={field.value}
                             onValueChange={(searchValue) => {
-                              // Allow custom input - update field value as user types
-                              if (searchValue) {
-                                field.onChange(searchValue);
-                              }
+                              field.onChange(searchValue);
                             }}
                           />
                           <CommandList>

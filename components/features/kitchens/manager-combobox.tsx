@@ -134,15 +134,21 @@ export function ManagerCombobox({
             </div>
           </div>
           {!disabled && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto p-1 hover:bg-transparent"
+            <span
+              className="inline-flex items-center justify-center h-auto p-1 cursor-pointer hover:bg-accent rounded-sm"
               onClick={handleClear}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleClear(e as any);
+                }
+              }}
             >
               <X className="h-3 w-3" />
               <span className="sr-only">Xóa lựa chọn</span>
-            </Button>
+            </span>
           )}
         </div>
       );

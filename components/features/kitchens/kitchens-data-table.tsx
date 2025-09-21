@@ -9,7 +9,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { MoreHorizontal, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { MoreHorizontal, Plus, Edit, Trash2 } from 'lucide-react';
 
 import { useKitchens, type Kitchen } from '@/lib/hooks/use-kitchens';
 import { Button } from '@/components/ui/button';
@@ -138,12 +138,26 @@ export function KitchensDataTable() {
     updateSearchParams({ status: value === 'all' ? null : value });
   };
 
-  // Sort handler
-  const handleSort = (column: string, direction: 'asc' | 'desc' | null) => {
-    if (direction === null) {
+  // Fixed sort handler with proper cycling logic
+  const handleSort = (column: string) => {
+    const currentSort = filters?.sort;
+    const currentOrder = filters?.order;
+
+    let newDirection: 'asc' | 'desc' | null = 'asc';
+
+    // Cycle through: no sort -> asc -> desc -> no sort
+    if (currentSort === column) {
+      if (currentOrder === 'asc') {
+        newDirection = 'desc';
+      } else if (currentOrder === 'desc') {
+        newDirection = null; // Clear sort
+      }
+    }
+
+    if (newDirection === null) {
       updateSearchParams({ sort: null, order: null });
     } else {
-      updateSearchParams({ sort: column, order: direction });
+      updateSearchParams({ sort: column, order: newDirection });
     }
   };
 
@@ -176,10 +190,6 @@ export function KitchensDataTable() {
     setIsDeleteModalOpen(true);
   };
 
-  const handleViewClick = (kitchen: Kitchen) => {
-    router.push(`${pathname}/${kitchen.id}`);
-  };
-
   // Table column definitions
   const columns: ColumnDef<Kitchen>[] = [
     {
@@ -187,7 +197,13 @@ export function KitchensDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Mã Bếp"
-          onSort={(direction) => handleSort('kitchenCode', direction)}
+          column={column}
+          onSort={() => handleSort('kitchenCode')}
+          sortState={
+            filters?.sort === 'kitchenCode'
+              ? filters?.order as 'asc' | 'desc'
+              : undefined
+          }
         />
       ),
       cell: ({ row }) => (
@@ -199,7 +215,13 @@ export function KitchensDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Tên Bếp"
-          onSort={(direction) => handleSort('name', direction)}
+          column={column}
+          onSort={() => handleSort('name')}
+          sortState={
+            filters?.sort === 'name'
+              ? filters?.order as 'asc' | 'desc'
+              : undefined
+          }
         />
       ),
       cell: ({ row }) => (
@@ -211,7 +233,13 @@ export function KitchensDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Khu Vực"
-          onSort={(direction) => handleSort('region', direction)}
+          column={column}
+          onSort={() => handleSort('region')}
+          sortState={
+            filters?.sort === 'region'
+              ? filters?.order as 'asc' | 'desc'
+              : undefined
+          }
         />
       ),
       cell: ({ row }) => (
@@ -223,7 +251,13 @@ export function KitchensDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Loại Hình"
-          onSort={(direction) => handleSort('teamType', direction)}
+          column={column}
+          onSort={() => handleSort('teamType')}
+          sortState={
+            filters?.sort === 'teamType'
+              ? filters?.order as 'asc' | 'desc'
+              : undefined
+          }
         />
       ),
       cell: ({ row }) => (
@@ -235,7 +269,13 @@ export function KitchensDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Quản Lý"
-          onSort={(direction) => handleSort('managerName', direction)}
+          column={column}
+          onSort={() => handleSort('managerName')}
+          sortState={
+            filters?.sort === 'managerName'
+              ? filters?.order as 'asc' | 'desc'
+              : undefined
+          }
         />
       ),
       cell: ({ row }) => (
@@ -249,7 +289,13 @@ export function KitchensDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Trạng Thái"
-          onSort={(direction) => handleSort('status', direction)}
+          column={column}
+          onSort={() => handleSort('status')}
+          sortState={
+            filters?.sort === 'status'
+              ? filters?.order as 'asc' | 'desc'
+              : undefined
+          }
         />
       ),
       cell: ({ row }) => {
@@ -279,10 +325,6 @@ export function KitchensDataTable() {
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => handleViewClick(kitchen)}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Xem chi tiết
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleEditClick(kitchen)}>
                   <Edit className="mr-2 h-4 w-4" />
                   Chỉnh sửa
@@ -293,7 +335,7 @@ export function KitchensDataTable() {
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Xóa
+                  Ngưng hoạt động
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

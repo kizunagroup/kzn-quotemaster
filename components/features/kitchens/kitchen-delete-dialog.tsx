@@ -50,7 +50,7 @@ export function KitchenDeleteDialog({
       }
     } catch (error) {
       console.error('Delete kitchen error:', error);
-      toast.error('Có lỗi xảy ra khi xóa bếp. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi ngưng hoạt động bếp. Vui lòng thử lại.');
     } finally {
       setIsDeleting(false);
     }
@@ -74,9 +74,9 @@ export function KitchenDeleteDialog({
               <AlertTriangle className="h-5 w-5 text-destructive" />
             </div>
             <div>
-              <AlertDialogTitle>Xác nhận xóa bếp</AlertDialogTitle>
+              <AlertDialogTitle>Xác nhận ngưng hoạt động bếp</AlertDialogTitle>
               <AlertDialogDescription className="mt-2">
-                Bạn có chắc chắn muốn xóa bếp này? Hành động này không thể hoàn tác.
+                Bạn có chắc chắn muốn ngưng hoạt động bếp này? Bếp sẽ được đánh dấu là không hoạt động.
               </AlertDialogDescription>
             </div>
           </div>
@@ -111,9 +111,9 @@ export function KitchenDeleteDialog({
             <div className="text-sm">
               <p className="font-medium text-destructive mb-1">Lưu ý quan trọng:</p>
               <ul className="text-muted-foreground space-y-1">
-                <li>• Bếp sẽ được đánh dấu là đã xóa và không còn hiển thị trong danh sách</li>
+                <li>• Bếp sẽ được đánh dấu là ngưng hoạt động và không còn hiển thị trong danh sách</li>
                 <li>• Dữ liệu lịch sử vẫn được bảo toàn trong hệ thống</li>
-                <li>• Bạn có thể khôi phục bếp này sau nếu cần thiết</li>
+                <li>• Bạn có thể khôi phục hoạt động bếp này sau nếu cần thiết</li>
               </ul>
             </div>
           </div>
@@ -131,10 +131,10 @@ export function KitchenDeleteDialog({
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang xóa...
+                Đang ngưng hoạt động...
               </>
             ) : (
-              'Xóa bếp'
+              'Ngưng hoạt động'
             )}
           </AlertDialogAction>
         </AlertDialogFooter>
