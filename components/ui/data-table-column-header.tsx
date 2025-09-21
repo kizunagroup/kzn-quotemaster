@@ -6,47 +6,23 @@ import { Button } from '@/components/ui/button';
 
 interface DataTableColumnHeaderProps {
   title: string;
-  column?: {
+  column: {
     getIsSorted: () => false | 'asc' | 'desc';
     getCanSort: () => boolean;
-    toggleSorting: (desc?: boolean) => void;
+    getToggleSortingHandler: () => ((event: unknown) => void) | undefined;
   };
-  onSort?: (direction: 'asc' | 'desc' | null) => void;
   className?: string;
-  sortable?: boolean;
 }
 
 export function DataTableColumnHeader({
   title,
   column,
-  onSort,
   className,
-  sortable = true,
 }: DataTableColumnHeaderProps) {
-  // Get current sort state
-  const sortDirection = column?.getIsSorted() || false;
-  const canSort = column?.getCanSort() ?? sortable;
-
-  // Handle sort click
-  const handleSort = () => {
-    if (!canSort) return;
-
-    if (column) {
-      // TanStack Table integration
-      column.toggleSorting(sortDirection === 'asc');
-    } else if (onSort) {
-      // Custom sort handler
-      let newDirection: 'asc' | 'desc' | null = 'asc';
-
-      if (sortDirection === 'asc') {
-        newDirection = 'desc';
-      } else if (sortDirection === 'desc') {
-        newDirection = null;
-      }
-
-      onSort(newDirection);
-    }
-  };
+  // Get current sort state and capabilities from TanStack Table
+  const sortDirection = column.getIsSorted();
+  const canSort = column.getCanSort();
+  const toggleSorting = column.getToggleSortingHandler();
 
   // Render sort icon based on current state
   const renderSortIcon = () => {
@@ -72,7 +48,7 @@ export function DataTableColumnHeader({
     );
   }
 
-  // Render sortable header with button
+  // Render sortable header with button using TanStack's built-in handler
   return (
     <Button
       variant="ghost"
@@ -82,7 +58,7 @@ export function DataTableColumnHeader({
         sortDirection && 'text-accent-foreground',
         className
       )}
-      onClick={handleSort}
+      onClick={toggleSorting}
     >
       <span>{title}</span>
       {renderSortIcon()}

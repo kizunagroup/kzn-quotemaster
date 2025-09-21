@@ -27,6 +27,7 @@ interface KitchensTableToolbarProps {
 
   // Filter props
   regions: string[];
+  regionsLoading?: boolean;
   selectedRegion?: string;
   onRegionChange: (value: string) => void;
   selectedStatus?: string;
@@ -44,6 +45,7 @@ export function KitchensTableToolbar({
   searchValue = '',
   onSearchChange,
   regions,
+  regionsLoading = false,
   selectedRegion = 'all',
   onRegionChange,
   selectedStatus = 'all',
@@ -90,9 +92,9 @@ export function KitchensTableToolbar({
       }
     >
       {/* Region Filter */}
-      <Select value={selectedRegion} onValueChange={onRegionChange}>
+      <Select value={selectedRegion} onValueChange={onRegionChange} disabled={regionsLoading}>
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder="Khu vực" />
+          <SelectValue placeholder={regionsLoading ? "Đang tải..." : "Khu vực"} />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tất cả khu vực</SelectItem>

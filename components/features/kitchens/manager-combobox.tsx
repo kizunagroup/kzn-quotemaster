@@ -48,6 +48,7 @@ export function ManagerCombobox({
   const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch managers data on component mount
   useEffect(() => {
@@ -82,6 +83,18 @@ export function ManagerCombobox({
     return managers.find(manager => manager.id === value) || null;
   }, [value, managers]);
 
+  // Filter managers based on search query
+  const filteredManagers = useMemo(() => {
+    if (!searchQuery.trim()) return managers;
+
+    const query = searchQuery.toLowerCase().trim();
+    return managers.filter(manager =>
+      manager.name.toLowerCase().includes(query) ||
+      manager.email.toLowerCase().includes(query) ||
+      manager.role.toLowerCase().includes(query)
+    );
+  }, [managers, searchQuery]);
+
   // Handle manager selection
   const handleSelect = (managerId: string) => {
     const selectedId = parseInt(managerId);
@@ -94,6 +107,7 @@ export function ManagerCombobox({
     }
 
     setOpen(false);
+    setSearchQuery(''); // Clear search when selection is made
   };
 
   // Handle clear selection
@@ -101,6 +115,19 @@ export function ManagerCombobox({
     e.preventDefault();
     e.stopPropagation();
     onChange(undefined);
+  };
+
+  // Handle search input change
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  // Reset search when popover closes
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (!newOpen) {
+      setSearchQuery(''); // Clear search when closing
+    }
   };
 
   // Render display value
@@ -183,7 +210,7 @@ export function ManagerCombobox({
   );
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -206,6 +233,8 @@ export function ManagerCombobox({
           <CommandInput
             placeholder="Tìm kiếm quản lý..."
             className="h-9"
+            value={searchQuery}
+            onValueChange={handleSearchChange}
           />
           <CommandList>
             {loading ? (
@@ -248,16 +277,26 @@ export function ManagerCombobox({
                   Thử lại
                 </Button>
               </div>
-            ) : managers.length === 0 ? (
+            ) : filteredManagers.length === 0 ? (
               <CommandEmpty>
                 <div className="flex flex-col items-center justify-center p-4 text-center">
                   <User className="h-8 w-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground">Không có quản lý nào khả dụng</p>
+                  <p className="text-sm text-muted-foreground">
+                    {searchQuery.trim()
+                      ? 'Không tìm thấy quản lý phù hợp'
+                      : 'Không có quản lý nào khả dụng'
+                    }
+                  </p>
+                  {searchQuery.trim() && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Thử tìm kiếm với từ khóa khác
+                    </p>
+                  )}
                 </div>
               </CommandEmpty>
             ) : (
               <CommandGroup>
-                {managers.map((manager) => {
+                {filteredManagers.map((manager) => {
                   const isSelected = value === manager.id;
                   return (
                     <CommandItem

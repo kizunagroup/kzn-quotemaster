@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -9,15 +8,16 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { MoreHorizontal, Plus, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
 
 import { useKitchens, type Kitchen } from '@/lib/hooks/use-kitchens';
+import { useDataTableUrlState } from '@/lib/hooks/use-data-table-url-state';
+import { getRegions } from '@/lib/actions/kitchen.actions';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -82,97 +82,105 @@ const getStatusDisplay = (status: string): string => {
 };
 
 export function KitchensDataTable() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedKitchen, setSelectedKitchen] = useState<Kitchen | null>(null);
 
+  // Independent regions data for filter dropdown
+  const [allRegions, setAllRegions] = useState<string[]>([]);
+  const [regionsLoading, setRegionsLoading] = useState(false);
+
+  // URL state management
+  const {
+    filters,
+    sort,
+    pagination: urlPagination,
+    setSearch,
+    setFilter,
+    setSort,
+    setPagination,
+    clearFilters,
+    hasActiveFilters,
+  } = useDataTableUrlState({
+    defaultPagination: { page: 1, limit: 10 },
+  });
+
   // Fetch kitchen data using our custom hook
   const {
     kitchens,
     pagination,
-    filters,
     isLoading,
     error,
     isEmpty,
     refresh,
   } = useKitchens();
 
-  // URL state management functions
-  const updateSearchParams = (updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams.toString());
-
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === null || value === '') {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
-
-    // Reset to page 1 when filters change (except for page changes)
-    if (!updates.page) {
-      params.delete('page');
+  // Convert our URL sort state to TanStack Table sorting format
+  const sorting: SortingState = useMemo(() => {
+    if (sort.column && sort.order) {
+      return [{ id: sort.column, desc: sort.order === 'desc' }];
     }
+    return [];
+  }, [sort.column, sort.order]);
 
-    router.push(`${pathname}?${params.toString()}`);
-  };
+  // Handle TanStack Table sorting changes and sync with URL state
+  const handleSortingChange = (updater: any) => {
+    const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
 
-  // Search handler
-  const handleSearchChange = (value: string) => {
-    updateSearchParams({ search: value });
-  };
-
-  // Region filter handler
-  const handleRegionChange = (value: string) => {
-    updateSearchParams({ region: value === 'all' ? null : value });
-  };
-
-  // Status filter handler
-  const handleStatusChange = (value: string) => {
-    updateSearchParams({ status: value === 'all' ? null : value });
-  };
-
-  // Fixed sort handler with proper cycling logic
-  const handleSort = (column: string) => {
-    const currentSort = filters?.sort;
-    const currentOrder = filters?.order;
-
-    let newDirection: 'asc' | 'desc' | null = 'asc';
-
-    // Cycle through: no sort -> asc -> desc -> no sort
-    if (currentSort === column) {
-      if (currentOrder === 'asc') {
-        newDirection = 'desc';
-      } else if (currentOrder === 'desc') {
-        newDirection = null; // Clear sort
-      }
-    }
-
-    if (newDirection === null) {
-      updateSearchParams({ sort: null, order: null });
+    if (newSorting.length === 0) {
+      // No sorting - clear sort from URL
+      setSort('');
     } else {
-      updateSearchParams({ sort: column, order: newDirection });
+      // Extract the first sort (single column sorting)
+      const { id, desc } = newSorting[0];
+      setSort(id);
     }
   };
 
-  // Pagination handlers
+  // Fetch all regions independently for the filter dropdown
+  useEffect(() => {
+    const fetchAllRegions = async () => {
+      setRegionsLoading(true);
+      try {
+        const result = await getRegions();
+        if (Array.isArray(result)) {
+          setAllRegions(result);
+        } else {
+          console.error('Failed to fetch regions:', result.error);
+          setAllRegions([]);
+        }
+      } catch (error) {
+        console.error('Error fetching regions:', error);
+        setAllRegions([]);
+      } finally {
+        setRegionsLoading(false);
+      }
+    };
+
+    fetchAllRegions();
+  }, []);
+
+  // Event handlers
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+  };
+
+  const handleRegionChange = (value: string) => {
+    setFilter('region', value === 'all' ? null : value);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setFilter('status', value === 'all' ? null : value);
+  };
+
   const handlePageChange = (page: number) => {
-    updateSearchParams({ page: page.toString() });
+    setPagination({ page });
   };
 
   const handlePageSizeChange = (pageSize: number) => {
-    updateSearchParams({ limit: pageSize.toString(), page: null });
-  };
-
-  // Clear all filters
-  const handleClearFilters = () => {
-    router.push(pathname);
+    setPagination({ limit: pageSize, page: 1 });
   };
 
   // Modal handlers
@@ -194,16 +202,11 @@ export function KitchensDataTable() {
   const columns: ColumnDef<Kitchen>[] = [
     {
       accessorKey: 'kitchenCode',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Mã Bếp"
           column={column}
-          onSort={() => handleSort('kitchenCode')}
-          sortState={
-            filters?.sort === 'kitchenCode'
-              ? filters?.order as 'asc' | 'desc'
-              : undefined
-          }
         />
       ),
       cell: ({ row }) => (
@@ -212,16 +215,11 @@ export function KitchensDataTable() {
     },
     {
       accessorKey: 'name',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Tên Bếp"
           column={column}
-          onSort={() => handleSort('name')}
-          sortState={
-            filters?.sort === 'name'
-              ? filters?.order as 'asc' | 'desc'
-              : undefined
-          }
         />
       ),
       cell: ({ row }) => (
@@ -230,16 +228,11 @@ export function KitchensDataTable() {
     },
     {
       accessorKey: 'region',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Khu Vực"
           column={column}
-          onSort={() => handleSort('region')}
-          sortState={
-            filters?.sort === 'region'
-              ? filters?.order as 'asc' | 'desc'
-              : undefined
-          }
         />
       ),
       cell: ({ row }) => (
@@ -248,16 +241,11 @@ export function KitchensDataTable() {
     },
     {
       accessorKey: 'teamType',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Loại Hình"
           column={column}
-          onSort={() => handleSort('teamType')}
-          sortState={
-            filters?.sort === 'teamType'
-              ? filters?.order as 'asc' | 'desc'
-              : undefined
-          }
         />
       ),
       cell: ({ row }) => (
@@ -266,16 +254,11 @@ export function KitchensDataTable() {
     },
     {
       accessorKey: 'managerName',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Quản Lý"
           column={column}
-          onSort={() => handleSort('managerName')}
-          sortState={
-            filters?.sort === 'managerName'
-              ? filters?.order as 'asc' | 'desc'
-              : undefined
-          }
         />
       ),
       cell: ({ row }) => (
@@ -286,16 +269,11 @@ export function KitchensDataTable() {
     },
     {
       accessorKey: 'status',
+      enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Trạng Thái"
           column={column}
-          onSort={() => handleSort('status')}
-          sortState={
-            filters?.sort === 'status'
-              ? filters?.order as 'asc' | 'desc'
-              : undefined
-          }
         />
       ),
       cell: ({ row }) => {
@@ -309,6 +287,7 @@ export function KitchensDataTable() {
     },
     {
       id: 'actions',
+      enableSorting: false,
       header: () => <div className="text-right">Thao Tác</div>,
       cell: ({ row }) => {
         const kitchen = row.original;
@@ -323,8 +302,6 @@ export function KitchensDataTable() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => handleEditClick(kitchen)}>
                   <Edit className="mr-2 h-4 w-4" />
                   Chỉnh sửa
@@ -345,7 +322,7 @@ export function KitchensDataTable() {
     },
   ];
 
-  // Initialize table
+  // Initialize table with proper TanStack Table sorting integration
   const table = useReactTable({
     data: kitchens,
     columns,
@@ -353,17 +330,16 @@ export function KitchensDataTable() {
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,
+    // Enable sorting UI capabilities
+    enableSorting: true,
+    // Single column sorting only
+    enableMultiSort: false,
+    // Provide current sorting state and change handler
+    state: {
+      sorting,
+    },
+    onSortingChange: handleSortingChange,
   });
-
-  // Check if filters are active
-  const hasActiveFilters = Boolean(
-    filters?.search ||
-    filters?.region ||
-    (filters?.status && filters.status !== 'all')
-  );
-
-  // Get unique regions for filter dropdown
-  const regions = [...new Set(kitchens.map(k => k.region))].sort();
 
   if (error) {
     return (
@@ -383,14 +359,15 @@ export function KitchensDataTable() {
     <div className="space-y-4">
       {/* Toolbar */}
       <KitchensTableToolbar
-        searchValue={filters?.search || ''}
+        searchValue={filters.search || ''}
         onSearchChange={handleSearchChange}
-        regions={regions}
-        selectedRegion={filters?.region || 'all'}
+        regions={allRegions}
+        regionsLoading={regionsLoading}
+        selectedRegion={filters.region || 'all'}
         onRegionChange={handleRegionChange}
-        selectedStatus={filters?.status || 'all'}
+        selectedStatus={filters.status || 'all'}
         onStatusChange={handleStatusChange}
-        onClearFilters={handleClearFilters}
+        onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
         onCreateClick={handleCreateClick}
       />

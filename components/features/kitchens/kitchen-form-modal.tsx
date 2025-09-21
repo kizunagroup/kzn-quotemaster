@@ -78,6 +78,7 @@ export function KitchenFormModal({
   // Form setup with conditional schema based on mode
   const form = useForm<z.infer<typeof createFormSchema> | z.infer<typeof updateFormSchema>>({
     resolver: zodResolver(isEditMode ? updateFormSchema : createFormSchema),
+    mode: 'onChange', // Enable instant validation
     defaultValues: {
       kitchenCode: '',
       name: '',
@@ -274,33 +275,68 @@ export function KitchenFormModal({
                             onValueChange={(searchValue) => {
                               field.onChange(searchValue);
                             }}
+                            onKeyDown={(e) => {
+                              // Handle Enter key to create new region or select current input
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (field.value && field.value.trim() !== '') {
+                                  setRegionComboboxOpen(false);
+                                }
+                              }
+                            }}
                           />
                           <CommandList>
                             <CommandEmpty>
-                              <div className="py-3 px-2 text-sm">
-                                Không tìm thấy khu vực. Nhập để tạo mới.
-                              </div>
+                              {field.value && field.value.trim() !== '' ? (
+                                <CommandItem
+                                  value={field.value}
+                                  onSelect={() => {
+                                    field.onChange(field.value);
+                                    setRegionComboboxOpen(false);
+                                  }}
+                                  className="flex items-center py-3 px-2 cursor-pointer"
+                                >
+                                  <div className="flex items-center">
+                                    <div className="w-4 h-4 mr-2 rounded border-2 border-primary flex items-center justify-center bg-primary/10">
+                                      <span className="text-xs text-primary font-bold">+</span>
+                                    </div>
+                                    <div>
+                                      <div className="text-sm font-medium">Tạo mới: "{field.value}"</div>
+                                      <div className="text-xs text-muted-foreground">Nhấn Enter hoặc click để tạo khu vực mới</div>
+                                    </div>
+                                  </div>
+                                </CommandItem>
+                              ) : (
+                                <div className="py-3 px-2 text-sm text-muted-foreground">
+                                  Nhập tên khu vực để tạo mới
+                                </div>
+                              )}
                             </CommandEmpty>
                             {regions.length > 0 && (
-                              <CommandGroup>
-                                {regions.map((region) => (
-                                  <CommandItem
-                                    key={region}
-                                    value={region}
-                                    onSelect={(currentValue) => {
-                                      field.onChange(currentValue);
-                                      setRegionComboboxOpen(false);
-                                    }}
-                                  >
-                                    <Check
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        field.value === region ? "opacity-100" : "opacity-0"
-                                      )}
-                                    />
-                                    {region}
-                                  </CommandItem>
-                                ))}
+                              <CommandGroup heading="Khu vực hiện có">
+                                {regions
+                                  .filter(region =>
+                                    !field.value ||
+                                    region.toLowerCase().includes(field.value.toLowerCase())
+                                  )
+                                  .map((region) => (
+                                    <CommandItem
+                                      key={region}
+                                      value={region}
+                                      onSelect={(currentValue) => {
+                                        field.onChange(currentValue);
+                                        setRegionComboboxOpen(false);
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          field.value === region ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {region}
+                                    </CommandItem>
+                                  ))}
                               </CommandGroup>
                             )}
                           </CommandList>
