@@ -1,4 +1,4 @@
-import { desc, and, eq, isNull } from 'drizzle-orm';
+import { desc, and, eq, isNull, sql } from 'drizzle-orm';
 import { db } from './drizzle';
 import { activityLogs, teamMembers, teams, users } from './schema';
 import { cookies } from 'next/headers';
@@ -127,4 +127,45 @@ export async function getTeamForUser() {
   });
 
   return result?.team || null;
+}
+
+export async function verifyKitchenIndexes(): Promise<void> {
+  try {
+    const indexes = await db.execute(sql`
+      SELECT indexname FROM pg_indexes
+      WHERE tablename = 'teams'
+      AND indexname IN (
+        'idx_teams_kitchen_code',
+        'idx_teams_team_type',
+        'idx_teams_region_status',
+        'idx_teams_name_search'
+      )
+    `);
+
+    const requiredIndexCount = 4;
+    const foundIndexCount = indexes.length;
+
+    if (foundIndexCount < requiredIndexCount) {
+      const foundIndexNames = indexes.map((row: any) => row.indexname);
+      const missingIndexes = [
+        'idx_teams_kitchen_code',
+        'idx_teams_team_type',
+        'idx_teams_region_status',
+        'idx_teams_name_search'
+      ].filter(indexName => !foundIndexNames.includes(indexName));
+
+      throw new Error(
+        `Database performance indexes missing. Found ${foundIndexCount}/${requiredIndexCount} required indexes. ` +
+        `Missing indexes: ${missingIndexes.join(', ')}. ` +
+        `Please run database migrations first to create the required performance indexes.`
+      );
+    }
+
+    console.log(`Database verification passed: All ${requiredIndexCount} required kitchen indexes found.`);
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to verify kitchen database indexes: Unknown error occurred.');
+  }
 }

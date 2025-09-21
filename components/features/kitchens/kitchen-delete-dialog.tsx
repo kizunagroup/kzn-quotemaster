@@ -1,137 +1,144 @@
-"use client";
+'use client';
 
-import React, { useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import { deleteKitchen } from '@/lib/actions/kitchen.actions';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
-// Type for kitchen data (matches the getKitchens return type)
-interface KitchenData {
-  id: number;
-  kitchenCode: string | null;
-  name: string;
-  region: string | null;
-  address: string | null;
-  managerName: string | null;
-  phone: string | null;
-  email: string | null;
-  teamType: string | null;
-  status: string | null;
-  createdAt: Date | null;
-  updatedAt: Date | null;
-}
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { deleteKitchen } from '@/lib/actions/kitchen.actions';
+import type { Kitchen } from '@/lib/hooks/use-kitchens';
 
 interface KitchenDeleteDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  kitchen: KitchenData | null;
-  onSuccess?: () => void;
+  onSuccess: () => void;
+  kitchen: Kitchen | null;
 }
 
 export function KitchenDeleteDialog({
   isOpen,
   onClose,
-  kitchen,
   onSuccess,
+  kitchen,
 }: KitchenDeleteDialogProps) {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const handleConfirm = async () => {
-    if (!kitchen) {
-      return;
-    }
+  // Handle delete confirmation
+  const handleDelete = async () => {
+    if (!kitchen) return;
 
-    setIsLoading(true);
+    setIsDeleting(true);
 
     try {
-      const formData = new FormData();
-      formData.append('id', kitchen.id.toString());
+      const result = await deleteKitchen({ id: kitchen.id });
 
-      const result = await deleteKitchen({}, formData);
-
-      if (result.error) {
-        toast.error(result.error);
-      } else if (result.success) {
+      if (result.success) {
         toast.success(result.success);
-        onClose(); // Close the dialog on success
-        onSuccess?.(); // Call additional success callback if provided
-      } else {
-        toast.error('Phản hồi không hợp lệ từ server.');
+        onSuccess();
+        onClose();
+      } else if (result.error) {
+        toast.error(result.error);
       }
     } catch (error) {
-      console.error('🔄 [API] Delete operation failed', error);
-      toast.error('Có lỗi xảy ra khi ngưng hoạt động bếp. Vui lòng thử lại.');
+      console.error('Delete kitchen error:', error);
+      toast.error('Có lỗi xảy ra khi xóa bếp. Vui lòng thử lại.');
     } finally {
-      setIsLoading(false);
+      setIsDeleting(false);
     }
   };
 
-  const handleCancel = () => {
-    if (!isLoading) {
+  // Handle dialog close
+  const handleClose = () => {
+    if (!isDeleting) {
       onClose();
     }
   };
 
+  if (!kitchen) return null;
+
   return (
-    <Dialog open={isOpen} modal={false}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="text-red-600">Xác nhận ngưng hoạt động</DialogTitle>
-          <DialogDescription className="pt-2">
-            {kitchen ? (
-              <>
-                Bạn có chắc chắn muốn ngưng hoạt động bếp{' '}
-                <span className="font-medium text-gray-900">
-                  {kitchen.name}
-                </span>{' '}
-                (Mã: {kitchen.kitchenCode})?
-                <br />
-                <br />
-                <span className="text-red-600 font-medium">
-                  Hành động này sẽ đặt bếp về trạng thái không hoạt động và có thể được hoàn tác sau.
-                </span>
-              </>
-            ) : (
-              'Đang tải thông tin bếp...'
+    <AlertDialog open={isOpen} onOpenChange={handleClose}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <AlertDialogTitle>Xác nhận xóa bếp</AlertDialogTitle>
+              <AlertDialogDescription className="mt-2">
+                Bạn có chắc chắn muốn xóa bếp này? Hành động này không thể hoàn tác.
+              </AlertDialogDescription>
+            </div>
+          </div>
+        </AlertDialogHeader>
+
+        <div className="rounded-lg border bg-muted/50 p-4">
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="font-medium text-muted-foreground">Mã bếp:</span>
+              <span className="font-mono font-semibold">{kitchen.kitchenCode}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium text-muted-foreground">Tên bếp:</span>
+              <span className="font-semibold">{kitchen.name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="font-medium text-muted-foreground">Khu vực:</span>
+              <span>{kitchen.region}</span>
+            </div>
+            {kitchen.managerName && (
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">Quản lý:</span>
+                <span>{kitchen.managerName}</span>
+              </div>
             )}
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isLoading}
-            className="mb-2 sm:mb-0"
-          >
+          </div>
+        </div>
+
+        <div className="rounded-lg border-l-4 border-l-destructive bg-destructive/5 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium text-destructive mb-1">Lưu ý quan trọng:</p>
+              <ul className="text-muted-foreground space-y-1">
+                <li>• Bếp sẽ được đánh dấu là đã xóa và không còn hiển thị trong danh sách</li>
+                <li>• Dữ liệu lịch sử vẫn được bảo toàn trong hệ thống</li>
+                <li>• Bạn có thể khôi phục bếp này sau nếu cần thiết</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>
             Hủy
-          </Button>
-          <Button
-            type="button"
-            onClick={handleConfirm}
-            disabled={isLoading || !kitchen}
-            className="bg-red-600 hover:bg-red-700 text-white"
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isLoading ? (
+            {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang xử lý...
+                Đang xóa...
               </>
             ) : (
-              'Xác nhận'
+              'Xóa bếp'
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
