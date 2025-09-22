@@ -431,3 +431,532 @@ export async function getStaffById(id: number): Promise<Staff | { error: string 
     return { error: 'Có lỗi xảy ra khi tải thông tin nhân viên. Vui lòng thử lại.' };
   }
 }
+
+// Task 2.1.4: Server action to update staff information
+export async function updateStaff(values: UpdateStaffInput): Promise<ActionResult> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Validate input with schema
+    const validationResult = updateStaffSchema.safeParse(values);
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      return { error: `Dữ liệu không hợp lệ: ${errors}` };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 4. Fetch existing staff member to ensure they exist
+    const existingStaff = await db
+      .select({
+        id: users.id,
+        employeeCode: users.employeeCode,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        jobTitle: users.jobTitle,
+        department: users.department,
+        hireDate: users.hireDate,
+        status: users.status,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, validatedData.id))
+      .limit(1);
+
+    if (existingStaff.length === 0) {
+      return { error: 'Không tìm thấy nhân viên cần cập nhật' };
+    }
+
+    const currentStaff = existingStaff[0];
+
+    if (currentStaff.deletedAt) {
+      return { error: 'Không thể cập nhật nhân viên đã bị xóa' };
+    }
+
+    // 5. Check email uniqueness if being changed
+    if (validatedData.email && validatedData.email !== currentStaff.email) {
+      const emailIsUnique = await isEmailUnique(validatedData.email, validatedData.id);
+      if (!emailIsUnique) {
+        return { error: 'Email đã tồn tại trong hệ thống. Vui lòng sử dụng email khác.' };
+      }
+    }
+
+    // 6. Check employee code uniqueness if being changed
+    if (validatedData.employeeCode && validatedData.employeeCode !== currentStaff.employeeCode) {
+      const codeIsUnique = await isEmployeeCodeUnique(validatedData.employeeCode, validatedData.id);
+      if (!codeIsUnique) {
+        return { error: 'Mã nhân viên đã tồn tại. Vui lòng chọn mã khác.' };
+      }
+    }
+
+    // 7. Build update data with only provided fields
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
+
+    // Only update fields that were provided
+    if (validatedData.employeeCode !== undefined) {
+      updateData.employeeCode = validatedData.employeeCode.toUpperCase();
+    }
+    if (validatedData.name !== undefined) {
+      updateData.name = validatedData.name.trim();
+    }
+    if (validatedData.email !== undefined) {
+      updateData.email = validatedData.email.toLowerCase();
+    }
+    if (validatedData.phone !== undefined) {
+      updateData.phone = validatedData.phone?.trim() || null;
+    }
+    if (validatedData.jobTitle !== undefined) {
+      updateData.jobTitle = validatedData.jobTitle?.trim() || null;
+    }
+    if (validatedData.department !== undefined) {
+      updateData.department = validatedData.department.trim();
+    }
+    if (validatedData.hireDate !== undefined) {
+      updateData.hireDate = validatedData.hireDate ? new Date(validatedData.hireDate) : null;
+    }
+    if (validatedData.status !== undefined) {
+      updateData.status = validatedData.status;
+    }
+
+    // 8. Execute update command
+    const updatedStaff = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, validatedData.id))
+      .returning({
+        id: users.id,
+        employeeCode: users.employeeCode,
+        name: users.name,
+        email: users.email,
+      });
+
+    // 9. Revalidate cache and return success
+    revalidatePath('/danh-muc/nhan-vien');
+
+    return {
+      success: `Nhân viên "${updatedStaff[0].name}" (${updatedStaff[0].employeeCode}) đã được cập nhật thành công`
+    };
+
+  } catch (error) {
+    console.error('Update staff error:', error);
+    return { error: 'Có lỗi xảy ra khi cập nhật nhân viên. Vui lòng thử lại.' };
+  }
+}
+
+// Task 2.1.5: Server action to deactivate staff member (soft delete)
+export async function deactivateStaff(values: DeleteStaffInput): Promise<ActionResult> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Validate input data
+    const validationResult = deleteStaffSchema.safeParse(values);
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      return { error: `Dữ liệu không hợp lệ: ${errors}` };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 4. Check if staff exists and is currently active
+    const existingStaff = await db
+      .select({
+        id: users.id,
+        employeeCode: users.employeeCode,
+        name: users.name,
+        status: users.status,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, validatedData.id))
+      .limit(1);
+
+    if (existingStaff.length === 0) {
+      return { error: 'Không tìm thấy nhân viên cần tạm dừng' };
+    }
+
+    const staff = existingStaff[0];
+
+    if (staff.status === 'inactive' || staff.deletedAt) {
+      return { error: 'Nhân viên này đã được tạm dừng hoạt động' };
+    }
+
+    // 5. Deactivate staff by setting status to inactive and deletedAt timestamp
+    // Note: Team assignments are preserved for audit trail
+    const deactivatedStaff = await db
+      .update(users)
+      .set({
+        status: 'inactive',
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, validatedData.id))
+      .returning({
+        employeeCode: users.employeeCode,
+        name: users.name,
+      });
+
+    // 6. Revalidate cache and return success
+    revalidatePath('/danh-muc/nhan-vien');
+
+    return {
+      success: `Nhân viên "${deactivatedStaff[0].name}" (${deactivatedStaff[0].employeeCode}) đã được tạm dừng hoạt động`
+    };
+
+  } catch (error) {
+    console.error('Deactivate staff error:', error);
+    return { error: 'Có lỗi xảy ra khi tạm dừng nhân viên. Vui lòng thử lại.' };
+  }
+}
+
+// Task 2.1.5: Server action to activate staff member
+export async function activateStaff(data: { id: number }): Promise<ActionResult> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Validate input data
+    const validationResult = z.object({ id: z.number().positive() }).safeParse(data);
+    if (!validationResult.success) {
+      return { error: 'ID nhân viên không hợp lệ' };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 4. Check if staff exists and is currently inactive
+    const existingStaff = await db
+      .select({
+        id: users.id,
+        employeeCode: users.employeeCode,
+        name: users.name,
+        status: users.status,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, validatedData.id))
+      .limit(1);
+
+    if (existingStaff.length === 0) {
+      return { error: 'Không tìm thấy nhân viên cần kích hoạt' };
+    }
+
+    const staff = existingStaff[0];
+
+    if (staff.status === 'active' && !staff.deletedAt) {
+      return { error: 'Nhân viên này đã đang hoạt động' };
+    }
+
+    if (staff.status === 'terminated') {
+      return { error: 'Không thể kích hoạt nhân viên đã bị chấm dứt hợp đồng' };
+    }
+
+    // 5. Activate staff by setting status to active and clearing deletedAt
+    const activatedStaff = await db
+      .update(users)
+      .set({
+        status: 'active',
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, validatedData.id))
+      .returning({
+        employeeCode: users.employeeCode,
+        name: users.name,
+      });
+
+    // 6. Revalidate cache and return success
+    revalidatePath('/danh-muc/nhan-vien');
+
+    return {
+      success: `Nhân viên "${activatedStaff[0].name}" (${activatedStaff[0].employeeCode}) đã được kích hoạt lại`
+    };
+
+  } catch (error) {
+    console.error('Activate staff error:', error);
+    return { error: 'Có lỗi xảy ra khi kích hoạt nhân viên. Vui lòng thử lại.' };
+  }
+}
+
+// Task 2.1.6: Server action to get teams available for assignment
+export async function getTeamsForAssignment(): Promise<{ id: number; name: string; type: string }[] | { error: string }> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Query all active teams
+    const availableTeams = await db
+      .select({
+        id: teams.id,
+        name: teams.name,
+        teamType: teams.teamType,
+        status: teams.status,
+      })
+      .from(teams)
+      .where(
+        and(
+          isNull(teams.deletedAt), // Only active teams
+          eq(teams.status, 'active') // Only teams with active status
+        )
+      )
+      .orderBy(teams.teamType, teams.name); // Sort by type, then name
+
+    // 4. Return formatted data suitable for assignment selection
+    return availableTeams.map(team => ({
+      id: team.id,
+      name: team.name,
+      type: team.teamType || 'OFFICE', // Default to OFFICE if null
+    }));
+
+  } catch (error) {
+    console.error('Get teams for assignment error:', error);
+    return { error: 'Có lỗi xảy ra khi tải danh sách nhóm. Vui lòng thử lại.' };
+  }
+}
+
+// Task 2.1.6: Server action to assign staff to team
+export async function assignStaffToTeam(staffId: number, teamId: number, role: string): Promise<ActionResult> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Validate input parameters
+    const assignmentSchema = z.object({
+      staffId: z.number().positive('ID nhân viên không hợp lệ'),
+      teamId: z.number().positive('ID nhóm không hợp lệ'),
+      role: z.string().min(1, 'Vai trò là bắt buộc').max(50, 'Vai trò không được vượt quá 50 ký tự'),
+    });
+
+    const validationResult = assignmentSchema.safeParse({ staffId, teamId, role });
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      return { error: `Dữ liệu không hợp lệ: ${errors}` };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 4. Verify staff member exists and is active
+    const staff = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        employeeCode: users.employeeCode,
+        status: users.status,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, validatedData.staffId))
+      .limit(1);
+
+    if (staff.length === 0) {
+      return { error: 'Không tìm thấy nhân viên' };
+    }
+
+    if (staff[0].deletedAt || staff[0].status !== 'active') {
+      return { error: 'Không thể phân công nhân viên không hoạt động' };
+    }
+
+    // 5. Verify team exists and is active
+    const team = await db
+      .select({
+        id: teams.id,
+        name: teams.name,
+        teamType: teams.teamType,
+        status: teams.status,
+        deletedAt: teams.deletedAt,
+      })
+      .from(teams)
+      .where(eq(teams.id, validatedData.teamId))
+      .limit(1);
+
+    if (team.length === 0) {
+      return { error: 'Không tìm thấy nhóm' };
+    }
+
+    if (team[0].deletedAt || team[0].status !== 'active') {
+      return { error: 'Không thể phân công vào nhóm không hoạt động' };
+    }
+
+    // 6. Check for existing assignment to prevent duplicates
+    const existingAssignment = await db
+      .select({ id: teamMembers.id })
+      .from(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.userId, validatedData.staffId),
+          eq(teamMembers.teamId, validatedData.teamId)
+        )
+      )
+      .limit(1);
+
+    if (existingAssignment.length > 0) {
+      return { error: 'Nhân viên đã được phân công vào nhóm này' };
+    }
+
+    // 7. Create new team assignment
+    await db
+      .insert(teamMembers)
+      .values({
+        userId: validatedData.staffId,
+        teamId: validatedData.teamId,
+        role: validatedData.role,
+        joinedAt: new Date(),
+      });
+
+    // 8. Revalidate cache and return success
+    revalidatePath('/danh-muc/nhan-vien');
+
+    return {
+      success: `Nhân viên "${staff[0].name}" (${staff[0].employeeCode}) đã được phân công vào nhóm "${team[0].name}" với vai trò: ${validatedData.role}`
+    };
+
+  } catch (error) {
+    console.error('Assign staff to team error:', error);
+    return { error: 'Có lỗi xảy ra khi phân công nhân viên. Vui lòng thử lại.' };
+  }
+}
+
+// Task 2.1.6: Server action to remove staff from team
+export async function removeStaffFromTeam(staffId: number, teamId: number): Promise<ActionResult> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Validate input parameters
+    const removalSchema = z.object({
+      staffId: z.number().positive('ID nhân viên không hợp lệ'),
+      teamId: z.number().positive('ID nhóm không hợp lệ'),
+    });
+
+    const validationResult = removalSchema.safeParse({ staffId, teamId });
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      return { error: `Dữ liệu không hợp lệ: ${errors}` };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 4. Verify assignment exists
+    const assignment = await db
+      .select({
+        id: teamMembers.id,
+        role: teamMembers.role,
+        userId: teamMembers.userId,
+        teamId: teamMembers.teamId,
+      })
+      .from(teamMembers)
+      .leftJoin(users, eq(teamMembers.userId, users.id))
+      .leftJoin(teams, eq(teamMembers.teamId, teams.id))
+      .where(
+        and(
+          eq(teamMembers.userId, validatedData.staffId),
+          eq(teamMembers.teamId, validatedData.teamId)
+        )
+      )
+      .limit(1);
+
+    if (assignment.length === 0) {
+      return { error: 'Không tìm thấy phân công này' };
+    }
+
+    // 5. Get staff and team info for success message
+    const staffInfo = await db
+      .select({
+        name: users.name,
+        employeeCode: users.employeeCode,
+      })
+      .from(users)
+      .where(eq(users.id, validatedData.staffId))
+      .limit(1);
+
+    const teamInfo = await db
+      .select({
+        name: teams.name,
+      })
+      .from(teams)
+      .where(eq(teams.id, validatedData.teamId))
+      .limit(1);
+
+    // 6. Remove team assignment
+    await db
+      .delete(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.userId, validatedData.staffId),
+          eq(teamMembers.teamId, validatedData.teamId)
+        )
+      );
+
+    // 7. Revalidate cache and return success
+    revalidatePath('/danh-muc/nhan-vien');
+
+    const staffName = staffInfo[0]?.name || 'Không xác định';
+    const staffCode = staffInfo[0]?.employeeCode || 'N/A';
+    const teamName = teamInfo[0]?.name || 'Không xác định';
+
+    return {
+      success: `Đã hủy phân công nhân viên "${staffName}" (${staffCode}) khỏi nhóm "${teamName}"`
+    };
+
+  } catch (error) {
+    console.error('Remove staff from team error:', error);
+    return { error: 'Có lỗi xảy ra khi hủy phân công nhân viên. Vui lòng thử lại.' };
+  }
+}
