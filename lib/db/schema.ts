@@ -7,12 +7,14 @@ import {
   integer,
   decimal,
   unique,
+  check,
+  index,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }),
+  name: varchar('name', { length: 100 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   role: varchar('role', { length: 20 }).notNull().default('member'),
@@ -29,6 +31,7 @@ export const teams = pgTable('teams', {
   name: varchar('name', { length: 100 }).notNull(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  deletedAt: timestamp('deleted_at'),
   stripeCustomerId: text('stripe_customer_id').unique(),
   stripeSubscriptionId: text('stripe_subscription_id').unique(),
   stripeProductId: text('stripe_product_id'),
@@ -38,20 +41,28 @@ export const teams = pgTable('teams', {
   kitchenCode: varchar('kitchen_code', { length: 50 }).unique(),
   region: varchar('region', { length: 50 }),
   address: text('address'),
-  managerName: varchar('manager_name', { length: 100 }),
-  phone: varchar('phone', { length: 20 }),
-  email: varchar('email', { length: 255 }),
+  // Manager relationship (NORMALIZED)
+  managerId: integer('manager_id').references(() => users.id, { onDelete: 'set null' }),
   teamType: varchar('team_type', { length: 20 }).default('OFFICE').notNull(),
-});
+  status: varchar('status', { length: 20 }).default('active').notNull(),
+}, (table) => ({
+  // Performance indexes for Kitchen Management
+  kitchenCodeIdx: index('idx_teams_kitchen_code').on(table.kitchenCode).where(sql`${table.kitchenCode} IS NOT NULL`),
+  teamTypeIdx: index('idx_teams_team_type').on(table.teamType),
+  regionStatusIdx: index('idx_teams_region_status').on(table.region, table.deletedAt),
+  nameSearchIdx: index('idx_teams_name_search').on(table.name).where(sql`${table.teamType} = 'KITCHEN'`),
+  managerIdx: index('idx_teams_manager_id').on(table.managerId).where(sql`${table.managerId} IS NOT NULL`),
+  compositeIdx: index('idx_teams_kitchen_composite').on(table.teamType, table.region, table.deletedAt, table.name),
+}));
 
 export const teamMembers = pgTable('team_members', {
   id: serial('id').primaryKey(),
   userId: integer('user_id')
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   teamId: integer('team_id')
     .notNull()
-    .references(() => teams.id),
+    .references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   role: varchar('role', { length: 50 }).notNull(),
   joinedAt: timestamp('joined_at').notNull().defaultNow(),
 });
@@ -60,8 +71,8 @@ export const activityLogs = pgTable('activity_logs', {
   id: serial('id').primaryKey(),
   teamId: integer('team_id')
     .notNull()
-    .references(() => teams.id),
-  userId: integer('user_id').references(() => users.id),
+    .references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+  userId: integer('user_id').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   action: text('action').notNull(),
   timestamp: timestamp('timestamp').notNull().defaultNow(),
   ipAddress: varchar('ip_address', { length: 45 }),
@@ -71,12 +82,12 @@ export const invitations = pgTable('invitations', {
   id: serial('id').primaryKey(),
   teamId: integer('team_id')
     .notNull()
-    .references(() => teams.id),
+    .references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   email: varchar('email', { length: 255 }).notNull(),
   role: varchar('role', { length: 50 }).notNull(),
   invitedBy: integer('invited_by')
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   invitedAt: timestamp('invited_at').notNull().defaultNow(),
   status: varchar('status', { length: 20 }).notNull().default('pending'),
 });
@@ -114,24 +125,26 @@ export const quotations = pgTable('quotations', {
   id: serial('id').primaryKey(),
   quotationId: varchar('quotation_id', { length: 100 }).notNull().unique(),
   period: varchar('period', { length: 10 }).notNull(),
-  supplierId: integer('supplier_id').references(() => suppliers.id).notNull(),
-  teamId: integer('team_id').references(() => teams.id).notNull(),
+  supplierId: integer('supplier_id').references(() => suppliers.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
   region: varchar('region', { length: 50 }).notNull(),
   category: varchar('category', { length: 100 }).notNull(),
   quoteDate: timestamp('quote_date'),
   updateDate: timestamp('update_date'),
   status: varchar('status', { length: 20 }).default('pending').notNull(),
-  createdBy: integer('created_by').references(() => users.id).notNull(),
+  createdBy: integer('created_by').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   uniqueQuotePerTeamPerPeriod: unique().on(table.period, table.supplierId, table.teamId),
+  periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
+  validStatus: check('valid_status', sql`${table.status} IN ('pending', 'approved', 'cancelled', 'negotiation')`),
 }));
 
 export const quoteItems = pgTable('quote_items', {
   id: serial('id').primaryKey(),
-  quotationId: integer('quotation_id').references(() => quotations.id, { onDelete: 'cascade' }).notNull(),
-  productId: integer('product_id').references(() => products.id).notNull(),
+  quotationId: integer('quotation_id').references(() => quotations.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  productId: integer('product_id').references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
   quantity: decimal('quantity', { precision: 12, scale: 2 }),
   initialPrice: decimal('initial_price', { precision: 12, scale: 2 }),
   negotiatedPrice: decimal('negotiated_price', { precision: 12, scale: 2 }),
@@ -142,48 +155,68 @@ export const quoteItems = pgTable('quote_items', {
   negotiationRounds: integer('negotiation_rounds').default(0),
   lastNegotiatedAt: timestamp('last_negotiated_at'),
   approvedAt: timestamp('approved_at'),
-  approvedBy: integer('approved_by').references(() => users.id),
+  approvedBy: integer('approved_by').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   notes: text('notes'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   uniqueQuoteItem: unique().on(table.quotationId, table.productId),
+  positiveQuantity: check('positive_quantity', sql`${table.quantity} > 0`),
+  nonNegativePrices: check('non_negative_prices', sql`
+    ${table.initialPrice} >= 0 AND
+    (${table.negotiatedPrice} >= 0 OR ${table.negotiatedPrice} IS NULL) AND
+    (${table.approvedPrice} >= 0 OR ${table.approvedPrice} IS NULL)
+  `),
+  validVatPercentage: check('valid_vat', sql`${table.vatPercentage} >= 0 AND ${table.vatPercentage} <= 100`),
 }));
 
 export const priceHistory = pgTable('price_history', {
   id: serial('id').primaryKey(),
-  productId: integer('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
-  supplierId: integer('supplier_id').references(() => suppliers.id, { onDelete: 'cascade' }).notNull(),
-  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }),
+  productId: integer('product_id').references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  supplierId: integer('supplier_id').references(() => suppliers.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
   period: varchar('period', { length: 10 }).notNull(),
   price: decimal('price', { precision: 12, scale: 2 }).notNull(),
   priceType: varchar('price_type', { length: 20 }).notNull(),
   region: varchar('region', { length: 50 }),
   recordedAt: timestamp('recorded_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  nonNegativePrice: check('non_negative_price', sql`${table.price} >= 0`),
+  periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
+  validPriceType: check('valid_price_type', sql`${table.priceType} IN ('initial', 'negotiated', 'approved')`),
+}));
 
 export const kitchenPeriodDemands = pgTable('kitchen_period_demands', {
   id: serial('id').primaryKey(),
-  teamId: integer('team_id').references(() => teams.id, { onDelete: 'cascade' }).notNull(),
-  productId: integer('product_id').references(() => products.id, { onDelete: 'cascade' }).notNull(),
+  teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
+  productId: integer('product_id').references(() => products.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
   period: varchar('period', { length: 10 }).notNull(),
   quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
   unit: varchar('unit', { length: 50 }).notNull(),
   notes: text('notes'),
   status: varchar('status', { length: 20 }).default('active').notNull(),
-  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdBy: integer('created_by').references(() => users.id, { onUpdate: 'cascade', onDelete: 'set null' }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   uniqueDemand: unique().on(table.teamId, table.productId, table.period),
+  positiveQuantity: check('positive_quantity', sql`${table.quantity} > 0`),
+  periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
+  validStatus: check('valid_status', sql`${table.status} IN ('active', 'inactive')`),
 }));
 
 // Relations
-export const teamsRelations = relations(teams, ({ many }) => ({
+export const teamsRelations = relations(teams, ({ one, many }) => ({
   // Template relations preserved
   teamMembers: many(teamMembers),
   activityLogs: many(activityLogs),
   invitations: many(invitations),
+  // Manager relationship - normalized reference to users table
+  manager: one(users, {
+    fields: [teams.managerId],
+    references: [users.id],
+    relationName: 'teamManager',
+  }),
   // QuoteMaster extensions
   quotations: many(quotations),
   demands: many(kitchenPeriodDemands),
@@ -193,6 +226,10 @@ export const usersRelations = relations(users, ({ many }) => ({
   // Template relations preserved
   teamMembers: many(teamMembers),
   invitationsSent: many(invitations),
+  // Managed teams relationship (one manager can manage multiple teams)
+  managedTeams: many(teams, {
+    relationName: 'teamManager',
+  }),
   // QuoteMaster extensions
   quotations: many(quotations),
   createdDemands: many(kitchenPeriodDemands),
@@ -360,5 +397,6 @@ export enum ActivityType {
   DELETE_SUPPLIER = 'DELETE_SUPPLIER',
   CREATE_KITCHEN = 'CREATE_KITCHEN',
   UPDATE_KITCHEN = 'UPDATE_KITCHEN',
+  DELETE_KITCHEN = 'DELETE_KITCHEN',
   SEED_DATABASE = 'SEED_DATABASE',
 }
