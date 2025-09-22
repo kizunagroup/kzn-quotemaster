@@ -83,7 +83,7 @@ export function ManagerCombobox({
     return managers.find(manager => manager.id === value) || null;
   }, [value, managers]);
 
-  // Filter managers based on search query
+  // Filter managers based on search query - FIXED CLIENT-SIDE FILTERING
   const filteredManagers = useMemo(() => {
     if (!searchQuery.trim()) return managers;
 
@@ -117,7 +117,7 @@ export function ManagerCombobox({
     onChange(undefined);
   };
 
-  // Handle search input change
+  // Handle search input change - FIXED TO UPDATE SEARCH QUERY
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
   };
@@ -229,7 +229,7 @@ export function ManagerCombobox({
       </PopoverTrigger>
 
       <PopoverContent className="w-[400px] p-0" align="start">
-        <Command>
+        <Command shouldFilter={false}>
           <CommandInput
             placeholder="Tìm kiếm quản lý..."
             className="h-9"

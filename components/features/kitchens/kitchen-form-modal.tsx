@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Check, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Check, ChevronsUpDown, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -75,10 +75,10 @@ export function KitchenFormModal({
   const [regionComboboxOpen, setRegionComboboxOpen] = useState(false);
   const isEditMode = Boolean(kitchen);
 
-  // Form setup with conditional schema based on mode
+  // Form setup with conditional schema based on mode - ENABLED INSTANT VALIDATION
   const form = useForm<z.infer<typeof createFormSchema> | z.infer<typeof updateFormSchema>>({
     resolver: zodResolver(isEditMode ? updateFormSchema : createFormSchema),
-    mode: 'onChange', // Enable instant validation
+    mode: 'onChange', // FIXED: Enable instant validation for all fields
     defaultValues: {
       kitchenCode: '',
       name: '',
@@ -235,7 +235,7 @@ export function KitchenFormModal({
                 )}
               />
 
-              {/* Region Combobox */}
+              {/* Region Combobox - IMPROVED UX */}
               <FormField
                 control={form.control}
                 name="region"
@@ -268,7 +268,7 @@ export function KitchenFormModal({
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-full p-0" align="start">
-                        <Command>
+                        <Command shouldFilter={false}>
                           <CommandInput
                             placeholder="Tìm kiếm hoặc nhập khu vực mới..."
                             value={field.value}
@@ -276,7 +276,7 @@ export function KitchenFormModal({
                               field.onChange(searchValue);
                             }}
                             onKeyDown={(e) => {
-                              // Handle Enter key to create new region or select current input
+                              // FIXED: Handle Enter key to create new region or select current input
                               if (e.key === 'Enter') {
                                 e.preventDefault();
                                 if (field.value && field.value.trim() !== '') {
@@ -296,11 +296,11 @@ export function KitchenFormModal({
                                   }}
                                   className="flex items-center py-3 px-2 cursor-pointer"
                                 >
-                                  <div className="flex items-center">
+                                  <div className="flex items-center w-full">
                                     <div className="w-4 h-4 mr-2 rounded border-2 border-primary flex items-center justify-center bg-primary/10">
-                                      <span className="text-xs text-primary font-bold">+</span>
+                                      <Plus className="h-3 w-3 text-primary" />
                                     </div>
-                                    <div>
+                                    <div className="flex-1">
                                       <div className="text-sm font-medium">Tạo mới: "{field.value}"</div>
                                       <div className="text-xs text-muted-foreground">Nhấn Enter hoặc click để tạo khu vực mới</div>
                                     </div>
