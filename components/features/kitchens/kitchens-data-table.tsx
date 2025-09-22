@@ -241,7 +241,7 @@ export function KitchensDataTable() {
     },
     {
       accessorKey: 'teamType',
-      enableSorting: true,
+      enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Loại Hình"
@@ -254,7 +254,7 @@ export function KitchensDataTable() {
     },
     {
       accessorKey: 'managerName',
-      enableSorting: true,
+      enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Quản Lý"
