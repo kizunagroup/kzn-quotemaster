@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -25,24 +25,10 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 
 import {
   createKitchen,
   updateKitchen,
-  getRegions,
 } from '@/lib/actions/kitchen.actions';
 import {
   createKitchenSchema,
@@ -50,7 +36,7 @@ import {
 } from '@/lib/schemas/kitchen.schemas';
 import type { Kitchen } from '@/lib/hooks/use-kitchens';
 import { ManagerCombobox } from './manager-combobox';
-import { cn } from '@/lib/utils';
+import { RegionCombobox } from './region-combobox';
 
 // Form validation schemas
 const createFormSchema = createKitchenSchema;
@@ -70,15 +56,12 @@ export function KitchenFormModal({
   kitchen,
 }: KitchenFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [regions, setRegions] = useState<string[]>([]);
-  const [regionsLoading, setRegionsLoading] = useState(false);
-  const [regionComboboxOpen, setRegionComboboxOpen] = useState(false);
   const isEditMode = Boolean(kitchen);
 
-  // Form setup with conditional schema based on mode - ENABLED INSTANT VALIDATION
+  // Form setup with conditional schema based on mode - INSTANT VALIDATION ENABLED
   const form = useForm<z.infer<typeof createFormSchema> | z.infer<typeof updateFormSchema>>({
     resolver: zodResolver(isEditMode ? updateFormSchema : createFormSchema),
-    mode: 'onChange', // FIXED: Enable instant validation for all fields
+    mode: 'onChange', // Enable instant validation for all fields
     defaultValues: {
       kitchenCode: '',
       name: '',
@@ -88,31 +71,6 @@ export function KitchenFormModal({
       ...(isEditMode && kitchen && { id: kitchen.id }),
     },
   });
-
-  // Fetch regions when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      const fetchRegions = async () => {
-        setRegionsLoading(true);
-        try {
-          const result = await getRegions();
-          if (Array.isArray(result)) {
-            setRegions(result);
-          } else {
-            console.error('Failed to fetch regions:', result.error);
-            setRegions([]);
-          }
-        } catch (error) {
-          console.error('Error fetching regions:', error);
-          setRegions([]);
-        } finally {
-          setRegionsLoading(false);
-        }
-      };
-
-      fetchRegions();
-    }
-  }, [isOpen]);
 
   // Reset form when modal opens/closes or kitchen changes
   useEffect(() => {
@@ -195,7 +153,7 @@ export function KitchenFormModal({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Kitchen Code */}
+              {/* Kitchen Code - INSTANT VALIDATION ENABLED */}
               <FormField
                 control={form.control}
                 name="kitchenCode"
@@ -235,114 +193,21 @@ export function KitchenFormModal({
                 )}
               />
 
-              {/* Region Combobox - IMPROVED UX */}
+              {/* Region Combobox - REFACTORED TO USE DEDICATED COMPONENT */}
               <FormField
                 control={form.control}
                 name="region"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Khu vực *</FormLabel>
-                    <Popover open={regionComboboxOpen} onOpenChange={setRegionComboboxOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={regionComboboxOpen}
-                            className={cn(
-                              "w-full justify-between",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            disabled={isSubmitting || regionsLoading}
-                          >
-                            {regionsLoading ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Đang tải...
-                              </>
-                            ) : (
-                              field.value || "Chọn hoặc nhập khu vực..."
-                            )}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0" align="start">
-                        <Command shouldFilter={false}>
-                          <CommandInput
-                            placeholder="Tìm kiếm hoặc nhập khu vực mới..."
-                            value={field.value}
-                            onValueChange={(searchValue) => {
-                              field.onChange(searchValue);
-                            }}
-                            onKeyDown={(e) => {
-                              // FIXED: Handle Enter key to create new region or select current input
-                              if (e.key === 'Enter') {
-                                e.preventDefault();
-                                if (field.value && field.value.trim() !== '') {
-                                  setRegionComboboxOpen(false);
-                                }
-                              }
-                            }}
-                          />
-                          <CommandList>
-                            <CommandEmpty>
-                              {field.value && field.value.trim() !== '' ? (
-                                <CommandItem
-                                  value={field.value}
-                                  onSelect={() => {
-                                    field.onChange(field.value);
-                                    setRegionComboboxOpen(false);
-                                  }}
-                                  className="flex items-center py-3 px-2 cursor-pointer"
-                                >
-                                  <div className="flex items-center w-full">
-                                    <div className="w-4 h-4 mr-2 rounded border-2 border-primary flex items-center justify-center bg-primary/10">
-                                      <Plus className="h-3 w-3 text-primary" />
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="text-sm font-medium">Tạo mới: "{field.value}"</div>
-                                      <div className="text-xs text-muted-foreground">Nhấn Enter hoặc click để tạo khu vực mới</div>
-                                    </div>
-                                  </div>
-                                </CommandItem>
-                              ) : (
-                                <div className="py-3 px-2 text-sm text-muted-foreground">
-                                  Nhập tên khu vực để tạo mới
-                                </div>
-                              )}
-                            </CommandEmpty>
-                            {regions.length > 0 && (
-                              <CommandGroup heading="Khu vực hiện có">
-                                {regions
-                                  .filter(region =>
-                                    !field.value ||
-                                    region.toLowerCase().includes(field.value.toLowerCase())
-                                  )
-                                  .map((region) => (
-                                    <CommandItem
-                                      key={region}
-                                      value={region}
-                                      onSelect={(currentValue) => {
-                                        field.onChange(currentValue);
-                                        setRegionComboboxOpen(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          field.value === region ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      {region}
-                                    </CommandItem>
-                                  ))}
-                              </CommandGroup>
-                            )}
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <FormControl>
+                      <RegionCombobox
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Chọn hoặc nhập khu vực..."
+                        disabled={isSubmitting}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
