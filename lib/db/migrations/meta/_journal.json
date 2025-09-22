@@ -8,6 +8,13 @@
       "when": 1758470655427,
       "tag": "0000_perfect_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1758525162758,
+      "tag": "0001_soft_micromacro",
+      "breakpoints": true
     }
   ]
 }

@@ -12,19 +12,48 @@ import {
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
-export const users = pgTable('users', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull(),
-  email: varchar('email', { length: 255 }).notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
-  role: varchar('role', { length: 20 }).notNull().default('member'),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
-  deletedAt: timestamp('deleted_at'),
-  // QuoteMaster extensions
-  employeeCode: varchar('employee_code', { length: 50 }).unique(),
-  phone: varchar('phone', { length: 20 }),
-});
+export const users = pgTable(
+  'users',
+  {
+    // Existing template fields preserved ✅
+    id: serial('id').primaryKey(),
+    name: varchar('name', { length: 100 }).notNull(),
+    email: varchar('email', { length: 255 }).notNull().unique(),
+    passwordHash: text('password_hash').notNull(),
+    role: varchar('role', { length: 20 }).notNull().default('member'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at'),
+
+    // QuoteMaster staff extensions (already defined in spec)
+    employeeCode: varchar('employee_code', { length: 50 }).unique(),
+    phone: varchar('phone', { length: 20 }),
+
+    // Additional staff-specific fields
+    jobTitle: varchar('job_title', { length: 100 }),
+    department: varchar('department', { length: 50 }),
+    hireDate: timestamp('hire_date'),
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+  },
+  (table) => ({
+    // Performance indexes
+    employeeCodeIdx: index('idx_users_employee_code')
+      .on(table.employeeCode)
+      .where(sql`${table.employeeCode} IS NOT NULL`),
+    departmentIdx: index('idx_users_department').on(table.department),
+    statusIdx: index('idx_users_status').on(table.status),
+
+    // Data integrity constraints
+    employeeCodeCheck: check(
+      'employee_code_format',
+      sql`${table.employeeCode} ~ '^[A-Z0-9_-]+$'`
+    ),
+    statusCheck: check(
+      'status_values',
+      sql`${table.status} IN ('active', 'inactive', 'terminated')`
+    ),
+  })
+);
 
 export const teams = pgTable('teams', {
   id: serial('id').primaryKey(),
