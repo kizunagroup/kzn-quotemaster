@@ -36,11 +36,13 @@ import {
 import {
   createStaff,
   updateStaff,
+} from '@/lib/actions/staff.actions';
+import {
   createStaffSchema,
   updateStaffSchema,
   type CreateStaffInput,
   type UpdateStaffInput,
-} from '@/lib/actions/staff.actions';
+} from '@/lib/schemas/staff.schemas';
 import type { Staff } from '@/lib/hooks/use-staff';
 import { DepartmentCombobox } from './department-combobox';
 

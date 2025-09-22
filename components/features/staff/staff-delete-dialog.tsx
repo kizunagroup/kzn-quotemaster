@@ -17,8 +17,8 @@ import {
 import {
   deactivateStaff,
   updateStaff,
-  type UpdateStaffInput
 } from '@/lib/actions/staff.actions';
+import { type UpdateStaffInput } from '@/lib/schemas/staff.schemas';
 import type { Staff } from '@/lib/hooks/use-staff';
 
 interface StaffDeleteDialogProps {
