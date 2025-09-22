@@ -3,9 +3,10 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/drizzle';
-import { teams, users } from '@/lib/db/schema';
+import { teams, users, teamMembers } from '@/lib/db/schema';
 import { eq, and, ilike, isNull, sql } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
+import { checkPermission, getUserWithTeams } from '@/lib/auth/permissions';
 import {
   createKitchenSchema,
   updateKitchenSchema,
@@ -14,7 +15,6 @@ import {
   type UpdateKitchenInput,
   type DeleteKitchenInput,
 } from '@/lib/schemas/kitchen.schemas';
-
 
 // Helper function to check kitchen code uniqueness
 async function isKitchenCodeUnique(kitchenCode: string, excludeId?: number): Promise<boolean> {
@@ -41,7 +41,7 @@ async function isKitchenCodeUnique(kitchenCode: string, excludeId?: number): Pro
   return existingKitchen.length === 0;
 }
 
-// Helper function to validate manager exists and has appropriate permissions
+// Helper function to validate manager exists (PURE TEAM-BASED RBAC)
 async function validateManager(managerId: number): Promise<{ valid: boolean; error?: string; manager?: any }> {
   try {
     const manager = await db
@@ -49,7 +49,7 @@ async function validateManager(managerId: number): Promise<{ valid: boolean; err
         id: users.id,
         name: users.name,
         email: users.email,
-        role: users.role,
+        status: users.status,
         deletedAt: users.deletedAt,
       })
       .from(users)
@@ -66,9 +66,25 @@ async function validateManager(managerId: number): Promise<{ valid: boolean; err
       return { valid: false, error: 'Quản lý được chỉ định đã bị vô hiệu hóa' };
     }
 
-    // Check if user has manager-level permissions (consistent with getKitchenManagers)
-    const allowedRoles = ['admin', 'manager', 'super_admin', 'admin_super_admin', 'procurement_manager', 'kitchen_manager'];
-    if (!allowedRoles.includes(managerData.role.toLowerCase())) {
+    if (managerData.status !== 'active') {
+      return { valid: false, error: 'Quản lý được chỉ định không ở trạng thái hoạt động' };
+    }
+
+    // PURE TEAM-BASED RBAC: Check if user has management permissions via team roles
+    const userWithTeams = await getUserWithTeams(managerId);
+    let hasManagerPermissions = false;
+
+    if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
+      // Check for admin or management roles in any team
+      hasManagerPermissions = userWithTeams.teams.some(tm => {
+        const role = tm.role.toUpperCase();
+        return role.includes('ADMIN_') ||
+               role.includes('MANAGER') ||
+               role.includes('SUPER_ADMIN');
+      });
+    }
+
+    if (!hasManagerPermissions) {
       return {
         valid: false,
         error: 'Người dùng được chỉ định không có quyền quản lý bếp'
@@ -82,8 +98,67 @@ async function validateManager(managerId: number): Promise<{ valid: boolean; err
   }
 }
 
-// Server action to get eligible kitchen managers (Task 2.1.3)
-export async function getKitchenManagers(): Promise<{ id: number; name: string; email: string; role: string; }[] | { error: string }> {
+// Helper function to manage team membership for kitchen managers
+async function manageKitchenManagerMembership(
+  managerId: number,
+  kitchenTeamId: number,
+  action: 'create' | 'update',
+  previousManagerId?: number
+): Promise<void> {
+  try {
+    // Remove previous manager from team if updating and manager changed
+    if (action === 'update' && previousManagerId && previousManagerId !== managerId) {
+      await db
+        .delete(teamMembers)
+        .where(
+          and(
+            eq(teamMembers.userId, previousManagerId),
+            eq(teamMembers.teamId, kitchenTeamId),
+            eq(teamMembers.role, 'KITCHEN_MANAGER')
+          )
+        );
+    }
+
+    // Check if new manager is already a member of this team
+    const existingMembership = await db
+      .select({ id: teamMembers.id, role: teamMembers.role })
+      .from(teamMembers)
+      .where(
+        and(
+          eq(teamMembers.userId, managerId),
+          eq(teamMembers.teamId, kitchenTeamId)
+        )
+      )
+      .limit(1);
+
+    if (existingMembership.length > 0) {
+      // Update existing membership to KITCHEN_MANAGER role
+      await db
+        .update(teamMembers)
+        .set({
+          role: 'KITCHEN_MANAGER',
+          joinedAt: new Date() // Update join time for role change
+        })
+        .where(eq(teamMembers.id, existingMembership[0].id));
+    } else {
+      // Create new team membership with KITCHEN_MANAGER role
+      await db
+        .insert(teamMembers)
+        .values({
+          userId: managerId,
+          teamId: kitchenTeamId,
+          role: 'KITCHEN_MANAGER',
+          joinedAt: new Date()
+        });
+    }
+  } catch (error) {
+    console.error('Error managing kitchen manager membership:', error);
+    throw new Error('Lỗi khi cập nhật quyền quản lý bếp');
+  }
+}
+
+// Server action to get eligible kitchen managers (PURE TEAM-BASED RBAC)
+export async function getKitchenManagers(): Promise<{ id: number; name: string; email: string; currentRole: string; }[] | { error: string }> {
   try {
     // 1. Authorization check
     const user = await getUser();
@@ -91,39 +166,98 @@ export async function getKitchenManagers(): Promise<{ id: number; name: string; 
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Query users table for eligible managers
-    const managers = await db
+    // 2. Check kitchen management permission
+    const canManageKitchens = await checkPermission(user.id, 'canManageKitchens');
+    if (!canManageKitchens) {
+      return { error: 'Không có quyền quản lý bếp' };
+    }
+
+    // 3. Get all active users
+    const allUsers = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
-        role: users.role,
+        status: users.status,
       })
       .from(users)
       .where(
         and(
-          isNull(users.deletedAt), // Only active users
-          // Filter for users with manager-level permissions
-          sql`LOWER(${users.role}) IN ('admin', 'manager', 'super_admin', 'admin_super_admin', 'procurement_manager', 'kitchen_manager')`
+          eq(users.status, 'active'),
+          isNull(users.deletedAt)
         )
-      )
-      .orderBy(users.name); // Sort alphabetically for better UX
+      );
 
-    // 3. Return formatted data suitable for combobox
-    return managers.map(manager => ({
-      id: manager.id,
-      name: manager.name,
-      email: manager.email,
-      role: manager.role,
-    }));
+    // 4. Filter users who have management permissions via team roles
+    const eligibleManagers = [];
 
+    for (const user of allUsers) {
+      const userWithTeams = await getUserWithTeams(user.id);
+      let hasManagerPermissions = false;
+      let currentRole = 'No Role';
+
+      if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
+        // Check for admin or management roles in any team
+        const managerTeam = userWithTeams.teams.find(tm => {
+          const role = tm.role.toUpperCase();
+          return role.includes('ADMIN_') ||
+                 role.includes('MANAGER') ||
+                 role.includes('SUPER_ADMIN');
+        });
+
+        if (managerTeam) {
+          hasManagerPermissions = true;
+          currentRole = managerTeam.role;
+        }
+      }
+
+      if (hasManagerPermissions) {
+        eligibleManagers.push({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          currentRole: currentRole
+        });
+      }
+    }
+
+    return eligibleManagers;
   } catch (error) {
     console.error('Get kitchen managers error:', error);
-    return { error: 'Có lỗi xảy ra khi tải danh sách quản lý. Vui lòng thử lại.' };
+    return { error: 'Có lỗi xảy ra khi tải danh sách quản lý' };
   }
 }
 
-// Server action to create a new kitchen (UPDATED FOR NORMALIZED MANAGER)
+// Server action to get regions for kitchen creation/filtering
+export async function getRegions(): Promise<string[] | { error: string }> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Query distinct regions from existing kitchens
+    const regions = await db
+      .selectDistinct({ region: teams.region })
+      .from(teams)
+      .where(
+        and(
+          eq(teams.teamType, 'KITCHEN'),
+          isNull(teams.deletedAt),
+          sql`${teams.region} IS NOT NULL AND ${teams.region} != ''`
+        )
+      )
+      .orderBy(teams.region);
+
+    return regions.map(r => r.region).filter(Boolean);
+  } catch (error) {
+    console.error('Get regions error:', error);
+    return { error: 'Có lỗi xảy ra khi tải danh sách khu vực' };
+  }
+}
+
+// Server action to create a new kitchen (ENHANCED with team member management)
 export async function createKitchen(data: CreateKitchenInput) {
   try {
     // 1. Authorization check
@@ -132,7 +266,13 @@ export async function createKitchen(data: CreateKitchenInput) {
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Validate input data
+    // 2. Check kitchen management permission
+    const canManageKitchens = await checkPermission(user.id, 'canManageKitchens');
+    if (!canManageKitchens) {
+      return { error: 'Không có quyền tạo bếp mới' };
+    }
+
+    // 3. Validate input data
     const validationResult = createKitchenSchema.safeParse(data);
     if (!validationResult.success) {
       const errors = validationResult.error.errors.map(err => err.message).join(', ');
@@ -141,19 +281,19 @@ export async function createKitchen(data: CreateKitchenInput) {
 
     const validatedData = validationResult.data;
 
-    // 3. Validate manager exists and has permissions
+    // 4. Validate manager exists and has permissions
     const managerValidation = await validateManager(validatedData.managerId);
     if (!managerValidation.valid) {
       return { error: managerValidation.error };
     }
 
-    // 4. Check kitchen code uniqueness
+    // 5. Check kitchen code uniqueness
     const isUnique = await isKitchenCodeUnique(validatedData.kitchenCode);
     if (!isUnique) {
       return { error: 'Mã bếp đã tồn tại. Vui lòng chọn mã khác.' };
     }
 
-    // 5. Create kitchen record with normalized manager relationship
+    // 6. Create kitchen record with normalized manager relationship
     const newKitchen = await db
       .insert(teams)
       .values({
@@ -174,12 +314,19 @@ export async function createKitchen(data: CreateKitchenInput) {
         managerId: teams.managerId
       });
 
-    // 6. Revalidate cache and return success
-    revalidatePath('/danh-muc/bep');
+    const kitchen = newKitchen[0];
 
-    const managerName = managerValidation.manager?.name || 'Không xác định';
+    // 7. ENHANCED: Automatically create team membership for manager
+    await manageKitchenManagerMembership(
+      validatedData.managerId,
+      kitchen.id,
+      'create'
+    );
+
+    // 8. Revalidate cache and return success
+    revalidatePath('/danh-muc/bep');
     return {
-      success: `Bếp "${newKitchen[0].name}" (${newKitchen[0].kitchenCode}) đã được tạo thành công với quản lý: ${managerName}`
+      success: `Bếp "${kitchen.name}" (${kitchen.kitchenCode}) đã được tạo thành công và quản lý đã được phân quyền`
     };
 
   } catch (error) {
@@ -188,7 +335,7 @@ export async function createKitchen(data: CreateKitchenInput) {
   }
 }
 
-// Server action to update an existing kitchen (Task 2.1.2)
+// Server action to update an existing kitchen (ENHANCED with team member management)
 export async function updateKitchen(data: UpdateKitchenInput) {
   try {
     // 1. Authorization check
@@ -197,7 +344,13 @@ export async function updateKitchen(data: UpdateKitchenInput) {
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Validate input data
+    // 2. Check kitchen management permission
+    const canManageKitchens = await checkPermission(user.id, 'canManageKitchens');
+    if (!canManageKitchens) {
+      return { error: 'Không có quyền cập nhật bếp' };
+    }
+
+    // 3. Validate input data
     const validationResult = updateKitchenSchema.safeParse(data);
     if (!validationResult.success) {
       const errors = validationResult.error.errors.map(err => err.message).join(', ');
@@ -206,7 +359,7 @@ export async function updateKitchen(data: UpdateKitchenInput) {
 
     const validatedData = validationResult.data;
 
-    // 3. Fetch existing kitchen to ensure it exists
+    // 4. Fetch existing kitchen to ensure it exists
     const existingKitchen = await db
       .select({
         id: teams.id,
@@ -237,7 +390,7 @@ export async function updateKitchen(data: UpdateKitchenInput) {
       return { error: 'Không thể cập nhật bếp đã bị xóa' };
     }
 
-    // 4. Check kitchen code uniqueness if being changed
+    // 5. Check kitchen code uniqueness if being changed
     if (validatedData.kitchenCode && validatedData.kitchenCode !== currentKitchen.kitchenCode) {
       const isUnique = await isKitchenCodeUnique(validatedData.kitchenCode, validatedData.id);
       if (!isUnique) {
@@ -245,7 +398,7 @@ export async function updateKitchen(data: UpdateKitchenInput) {
       }
     }
 
-    // 5. Validate new manager if managerId is being changed
+    // 6. Validate new manager if being changed
     if (validatedData.managerId && validatedData.managerId !== currentKitchen.managerId) {
       const managerValidation = await validateManager(validatedData.managerId);
       if (!managerValidation.valid) {
@@ -253,35 +406,17 @@ export async function updateKitchen(data: UpdateKitchenInput) {
       }
     }
 
-    // 6. Build update data with only provided fields
-    const updateData: any = {
-      updatedAt: new Date(),
-    };
-
-    // Only update fields that were provided
-    if (validatedData.kitchenCode !== undefined) {
-      updateData.kitchenCode = validatedData.kitchenCode.trim().toUpperCase();
-    }
-    if (validatedData.name !== undefined) {
-      updateData.name = validatedData.name.trim();
-    }
-    if (validatedData.region !== undefined) {
-      updateData.region = validatedData.region.trim();
-    }
-    if (validatedData.address !== undefined) {
-      updateData.address = validatedData.address?.trim() || null;
-    }
-    if (validatedData.managerId !== undefined) {
-      updateData.managerId = validatedData.managerId;
-    }
-    if (validatedData.status !== undefined) {
-      updateData.status = validatedData.status;
-    }
-
-    // 7. Execute update command
+    // 7. Update kitchen record
     const updatedKitchen = await db
       .update(teams)
-      .set(updateData)
+      .set({
+        kitchenCode: validatedData.kitchenCode?.trim().toUpperCase() || currentKitchen.kitchenCode,
+        name: validatedData.name?.trim() || currentKitchen.name,
+        region: validatedData.region?.trim() || currentKitchen.region,
+        address: validatedData.address?.trim() || currentKitchen.address,
+        managerId: validatedData.managerId || currentKitchen.managerId,
+        updatedAt: new Date(),
+      })
       .where(eq(teams.id, validatedData.id))
       .returning({
         id: teams.id,
@@ -290,11 +425,22 @@ export async function updateKitchen(data: UpdateKitchenInput) {
         managerId: teams.managerId
       });
 
-    // 8. Revalidate cache and return success
-    revalidatePath('/danh-muc/bep');
+    const kitchen = updatedKitchen[0];
 
+    // 8. ENHANCED: Update team membership if manager changed
+    if (validatedData.managerId && validatedData.managerId !== currentKitchen.managerId) {
+      await manageKitchenManagerMembership(
+        validatedData.managerId,
+        kitchen.id,
+        'update',
+        currentKitchen.managerId || undefined
+      );
+    }
+
+    // 9. Revalidate cache and return success
+    revalidatePath('/danh-muc/bep');
     return {
-      success: `Bếp "${updatedKitchen[0].name}" (${updatedKitchen[0].kitchenCode}) đã được cập nhật thành công`
+      success: `Bếp "${kitchen.name}" (${kitchen.kitchenCode}) đã được cập nhật thành công${validatedData.managerId !== currentKitchen.managerId ? ' và quyền quản lý đã được cập nhật' : ''}`
     };
 
   } catch (error) {
@@ -303,7 +449,7 @@ export async function updateKitchen(data: UpdateKitchenInput) {
   }
 }
 
-// Server action to deactivate a kitchen (renamed from deleteKitchen for clarity)
+// Server action to deactivate a kitchen
 export async function deactivateKitchen(data: DeleteKitchenInput) {
   try {
     // 1. Authorization check
@@ -312,7 +458,13 @@ export async function deactivateKitchen(data: DeleteKitchenInput) {
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Validate input data
+    // 2. Check kitchen management permission
+    const canManageKitchens = await checkPermission(user.id, 'canManageKitchens');
+    if (!canManageKitchens) {
+      return { error: 'Không có quyền tạm dừng bếp' };
+    }
+
+    // 3. Validate input data
     const validationResult = deleteKitchenSchema.safeParse(data);
     if (!validationResult.success) {
       const errors = validationResult.error.errors.map(err => err.message).join(', ');
@@ -321,13 +473,12 @@ export async function deactivateKitchen(data: DeleteKitchenInput) {
 
     const validatedData = validationResult.data;
 
-    // 3. Check if kitchen exists and is currently active
+    // 4. Fetch existing kitchen
     const existingKitchen = await db
       .select({
         id: teams.id,
         kitchenCode: teams.kitchenCode,
         name: teams.name,
-        managerId: teams.managerId,
         status: teams.status,
         deletedAt: teams.deletedAt
       })
@@ -346,31 +497,27 @@ export async function deactivateKitchen(data: DeleteKitchenInput) {
 
     const kitchen = existingKitchen[0];
 
-    if (kitchen.status === 'inactive' || kitchen.deletedAt) {
-      return { error: 'Bếp này đã được tạm dừng hoạt động' };
+    if (kitchen.deletedAt) {
+      return { error: 'Bếp đã được tạm dừng trước đó' };
     }
 
-    // 4. Deactivate kitchen by setting status to inactive and deletedAt timestamp
-    // Note: managerId is preserved for audit trail
-    const deactivatedKitchen = await db
+    if (kitchen.status === 'inactive') {
+      return { error: 'Bếp đã ở trạng thái tạm dừng' };
+    }
+
+    // 5. Deactivate kitchen (soft delete)
+    await db
       .update(teams)
       .set({
         status: 'inactive',
-        deletedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(teams.id, validatedData.id))
-      .returning({
-        kitchenCode: teams.kitchenCode,
-        name: teams.name,
-        managerId: teams.managerId
-      });
+      .where(eq(teams.id, validatedData.id));
 
-    // 5. Revalidate cache and return success
+    // 6. Revalidate cache and return success
     revalidatePath('/danh-muc/bep');
-
     return {
-      success: `Bếp "${deactivatedKitchen[0].name}" (${deactivatedKitchen[0].kitchenCode}) đã được tạm dừng hoạt động`
+      success: `Bếp "${kitchen.name}" (${kitchen.kitchenCode}) đã được tạm dừng hoạt động`
     };
 
   } catch (error) {
@@ -378,110 +525,3 @@ export async function deactivateKitchen(data: DeleteKitchenInput) {
     return { error: 'Có lỗi xảy ra khi tạm dừng bếp. Vui lòng thử lại.' };
   }
 }
-
-// Server action to activate a kitchen
-export async function activateKitchen(data: { id: number }) {
-  try {
-    // 1. Authorization check
-    const user = await getUser();
-    if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
-    }
-
-    // 2. Validate input data
-    const validationResult = z.object({ id: z.number().positive() }).safeParse(data);
-    if (!validationResult.success) {
-      return { error: 'ID bếp không hợp lệ' };
-    }
-
-    const validatedData = validationResult.data;
-
-    // 3. Check if kitchen exists and is currently inactive
-    const existingKitchen = await db
-      .select({
-        id: teams.id,
-        kitchenCode: teams.kitchenCode,
-        name: teams.name,
-        managerId: teams.managerId,
-        status: teams.status,
-        deletedAt: teams.deletedAt
-      })
-      .from(teams)
-      .where(
-        and(
-          eq(teams.id, validatedData.id),
-          eq(teams.teamType, 'KITCHEN')
-        )
-      )
-      .limit(1);
-
-    if (existingKitchen.length === 0) {
-      return { error: 'Không tìm thấy bếp cần kích hoạt' };
-    }
-
-    const kitchen = existingKitchen[0];
-
-    if (kitchen.status === 'active' && !kitchen.deletedAt) {
-      return { error: 'Bếp này đã đang hoạt động' };
-    }
-
-    // 4. Activate kitchen by setting status to active and clearing deletedAt
-    const activatedKitchen = await db
-      .update(teams)
-      .set({
-        status: 'active',
-        deletedAt: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(teams.id, validatedData.id))
-      .returning({
-        kitchenCode: teams.kitchenCode,
-        name: teams.name,
-        managerId: teams.managerId
-      });
-
-    // 5. Revalidate cache and return success
-    revalidatePath('/danh-muc/bep');
-
-    return {
-      success: `Bếp "${activatedKitchen[0].name}" (${activatedKitchen[0].kitchenCode}) đã được kích hoạt lại`
-    };
-
-  } catch (error) {
-    console.error('Activate kitchen error:', error);
-    return { error: 'Có lỗi xảy ra khi kích hoạt bếp. Vui lòng thử lại.' };
-  }
-}
-
-// Server action to get distinct regions from kitchens
-export async function getRegions(): Promise<string[] | { error: string }> {
-  try {
-    // 1. Authorization check
-    const user = await getUser();
-    if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
-    }
-
-    // 2. Query distinct regions from teams table where teamType is KITCHEN
-    const regions = await db
-      .selectDistinct({ region: teams.region })
-      .from(teams)
-      .where(
-        and(
-          eq(teams.teamType, 'KITCHEN'),
-          isNull(teams.deletedAt) // Only get regions from active kitchens
-        )
-      )
-      .orderBy(teams.region);
-
-    // 3. Return array of region strings
-    return regions
-      .map(r => r.region)
-      .filter(region => region && region.trim() !== ''); // Filter out null/empty regions
-
-  } catch (error) {
-    console.error('Get regions error:', error);
-    return { error: 'Có lỗi xảy ra khi tải danh sách khu vực. Vui lòng thử lại.' };
-  }
-}
-

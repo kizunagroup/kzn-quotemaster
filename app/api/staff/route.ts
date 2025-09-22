@@ -4,7 +4,7 @@ import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
 import { and, eq, ilike, isNull, asc, desc, sql, or, inArray } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
-import { checkPermission, getUserWithTeams } from '@/lib/auth/permissions';
+import { getUserWithTeams } from '@/lib/auth/permissions';
 
 // Exported constants for valid status values
 export const VALID_STATUSES = ['all', 'active', 'inactive', 'terminated'] as const;
@@ -71,9 +71,25 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 2. Check staff management permission
-    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
-    if (!canManageStaff) {
+    // 2. Check staff management permission - PURE TEAM-BASED AUTHORIZATION
+    const userWithTeams = await getUserWithTeams(user.id);
+    let hasStaffManagementPermission = false;
+
+    // Check if user has admin roles that grant staff management permissions
+    if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
+      const hasAdminRole = userWithTeams.teams.some(tm => {
+        const role = tm.role.toUpperCase();
+        // Admin roles that grant staff management access
+        return role === 'ADMIN_SUPER_ADMIN' ||
+               role === 'ADMIN_MANAGER';
+      });
+
+      if (hasAdminRole) {
+        hasStaffManagementPermission = true;
+      }
+    }
+
+    if (!hasStaffManagementPermission) {
       return NextResponse.json(
         { error: 'Forbidden: Insufficient permissions to manage staff' },
         { status: 403 }
@@ -103,32 +119,12 @@ export async function GET(request: NextRequest) {
       baseWhereConditions.push(sql`${users.status} != 'terminated'`);
     }
 
-    // 5. Task 2.2.2: Role-based data filtering (CRITICAL SECURITY REQUIREMENT) - FIXED
-    const userWithTeams = await getUserWithTeams(user.id);
+    // 5. Task 2.2.2: Role-based data filtering (CRITICAL SECURITY REQUIREMENT) - PURE TEAM-BASED RBAC
     let roleBasedConditions: any[] = [];
 
-    // Check if user is super admin based on multiple criteria
-    let isSuperAdmin = false;
-
-    // Check 1: Root user role (from original template)
-    if (user.role === 'owner' || user.role === 'admin') {
-      isSuperAdmin = true;
-    }
-
-    // Check 2: Team-based admin roles
-    if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
-      const hasAdminRole = userWithTeams.teams.some(tm => {
-        const role = tm.role.toUpperCase();
-        // FIXED: Check if role starts with ADMIN_ (more robust)
-        return role === 'ADMIN_SUPER_ADMIN' ||
-               role === 'ADMIN_MANAGER' ||
-               role === 'OWNER'; // Template role with full access
-      });
-
-      if (hasAdminRole) {
-        isSuperAdmin = true;
-      }
-    }
+    // Check if user is super admin based on PURE team-based RBAC
+    // Note: We already have userWithTeams from the authorization check above
+    let isSuperAdmin = hasStaffManagementPermission; // If user has staff management permission, they are admin
 
     // Apply role-based restrictions if user is not super admin
     if (!isSuperAdmin) {

@@ -15,6 +15,13 @@
       "when": 1758525162758,
       "tag": "0001_soft_micromacro",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1758563728809,
+      "tag": "0002_acoustic_celestials",
+      "breakpoints": true
     }
   ]
 }
