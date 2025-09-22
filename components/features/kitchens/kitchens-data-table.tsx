@@ -265,6 +265,10 @@ export function KitchensDataTable() {
     {
       accessorKey: 'teamType',
       enableSorting: false,
+      enableHiding: true,
+      meta: {
+        defaultIsVisible: false,
+      },
       header: ({ column }) => (
         <DataTableColumnHeader
           title="Loại Hình"
@@ -368,11 +372,19 @@ export function KitchensDataTable() {
     enableSorting: true,
     // Single column sorting only
     enableMultiSort: false,
+    // Enable column hiding
+    enableHiding: true,
     // Provide current sorting state and change handler
     state: {
       sorting,
     },
     onSortingChange: handleSortingChange,
+    // Set initial column visibility based on meta.defaultIsVisible
+    initialState: {
+      columnVisibility: {
+        teamType: false, // Hide "Loại Hình" by default
+      },
+    },
   });
 
   if (error) {
