@@ -5,8 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/drizzle';
 import { teams, users, teamMembers } from '@/lib/db/schema';
 import { eq, and, ilike, isNull, sql } from 'drizzle-orm';
-import { getUser } from '@/lib/db/queries';
-import { checkPermission, getUserWithTeams } from '@/lib/auth/permissions';
+import { getUser, getUserWithTeams } from '@/lib/db/queries';
+import { checkPermission } from '@/lib/auth/permissions';
 import {
   createKitchenSchema,
   updateKitchenSchema,

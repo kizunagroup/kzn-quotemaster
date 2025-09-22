@@ -3,8 +3,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
 import { and, eq, ilike, isNull, asc, desc, sql, or, inArray } from 'drizzle-orm';
-import { getUser } from '@/lib/db/queries';
-import { getUserWithTeams } from '@/lib/auth/permissions';
+import { getUser, getUserWithTeams } from '@/lib/db/queries';
 
 // Exported constants for valid status values
 export const VALID_STATUSES = ['all', 'active', 'inactive', 'terminated'] as const;
