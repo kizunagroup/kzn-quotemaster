@@ -596,6 +596,7 @@ export function StaffDataTable() {
         onClose={handleCloseDeleteModal}
         onSuccess={handleModalSuccess}
         staff={selectedStaff}
+        actionType="deactivate"
       />
 
       <TeamAssignmentModal

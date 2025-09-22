@@ -26,7 +26,7 @@ interface StaffDeleteDialogProps {
   onClose: () => void;
   onSuccess: () => void;
   staff: Staff | null;
-  actionType: 'deactivate' | 'terminate';
+  actionType?: 'deactivate' | 'terminate';
 }
 
 export function StaffDeleteDialog({
@@ -34,12 +34,12 @@ export function StaffDeleteDialog({
   onClose,
   onSuccess,
   staff,
-  actionType,
+  actionType = 'deactivate', // Default to 'deactivate' for safety
 }: StaffDeleteDialogProps) {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Configuration based on action type
-  const config = {
+  const actionConfig = {
     deactivate: {
       title: 'Xác nhận tạm dừng nhân viên',
       description: 'Bạn có chắc chắn muốn tạm dừng hoạt động của nhân viên này? Nhân viên sẽ được đánh dấu là tạm dừng.',
@@ -78,11 +78,15 @@ export function StaffDeleteDialog({
     }
   };
 
-  const currentConfig = config[actionType];
+  // Safe config retrieval with fallback to prevent crashes
+  const currentConfig = actionConfig[actionType] || actionConfig.deactivate;
 
   // Handle action confirmation
   const handleAction = async () => {
-    if (!staff) return;
+    if (!staff || !staff.id) {
+      toast.error('Không thể thực hiện thao tác: Thông tin nhân viên không hợp lệ.');
+      return;
+    }
 
     setIsProcessing(true);
 
@@ -96,8 +100,8 @@ export function StaffDeleteDialog({
         // Use updateStaff to set status to terminated
         const updateData: UpdateStaffInput = {
           id: staff.id,
-          name: staff.name,
-          email: staff.email,
+          name: staff.name || '',
+          email: staff.email || '',
           phone: staff.phone || '',
           jobTitle: staff.jobTitle || '',
           department: staff.department || '',
@@ -108,12 +112,18 @@ export function StaffDeleteDialog({
         result = await updateStaff(updateData);
       }
 
-      if (result.success) {
+      if (result?.success) {
         toast.success(result.success);
-        onSuccess();
-        onClose();
-      } else if (result.error) {
+        if (typeof onSuccess === 'function') {
+          onSuccess();
+        }
+        if (typeof onClose === 'function') {
+          onClose();
+        }
+      } else if (result?.error) {
         toast.error(result.error);
+      } else {
+        toast.error('Thao tác không thành công. Vui lòng thử lại.');
       }
     } catch (error) {
       console.error(`${actionType} staff error:`, error);
@@ -125,7 +135,7 @@ export function StaffDeleteDialog({
 
   // Handle dialog close
   const handleClose = () => {
-    if (!isProcessing) {
+    if (!isProcessing && typeof onClose === 'function') {
       onClose();
     }
   };
@@ -154,7 +164,7 @@ export function StaffDeleteDialog({
         {/* Staff Information */}
         <div className="rounded-lg border bg-muted/50 p-4">
           <div className="space-y-2">
-            {staff.employeeCode && (
+            {staff.employeeCode && staff.employeeCode.trim() !== '' && (
               <div className="flex justify-between">
                 <span className="font-medium text-muted-foreground">Mã nhân viên:</span>
                 <span className="font-mono font-semibold">{staff.employeeCode}</span>
@@ -162,19 +172,19 @@ export function StaffDeleteDialog({
             )}
             <div className="flex justify-between">
               <span className="font-medium text-muted-foreground">Tên nhân viên:</span>
-              <span className="font-semibold">{staff.name}</span>
+              <span className="font-semibold">{staff.name || 'N/A'}</span>
             </div>
             <div className="flex justify-between">
               <span className="font-medium text-muted-foreground">Email:</span>
-              <span>{staff.email}</span>
+              <span>{staff.email || 'N/A'}</span>
             </div>
-            {staff.department && (
+            {staff.department && staff.department.trim() !== '' && (
               <div className="flex justify-between">
                 <span className="font-medium text-muted-foreground">Phòng ban:</span>
                 <span>{staff.department}</span>
               </div>
             )}
-            {staff.jobTitle && (
+            {staff.jobTitle && staff.jobTitle.trim() !== '' && (
               <div className="flex justify-between">
                 <span className="font-medium text-muted-foreground">Chức danh:</span>
                 <span>{staff.jobTitle}</span>
