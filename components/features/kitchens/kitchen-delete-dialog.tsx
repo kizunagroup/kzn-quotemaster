@@ -14,7 +14,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { deleteKitchen } from '@/lib/actions/kitchen.actions';
+import { deactivateKitchen } from '@/lib/actions/kitchen.actions';
 import type { Kitchen } from '@/lib/hooks/use-kitchens';
 
 interface KitchenDeleteDialogProps {
@@ -30,16 +30,16 @@ export function KitchenDeleteDialog({
   onSuccess,
   kitchen,
 }: KitchenDeleteDialogProps) {
-  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
 
-  // Handle delete confirmation
-  const handleDelete = async () => {
+  // Handle deactivate confirmation
+  const handleDeactivate = async () => {
     if (!kitchen) return;
 
-    setIsDeleting(true);
+    setIsDeactivating(true);
 
     try {
-      const result = await deleteKitchen({ id: kitchen.id });
+      const result = await deactivateKitchen({ id: kitchen.id });
 
       if (result.success) {
         toast.success(result.success);
@@ -49,16 +49,16 @@ export function KitchenDeleteDialog({
         toast.error(result.error);
       }
     } catch (error) {
-      console.error('Delete kitchen error:', error);
-      toast.error('Có lỗi xảy ra khi ngưng hoạt động bếp. Vui lòng thử lại.');
+      console.error('Deactivate kitchen error:', error);
+      toast.error('Có lỗi xảy ra khi tạm dừng bếp. Vui lòng thử lại.');
     } finally {
-      setIsDeleting(false);
+      setIsDeactivating(false);
     }
   };
 
   // Handle dialog close
   const handleClose = () => {
-    if (!isDeleting) {
+    if (!isDeactivating) {
       onClose();
     }
   };
@@ -74,9 +74,9 @@ export function KitchenDeleteDialog({
               <AlertTriangle className="h-5 w-5 text-destructive" />
             </div>
             <div>
-              <AlertDialogTitle>Xác nhận ngưng hoạt động bếp</AlertDialogTitle>
+              <AlertDialogTitle>Xác nhận tạm dừng bếp</AlertDialogTitle>
               <AlertDialogDescription className="mt-2">
-                Bạn có chắc chắn muốn ngưng hoạt động bếp này? Bếp sẽ được đánh dấu là không hoạt động.
+                Bạn có chắc chắn muốn tạm dừng hoạt động của bếp này? Bếp sẽ được đánh dấu là không hoạt động.
               </AlertDialogDescription>
             </div>
           </div>
@@ -111,30 +111,30 @@ export function KitchenDeleteDialog({
             <div className="text-sm">
               <p className="font-medium text-destructive mb-1">Lưu ý quan trọng:</p>
               <ul className="text-muted-foreground space-y-1">
-                <li>• Bếp sẽ được đánh dấu là ngưng hoạt động và không còn hiển thị trong danh sách</li>
+                <li>• Bếp sẽ được đánh dấu là tạm dừng hoạt động</li>
                 <li>• Dữ liệu lịch sử vẫn được bảo toàn trong hệ thống</li>
-                <li>• Bạn có thể khôi phục hoạt động bếp này sau nếu cần thiết</li>
+                <li>• Bạn có thể kích hoạt lại bếp này bất cứ lúc nào</li>
               </ul>
             </div>
           </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>
+          <AlertDialogCancel disabled={isDeactivating}>
             Hủy
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={handleDeactivate}
+            disabled={isDeactivating}
+            className="bg-orange-600 text-white hover:bg-orange-700"
           >
-            {isDeleting ? (
+            {isDeactivating ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang ngưng hoạt động...
+                Đang tạm dừng...
               </>
             ) : (
-              'Ngưng hoạt động'
+              'Tạm Dừng'
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

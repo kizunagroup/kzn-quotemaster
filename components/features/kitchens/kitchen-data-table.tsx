@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import {
   Table,
   TableBody,
@@ -18,7 +19,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Search, ChevronLeft, ChevronRight, Edit, PowerOff } from 'lucide-react';
+import { MoreHorizontal, Search, ChevronLeft, ChevronRight, Edit, PowerOff, Play } from 'lucide-react';
+import { activateKitchen } from '@/lib/actions/kitchen.actions';
 
 // Type definition for kitchen data based on the getKitchens return type
 interface Kitchen {
@@ -31,6 +33,7 @@ interface Kitchen {
   phone: string | null;
   email: string | null;
   teamType: string | null;
+  status: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
 }
@@ -38,7 +41,8 @@ interface Kitchen {
 interface KitchenDataTableProps {
   data: Kitchen[];
   onEdit: (kitchen: Kitchen) => void;
-  onDelete: (kitchen: Kitchen) => void;
+  onDeactivate: (kitchen: Kitchen) => void;
+  onRefresh: () => void;
 }
 
 export interface KitchenDataTableRef {
@@ -47,10 +51,11 @@ export interface KitchenDataTableRef {
 
 const ITEMS_PER_PAGE = 10;
 
-export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDataTableProps>(({ data, onEdit, onDelete }, ref) => {
+export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDataTableProps>(({ data, onEdit, onDeactivate, onRefresh }, ref) => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [activatingId, setActivatingId] = useState<number | null>(null);
 
   // Filter data based on search term (kitchen name)
   const filteredData = useMemo(() => {
@@ -76,7 +81,28 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
   };
 
   const handleDeactivate = (kitchen: Kitchen) => {
-    onDelete(kitchen);
+    onDeactivate(kitchen);
+  };
+
+  // Handle activating a kitchen directly
+  const handleActivate = async (kitchen: Kitchen) => {
+    setActivatingId(kitchen.id);
+
+    try {
+      const result = await activateKitchen({ id: kitchen.id });
+
+      if (result.success) {
+        toast.success(result.success);
+        onRefresh(); // Refresh data to show updated status
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error('Activate kitchen error:', error);
+      toast.error('Có lỗi xảy ra khi kích hoạt bếp');
+    } finally {
+      setActivatingId(null);
+    }
   };
 
   const handleAddNew = () => {
@@ -165,9 +191,15 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
                   <TableCell>{kitchen.phone || 'N/A'}</TableCell>
                   <TableCell>{kitchen.email || 'N/A'}</TableCell>
                   <TableCell>
-                    <Badge variant="success">
-                      Hoạt động
-                    </Badge>
+                    {kitchen.status === 'active' ? (
+                      <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                        Hoạt động
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="bg-red-100 text-red-800 border-red-200">
+                        Tạm dừng
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -185,13 +217,24 @@ export const KitchenDataTable = React.forwardRef<KitchenDataTableRef, KitchenDat
                           <Edit className="mr-2 h-4 w-4" />
                           Sửa
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDeactivate(kitchen)}
-                          className="cursor-pointer text-red-600"
-                        >
-                          <PowerOff className="mr-2 h-4 w-4" />
-                          Ngưng hoạt động
-                        </DropdownMenuItem>
+                        {kitchen.status === 'active' ? (
+                          <DropdownMenuItem
+                            onClick={() => handleDeactivate(kitchen)}
+                            className="cursor-pointer text-orange-600"
+                          >
+                            <PowerOff className="mr-2 h-4 w-4" />
+                            Tạm Dừng
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem
+                            onClick={() => handleActivate(kitchen)}
+                            className="cursor-pointer text-green-600"
+                            disabled={activatingId === kitchen.id}
+                          >
+                            <Play className="mr-2 h-4 w-4" />
+                            {activatingId === kitchen.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

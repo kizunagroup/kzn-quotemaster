@@ -302,8 +302,8 @@ export async function updateKitchen(data: UpdateKitchenInput) {
   }
 }
 
-// Server action to soft delete a kitchen (Task 2.1.4)
-export async function deleteKitchen(data: DeleteKitchenInput) {
+// Server action to deactivate a kitchen (renamed from deleteKitchen for clarity)
+export async function deactivateKitchen(data: DeleteKitchenInput) {
   try {
     // 1. Authorization check
     const user = await getUser();
@@ -320,13 +320,14 @@ export async function deleteKitchen(data: DeleteKitchenInput) {
 
     const validatedData = validationResult.data;
 
-    // 3. Check if kitchen exists and is not already deleted
+    // 3. Check if kitchen exists and is currently active
     const existingKitchen = await db
       .select({
         id: teams.id,
         kitchenCode: teams.kitchenCode,
         name: teams.name,
         managerId: teams.managerId,
+        status: teams.status,
         deletedAt: teams.deletedAt
       })
       .from(teams)
@@ -339,20 +340,22 @@ export async function deleteKitchen(data: DeleteKitchenInput) {
       .limit(1);
 
     if (existingKitchen.length === 0) {
-      return { error: 'Không tìm thấy bếp cần xóa' };
+      return { error: 'Không tìm thấy bếp cần tạm dừng' };
     }
 
-    if (existingKitchen[0].deletedAt) {
-      return { error: 'Bếp này đã được xóa trước đó' };
+    const kitchen = existingKitchen[0];
+
+    if (kitchen.status === 'inactive' || kitchen.deletedAt) {
+      return { error: 'Bếp này đã được tạm dừng hoạt động' };
     }
 
-    // 4. Perform soft delete by setting deletedAt timestamp AND status to inactive
+    // 4. Deactivate kitchen by setting status to inactive and deletedAt timestamp
     // Note: managerId is preserved for audit trail
-    const deletedKitchen = await db
+    const deactivatedKitchen = await db
       .update(teams)
       .set({
+        status: 'inactive',
         deletedAt: new Date(),
-        status: 'inactive', // Set status to inactive for consistent source of truth
         updatedAt: new Date(),
       })
       .where(eq(teams.id, validatedData.id))
@@ -366,12 +369,86 @@ export async function deleteKitchen(data: DeleteKitchenInput) {
     revalidatePath('/danh-muc/bep');
 
     return {
-      success: `Bếp "${deletedKitchen[0].name}" (${deletedKitchen[0].kitchenCode}) đã được xóa thành công`
+      success: `Bếp "${deactivatedKitchen[0].name}" (${deactivatedKitchen[0].kitchenCode}) đã được tạm dừng hoạt động`
     };
 
   } catch (error) {
-    console.error('Delete kitchen error:', error);
-    return { error: 'Có lỗi xảy ra khi xóa bếp. Vui lòng thử lại.' };
+    console.error('Deactivate kitchen error:', error);
+    return { error: 'Có lỗi xảy ra khi tạm dừng bếp. Vui lòng thử lại.' };
+  }
+}
+
+// Server action to activate a kitchen
+export async function activateKitchen(data: { id: number }) {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Validate input data
+    const validationResult = z.object({ id: z.number().positive() }).safeParse(data);
+    if (!validationResult.success) {
+      return { error: 'ID bếp không hợp lệ' };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 3. Check if kitchen exists and is currently inactive
+    const existingKitchen = await db
+      .select({
+        id: teams.id,
+        kitchenCode: teams.kitchenCode,
+        name: teams.name,
+        managerId: teams.managerId,
+        status: teams.status,
+        deletedAt: teams.deletedAt
+      })
+      .from(teams)
+      .where(
+        and(
+          eq(teams.id, validatedData.id),
+          eq(teams.teamType, 'KITCHEN')
+        )
+      )
+      .limit(1);
+
+    if (existingKitchen.length === 0) {
+      return { error: 'Không tìm thấy bếp cần kích hoạt' };
+    }
+
+    const kitchen = existingKitchen[0];
+
+    if (kitchen.status === 'active' && !kitchen.deletedAt) {
+      return { error: 'Bếp này đã đang hoạt động' };
+    }
+
+    // 4. Activate kitchen by setting status to active and clearing deletedAt
+    const activatedKitchen = await db
+      .update(teams)
+      .set({
+        status: 'active',
+        deletedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, validatedData.id))
+      .returning({
+        kitchenCode: teams.kitchenCode,
+        name: teams.name,
+        managerId: teams.managerId
+      });
+
+    // 5. Revalidate cache and return success
+    revalidatePath('/danh-muc/bep');
+
+    return {
+      success: `Bếp "${activatedKitchen[0].name}" (${activatedKitchen[0].kitchenCode}) đã được kích hoạt lại`
+    };
+
+  } catch (error) {
+    console.error('Activate kitchen error:', error);
+    return { error: 'Có lỗi xảy ra khi kích hoạt bếp. Vui lòng thử lại.' };
   }
 }
 
