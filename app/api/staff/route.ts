@@ -176,8 +176,11 @@ export async function GET(request: NextRequest) {
     if (params.status && params.status !== 'all') {
       // When a specific status is requested, filter by that exact status
       baseWhereConditions.push(eq(users.status, params.status));
+    } else if (params.status === 'all') {
+      // When status is explicitly 'all', show staff with all statuses (active, inactive, terminated)
+      // No additional filter needed - show all statuses
     } else {
-      // When status is 'all' or not specified, show active and inactive staff by default (exclude terminated)
+      // When no status filter is specified, show active and inactive staff by default (exclude terminated)
       baseWhereConditions.push(inArray(users.status, ['active', 'inactive']));
     }
 

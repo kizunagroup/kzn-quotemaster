@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
 import { eq, and, isNull, ilike, sql } from 'drizzle-orm';
@@ -634,6 +635,83 @@ export async function activateStaff(data: { id: number }): Promise<ActionResult>
   } catch (error) {
     console.error('Activate staff error:', error);
     return { error: 'Có lỗi xảy ra khi kích hoạt nhân viên. Vui lòng thử lại.' };
+  }
+}
+
+// Task 2.1.5: Server action to terminate staff member (permanent termination)
+export async function terminateStaff(data: { id: number }): Promise<ActionResult> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Validate input data
+    const validationResult = z.object({ id: z.number().positive() }).safeParse(data);
+    if (!validationResult.success) {
+      return { error: 'ID nhân viên không hợp lệ' };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 4. Check if staff exists and is not already terminated
+    const existingStaff = await db
+      .select({
+        id: users.id,
+        employeeCode: users.employeeCode,
+        name: users.name,
+        status: users.status,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.id, validatedData.id))
+      .limit(1);
+
+    if (existingStaff.length === 0) {
+      return { error: 'Không tìm thấy nhân viên cần chấm dứt hợp đồng' };
+    }
+
+    const staff = existingStaff[0];
+
+    if (staff.status === 'terminated') {
+      return { error: 'Nhân viên này đã được chấm dứt hợp đồng' };
+    }
+
+    if (staff.deletedAt) {
+      return { error: 'Nhân viên này đã bị xóa khỏi hệ thống' };
+    }
+
+    // 5. Terminate staff by setting status to terminated and deletedAt timestamp
+    const terminatedStaff = await db
+      .update(users)
+      .set({
+        status: 'terminated',
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, validatedData.id))
+      .returning({
+        employeeCode: users.employeeCode,
+        name: users.name,
+      });
+
+    // 6. Revalidate cache and return success
+    revalidatePath('/danh-muc/nhan-vien');
+
+    return {
+      success: `Nhân viên "${terminatedStaff[0].name}" (${terminatedStaff[0].employeeCode}) đã được chấm dứt hợp đồng`
+    };
+
+  } catch (error) {
+    console.error('Terminate staff error:', error);
+    return { error: 'Có lỗi xảy ra khi chấm dứt hợp đồng nhân viên. Vui lòng thử lại.' };
   }
 }
 

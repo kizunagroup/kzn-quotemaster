@@ -16,9 +16,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   deactivateStaff,
-  updateStaff,
+  terminateStaff,
 } from '@/lib/actions/staff.actions';
-import { type UpdateStaffInput } from '@/lib/schemas/staff.schemas';
 import type { Staff } from '@/lib/hooks/use-staff';
 
 interface StaffDeleteDialogProps {
@@ -97,19 +96,8 @@ export function StaffDeleteDialog({
         // Use the existing deactivateStaff function
         result = await deactivateStaff({ id: staff.id });
       } else {
-        // Use updateStaff to set status to terminated
-        const updateData: UpdateStaffInput = {
-          id: staff.id,
-          name: staff.name || '',
-          email: staff.email || '',
-          phone: staff.phone || '',
-          jobTitle: staff.jobTitle || '',
-          department: staff.department || '',
-          employeeCode: staff.employeeCode || '',
-          hireDate: staff.hireDate ? new Date(staff.hireDate).toISOString().split('T')[0] : '',
-          status: 'terminated'
-        };
-        result = await updateStaff(updateData);
+        // Use the terminateStaff function
+        result = await terminateStaff({ id: staff.id });
       }
 
       if (result?.success) {

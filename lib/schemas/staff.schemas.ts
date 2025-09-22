@@ -40,11 +40,6 @@ export const createStaffSchema = z.object({
 
 export const updateStaffSchema = createStaffSchema.extend({
   id: z.number().positive('ID nhân viên không hợp lệ'),
-  status: z
-    .enum(['active', 'inactive', 'terminated'], {
-      errorMap: () => ({ message: 'Trạng thái phải là: active, inactive, hoặc terminated' })
-    })
-    .optional(),
 });
 
 export const deleteStaffSchema = z.object({

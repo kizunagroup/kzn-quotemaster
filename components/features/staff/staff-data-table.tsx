@@ -8,11 +8,11 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { MoreHorizontal, Edit, UserX, UserCheck, Users } from 'lucide-react';
+import { MoreHorizontal, Edit, UserX, UserCheck, Users, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useStaff, type Staff } from '@/lib/hooks/use-staff';
-import { activateStaff } from '@/lib/actions/staff.actions';
+import { activateStaff, terminateStaff } from '@/lib/actions/staff.actions';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -103,6 +103,7 @@ export function StaffDataTable() {
   const [isTeamAssignModalOpen, setIsTeamAssignModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
+  const [deleteActionType, setDeleteActionType] = useState<'deactivate' | 'terminate'>('deactivate');
 
   // Fetch staff data using our custom hook
   const {
@@ -180,6 +181,13 @@ export function StaffDataTable() {
 
   const handleDeleteClick = (staff: Staff) => {
     setSelectedStaff(staff);
+    setDeleteActionType('deactivate');
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleTerminateClick = (staff: Staff) => {
+    setSelectedStaff(staff);
+    setDeleteActionType('terminate');
     setIsDeleteModalOpen(true);
   };
 
@@ -421,21 +429,44 @@ export function StaffDataTable() {
                 <DropdownMenuSeparator />
 
                 {staff.status === 'active' ? (
-                  <DropdownMenuItem
-                    onClick={() => handleDeleteClick(staff)}
-                    className="text-orange-600 focus:text-orange-600"
-                  >
-                    <UserX className="mr-2 h-4 w-4" />
-                    Tạm Dừng
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => handleDeleteClick(staff)}
+                      className="text-orange-600 focus:text-orange-600"
+                    >
+                      <UserX className="mr-2 h-4 w-4" />
+                      Tạm Dừng
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleTerminateClick(staff)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Chấm Dứt
+                    </DropdownMenuItem>
+                  </>
                 ) : staff.status === 'inactive' ? (
-                  <DropdownMenuItem
-                    onClick={() => handleActivateClick(staff)}
-                    className="text-green-600 focus:text-green-600"
-                    disabled={activatingId === staff.id}
-                  >
-                    <UserCheck className="mr-2 h-4 w-4" />
-                    {activatingId === staff.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => handleActivateClick(staff)}
+                      className="text-green-600 focus:text-green-600"
+                      disabled={activatingId === staff.id}
+                    >
+                      <UserCheck className="mr-2 h-4 w-4" />
+                      {activatingId === staff.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleTerminateClick(staff)}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Chấm Dứt
+                    </DropdownMenuItem>
+                  </>
+                ) : staff.status === 'terminated' ? (
+                  <DropdownMenuItem disabled className="text-gray-400">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Đã Chấm Dứt
                   </DropdownMenuItem>
                 ) : null}
               </DropdownMenuContent>
@@ -596,7 +627,7 @@ export function StaffDataTable() {
         onClose={handleCloseDeleteModal}
         onSuccess={handleModalSuccess}
         staff={selectedStaff}
-        actionType="deactivate"
+        actionType={deleteActionType}
       />
 
       <TeamAssignmentModal

@@ -76,7 +76,6 @@ export function StaffFormModal({
       hireDate: '',
       ...(isEditMode && staff && {
         id: staff.id,
-        status: staff.status as 'active' | 'inactive' | 'terminated',
       }),
     },
   });
@@ -99,7 +98,6 @@ export function StaffFormModal({
           jobTitle: staff.jobTitle || '',
           department: staff.department || '',
           hireDate: hireDateString,
-          status: staff.status as 'active' | 'inactive' | 'terminated',
         });
       } else {
         // Reset form for create mode
@@ -342,35 +340,6 @@ export function StaffFormModal({
                 )}
               />
 
-              {/* Status - Only show in edit mode */}
-              {isEditMode && (
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Trạng thái</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        disabled={isSubmitting}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn trạng thái" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="active">Hoạt Động</SelectItem>
-                          <SelectItem value="inactive">Tạm Dừng</SelectItem>
-                          <SelectItem value="terminated">Đã Nghỉ</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
             </div>
 
             <DialogFooter className="gap-2">
