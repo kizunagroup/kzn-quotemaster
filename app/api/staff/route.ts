@@ -103,21 +103,38 @@ export async function GET(request: NextRequest) {
       baseWhereConditions.push(sql`${users.status} != 'terminated'`);
     }
 
-    // 5. Task 2.2.2: Role-based data filtering (CRITICAL SECURITY REQUIREMENT)
+    // 5. Task 2.2.2: Role-based data filtering (CRITICAL SECURITY REQUIREMENT) - FIXED
     const userWithTeams = await getUserWithTeams(user.id);
     let roleBasedConditions: any[] = [];
 
-    if (userWithTeams && userWithTeams.teams.length > 0) {
-      // Check if user has admin-level permissions (can see all staff)
+    // Check if user is super admin based on multiple criteria
+    let isSuperAdmin = false;
+
+    // Check 1: Root user role (from original template)
+    if (user.role === 'owner' || user.role === 'admin') {
+      isSuperAdmin = true;
+    }
+
+    // Check 2: Team-based admin roles
+    if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
       const hasAdminRole = userWithTeams.teams.some(tm => {
         const role = tm.role.toUpperCase();
-        return role.includes('ADMIN_SUPER_ADMIN') ||
-               role.includes('ADMIN_MANAGER') ||
+        // FIXED: Check if role starts with ADMIN_ (more robust)
+        return role === 'ADMIN_SUPER_ADMIN' ||
+               role === 'ADMIN_MANAGER' ||
                role === 'OWNER'; // Template role with full access
       });
 
-      if (!hasAdminRole) {
-        // Kitchen managers and other restricted roles - only see staff from their teams
+      if (hasAdminRole) {
+        isSuperAdmin = true;
+      }
+    }
+
+    // Apply role-based restrictions if user is not super admin
+    if (!isSuperAdmin) {
+      // FIXED: Properly handle users with no teams
+      if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
+        // User has teams - only see staff from their teams
         const userTeamIds = userWithTeams.teams.map(tm => tm.team.id);
 
         if (userTeamIds.length > 0) {
@@ -130,6 +147,8 @@ export async function GET(request: NextRequest) {
           const allowedUserIds = teamMemberUserIds.map(tm => tm.userId);
 
           if (allowedUserIds.length > 0) {
+            // Include the user themselves and team members
+            allowedUserIds.push(user.id);
             roleBasedConditions.push(inArray(users.id, allowedUserIds));
           } else {
             // If no team members found, user can only see themselves
@@ -139,12 +158,12 @@ export async function GET(request: NextRequest) {
           // User has no team assignments - can only see themselves
           roleBasedConditions.push(eq(users.id, user.id));
         }
+      } else {
+        // FIXED: User has no team memberships - can only see themselves
+        roleBasedConditions.push(eq(users.id, user.id));
       }
-      // Admin users don't get additional role-based restrictions
-    } else {
-      // User has no team memberships - can only see themselves
-      roleBasedConditions.push(eq(users.id, user.id));
     }
+    // Super admin users don't get additional role-based restrictions (can see all staff)
 
     // 6. Apply search filter - search in name, email, and employee code
     if (params.search && params.search.trim() !== '') {

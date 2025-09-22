@@ -99,31 +99,35 @@ async function cleanupExistingData() {
     await db.delete(kitchenPeriodDemands);
     await db.delete(activityLogs);
     await db.delete(teamMembers);
-    await db.delete(teams);
-    await db.delete(users);
     await db.delete(products);
     await db.delete(suppliers);
+    await db.delete(teams);
+    await db.delete(users);
 
-    console.log("✅ Cleanup completed successfully");
+    console.log("✅ Existing data cleaned up");
   } catch (error) {
-    console.log("⚠️ Cleanup encountered errors (likely empty tables):", error);
+    console.error("❌ Error cleaning up data:", error);
+    // Continue with seeding even if cleanup fails
   }
 }
 
-async function seedLargeQuoteMasterDataset() {
-  console.log("🌱 Seeding Large QuoteMaster Dataset...");
+export async function seedDatabase() {
+  console.log("🌱 Starting database seeding...");
 
   // 1. Clean up existing data first
   await cleanupExistingData();
 
-  // 2. Create Super Admin User
+  // 2. Create Super Admin User (CRITICAL: This admin will have full access)
   const [superAdmin] = await db.insert(users).values({
     name: "QuoteMaster Admin",
     email: "admin@quotemaster.local",
     passwordHash: await hashPassword("admin123!"),
     employeeCode: "ADMIN001",
     phone: "0901234567",
-    role: "owner"
+    role: "owner", // This ensures root-level access
+    department: "ADMIN",
+    jobTitle: "System Administrator",
+    status: "active"
   }).returning();
 
   console.log("✅ Created super admin user");
@@ -139,7 +143,10 @@ async function seedLargeQuoteMasterDataset() {
       passwordHash: await hashPassword("manager123!"),
       employeeCode: generateEmployeeCode("MG", i),
       phone: generatePhone(),
-      role: role
+      role: role,
+      department: "ADMIN",
+      jobTitle: "Manager",
+      status: "active"
     }).returning();
 
     managerUsers.push(manager[0]);
@@ -147,7 +154,7 @@ async function seedLargeQuoteMasterDataset() {
 
   console.log(`✅ Created ${managerUsers.length} manager users`);
 
-  // 4. Create Office Team
+  // 4. Create Office Team (CRITICAL: This is where admin will be assigned)
   const [officeTeam] = await db.insert(teams).values({
     name: "Văn Phòng Trung Tâm",
     teamType: "OFFICE",
@@ -161,55 +168,69 @@ async function seedLargeQuoteMasterDataset() {
 
   // 5. Generate 120 Kitchen Teams with diverse data
   const kitchenTeams = [];
-  const kitchenData = [];
 
   for (let i = 1; i <= 120; i++) {
     // Random assignments
     const randomManager = managerUsers[Math.floor(Math.random() * managerUsers.length)];
     const randomRegion = regions[Math.floor(Math.random() * regions.length)];
-    const isActive = Math.random() > 0.15; // 85% active, 15% inactive
 
-    const kitchenRecord = {
+    const kitchen = await db.insert(teams).values({
       name: `Bếp ${randomRegion} ${i}`,
-      teamType: "KITCHEN" as const,
-      kitchenCode: generateKitchenCode(i),
+      teamType: "KITCHEN",
       region: randomRegion,
       address: generateAddress(randomRegion),
       managerId: randomManager.id,
-      status: isActive ? "active" as const : "inactive" as const,
-      ...(isActive ? {} : { deletedAt: getRandomPastDate() })
-    };
+      status: i % 15 === 0 ? "inactive" : "active" // 1 in 15 kitchens inactive
+    }).returning();
 
-    kitchenData.push(kitchenRecord);
+    kitchenTeams.push(kitchen[0]);
   }
 
-  // Batch insert kitchens for better performance
-  const batchSize = 20;
-  for (let i = 0; i < kitchenData.length; i += batchSize) {
-    const batch = kitchenData.slice(i, i + batchSize);
-    const insertedBatch = await db.insert(teams).values(batch).returning();
-    kitchenTeams.push(...insertedBatch);
-  }
+  console.log(`✅ Created ${kitchenTeams.length} kitchen teams`);
 
-  console.log(`✅ Created ${kitchenTeams.length} diverse kitchen teams`);
-
-  // 6. Assign All Manager Users to Office Team
+  // 6. CRITICAL: Assign All Manager Users to Office Team with Proper Roles
   const teamMemberData = [
+    // SUPER ADMIN assignment - this is the critical fix
     {
       userId: superAdmin.id,
       teamId: officeTeam.id,
-      role: "ADMIN_SUPER_ADMIN"
+      role: "ADMIN_SUPER_ADMIN" // This role allows staff management
     },
-    ...managerUsers.map(manager => ({
-      userId: manager.id,
-      teamId: officeTeam.id,
-      role: manager.role.toUpperCase().replace('_', '_') as string
-    }))
+    // Assign manager users to office team with appropriate roles
+    ...managerUsers.map(manager => {
+      // Convert old role format to new enhanced role format
+      let enhancedRole = "ADMIN_STAFF"; // Default role
+
+      switch (manager.role) {
+        case 'super_admin':
+          enhancedRole = "ADMIN_SUPER_ADMIN";
+          break;
+        case 'admin':
+        case 'manager':
+          enhancedRole = "ADMIN_MANAGER";
+          break;
+        case 'kitchen_manager':
+          enhancedRole = "KITCHEN_MANAGER";
+          break;
+        case 'procurement_manager':
+          enhancedRole = "PROCUREMENT_MANAGER";
+          break;
+        default:
+          enhancedRole = "ADMIN_STAFF";
+      }
+
+      return {
+        userId: manager.id,
+        teamId: officeTeam.id,
+        role: enhancedRole
+      };
+    })
   ];
 
   await db.insert(teamMembers).values(teamMemberData);
 
-  console.log("✅ Assigned all users to office team");
+  console.log("✅ Assigned all users to office team with proper roles");
+  console.log(`✅ Super Admin assigned with role: ADMIN_SUPER_ADMIN`);
 
   // 7. Create Enhanced Suppliers
   const sampleSuppliers = await db.insert(suppliers).values([
@@ -247,291 +268,164 @@ async function seedLargeQuoteMasterDataset() {
       address: "321 Đường Nguyễn Huệ, Cần Thơ",
       contactPerson: "Võ Thị H",
       phone: "0292456789",
-      email: "coop@organic.vn"
-    },
-    {
-      supplierCode: "NCC005",
-      name: "Công ty Thực Phẩm Sài Gòn",
-      taxId: "5432167890",
-      address: "555 Đường Nguyễn Văn Cừ, Quận 5, TP.HCM",
-      contactPerson: "Đặng Văn I",
-      phone: "0283456789",
-      email: "saigonfood@supplier.vn"
-    },
-    {
-      supplierCode: "NCC006",
-      name: "Nhà Phân Phối Thực Phẩm Miền Bắc",
-      taxId: "6789012345",
-      address: "888 Đường Giải Phóng, Hà Nội",
-      contactPerson: "Bùi Thị K",
-      phone: "0244567890",
-      email: "northfood@supplier.vn"
+      email: "organic@huuco.vn"
     }
   ]).returning();
 
-  console.log("✅ Created enhanced supplier catalog");
+  console.log(`✅ Created ${sampleSuppliers.length} suppliers`);
 
-  // 8. Create Comprehensive Product Catalog
+  // 8. Create Enhanced Products with realistic Vietnamese food data
   const sampleProducts = await db.insert(products).values([
-    // Thịt category (8 products)
+    // Rice and Grains
     {
-      productCode: "SP001", name: "Thịt heo ba chỉ", specification: "Thịt heo ba chỉ tươi, không hóa chất",
-      unit: "kg", category: "Thịt", basePrice: "120000", baseQuantity: "100"
+      productCode: "FOOD001",
+      name: "Gạo Tám Xoan",
+      category: "Grains",
+      unit: "kg",
+      description: "Gạo thơm cao cấp vùng miền Tây",
+      supplierId: sampleSuppliers[0].id
     },
     {
-      productCode: "SP002", name: "Thịt bò thăn", specification: "Thịt bò thăn tươi, cao cấp",
-      unit: "kg", category: "Thịt", basePrice: "280000", baseQuantity: "50"
+      productCode: "FOOD002",
+      name: "Gạo Jasmine",
+      category: "Grains",
+      unit: "kg",
+      description: "Gạo thơm nhập khẩu Thái Lan",
+      supplierId: sampleSuppliers[1].id
     },
     {
-      productCode: "SP003", name: "Thịt gà ta", specification: "Thịt gà ta tươi, nuôi tự nhiên",
-      unit: "kg", category: "Thịt", basePrice: "85000", baseQuantity: "80"
-    },
-    {
-      productCode: "SP004", name: "Thịt vịt", specification: "Thịt vịt tươi, loại 1",
-      unit: "kg", category: "Thịt", basePrice: "95000", baseQuantity: "60"
-    },
-    {
-      productCode: "SP005", name: "Thịt nạc vai heo", specification: "Thịt nạc vai heo tươi",
-      unit: "kg", category: "Thịt", basePrice: "140000", baseQuantity: "70"
-    },
-    {
-      productCode: "SP006", name: "Thịt bò xay", specification: "Thịt bò xay tươi, không chất bảo quản",
-      unit: "kg", category: "Thịt", basePrice: "200000", baseQuantity: "40"
-    },
-    {
-      productCode: "SP007", name: "Sườn heo", specification: "Sườn heo tươi, có xương",
-      unit: "kg", category: "Thịt", basePrice: "110000", baseQuantity: "60"
-    },
-    {
-      productCode: "SP008", name: "Thịt gà công nghiệp", specification: "Thịt gà công nghiệp, đông lạnh",
-      unit: "kg", category: "Thịt", basePrice: "65000", baseQuantity: "100"
+      productCode: "FOOD003",
+      name: "Nếp Cẩm",
+      category: "Grains",
+      unit: "kg",
+      description: "Nếp tím đặc sản miền Bắc",
+      supplierId: sampleSuppliers[2].id
     },
 
-    // Rau củ category (10 products)
+    // Vegetables
     {
-      productCode: "SP009", name: "Cà chua", specification: "Cà chua tươi, loại 1",
-      unit: "kg", category: "Rau củ", basePrice: "15000", baseQuantity: "200"
+      productCode: "VEG001",
+      name: "Rau Muống",
+      category: "Vegetables",
+      unit: "kg",
+      description: "Rau muống tươi từ Đà Lạt",
+      supplierId: sampleSuppliers[3].id
     },
     {
-      productCode: "SP010", name: "Hành tây", specification: "Hành tây tươi, size vừa",
-      unit: "kg", category: "Rau củ", basePrice: "12000", baseQuantity: "150"
+      productCode: "VEG002",
+      name: "Cải Thảo",
+      category: "Vegetables",
+      unit: "kg",
+      description: "Bắp cải trắng tươi ngon",
+      supplierId: sampleSuppliers[0].id
     },
     {
-      productCode: "SP011", name: "Rau cải ngọt", specification: "Rau cải ngọt tươi, hữu cơ",
-      unit: "kg", category: "Rau củ", basePrice: "8000", baseQuantity: "120"
-    },
-    {
-      productCode: "SP012", name: "Cà rót", specification: "Cà rót tươi, hữu cơ",
-      unit: "kg", category: "Rau củ", basePrice: "18000", baseQuantity: "100"
-    },
-    {
-      productCode: "SP013", name: "Khoai tây", specification: "Khoai tây Đà Lạt, loại 1",
-      unit: "kg", category: "Rau củ", basePrice: "20000", baseQuantity: "180"
-    },
-    {
-      productCode: "SP014", name: "Cà rốt", specification: "Cà rốt Đà Lạt, tươi",
-      unit: "kg", category: "Rau củ", basePrice: "25000", baseQuantity: "160"
-    },
-    {
-      productCode: "SP015", name: "Bắp cải", specification: "Bắp cải tươi, không thuốc trừ sâu",
-      unit: "kg", category: "Rau củ", basePrice: "10000", baseQuantity: "140"
-    },
-    {
-      productCode: "SP016", name: "Rau muống", specification: "Rau muống tươi, hữu cơ",
-      unit: "kg", category: "Rau củ", basePrice: "6000", baseQuantity: "100"
-    },
-    {
-      productCode: "SP017", name: "Dưa chuột", specification: "Dưa chuột tươi, loại 1",
-      unit: "kg", category: "Rau củ", basePrice: "12000", baseQuantity: "130"
-    },
-    {
-      productCode: "SP018", name: "Ớt xanh", specification: "Ớt xanh tươi, cay vừa",
-      unit: "kg", category: "Rau củ", basePrice: "30000", baseQuantity: "50"
+      productCode: "VEG003",
+      name: "Củ Cải Trắng",
+      category: "Vegetables",
+      unit: "kg",
+      description: "Củ cải trắng to, tươi ngon",
+      supplierId: sampleSuppliers[1].id
     },
 
-    // Gia vị category (6 products)
+    // Proteins
     {
-      productCode: "SP019", name: "Muối biển", specification: "Muối biển tinh khiết, bao 1kg",
-      unit: "bao", category: "Gia vị", basePrice: "8000", baseQuantity: "100"
+      productCode: "MEAT001",
+      name: "Thịt Heo Ba Chỉ",
+      category: "Meat",
+      unit: "kg",
+      description: "Thịt heo tươi từ trang trại sạch",
+      supplierId: sampleSuppliers[2].id
     },
     {
-      productCode: "SP020", name: "Nước mắm", specification: "Nước mắm truyền thống, chai 500ml",
-      unit: "chai", category: "Gia vị", basePrice: "25000", baseQuantity: "60"
+      productCode: "MEAT002",
+      name: "Thịt Bò Úc",
+      category: "Meat",
+      unit: "kg",
+      description: "Thịt bò nhập khẩu Úc",
+      supplierId: sampleSuppliers[3].id
     },
     {
-      productCode: "SP021", name: "Dầu ăn", specification: "Dầu ăn cao cấp, chai 1L",
-      unit: "chai", category: "Gia vị", basePrice: "45000", baseQuantity: "80"
+      productCode: "FISH001",
+      name: "Cá Basa Phi Lê",
+      category: "Seafood",
+      unit: "kg",
+      description: "Cá basa phi lê tươi sống",
+      supplierId: sampleSuppliers[0].id
     },
     {
-      productCode: "SP022", name: "Tương ớt", specification: "Tương ớt Việt Nam, chai 250ml",
-      unit: "chai", category: "Gia vị", basePrice: "18000", baseQuantity: "70"
-    },
-    {
-      productCode: "SP023", name: "Bột ngọt", specification: "Bột ngọt MSG, gói 500g",
-      unit: "gói", category: "Gia vị", basePrice: "12000", baseQuantity: "90"
-    },
-    {
-      productCode: "SP024", name: "Tiêu đen", specification: "Tiêu đen xay, hộp 100g",
-      unit: "hộp", category: "Gia vị", basePrice: "35000", baseQuantity: "40"
-    },
-
-    // Hải sản category (6 products)
-    {
-      productCode: "SP025", name: "Cá thu", specification: "Cá thu tươi, size 1-2kg/con",
-      unit: "kg", category: "Hải sản", basePrice: "95000", baseQuantity: "40"
-    },
-    {
-      productCode: "SP026", name: "Tôm sú", specification: "Tôm sú tươi, size 20-30 con/kg",
-      unit: "kg", category: "Hải sản", basePrice: "180000", baseQuantity: "30"
-    },
-    {
-      productCode: "SP027", name: "Cá basa", specification: "Cá basa phi lê, đông lạnh",
-      unit: "kg", category: "Hải sản", basePrice: "65000", baseQuantity: "70"
-    },
-    {
-      productCode: "SP028", name: "Mực ống", specification: "Mực ống tươi, loại 1",
-      unit: "kg", category: "Hải sản", basePrice: "120000", baseQuantity: "35"
-    },
-    {
-      productCode: "SP029", name: "Cá hồi", specification: "Cá hồi phi lê, nhập khẩu",
-      unit: "kg", category: "Hải sản", basePrice: "320000", baseQuantity: "20"
-    },
-    {
-      productCode: "SP030", name: "Tôm thẻ", specification: "Tôm thẻ tươi, size nhỏ",
-      unit: "kg", category: "Hải sản", basePrice: "140000", baseQuantity: "40"
-    },
-
-    // Ngũ cốc category (5 products)
-    {
-      productCode: "SP031", name: "Gạo tám xoan", specification: "Gạo tám xoan An Giang, bao 25kg",
-      unit: "bao", category: "Ngũ cốc", basePrice: "850000", baseQuantity: "20"
-    },
-    {
-      productCode: "SP032", name: "Mì sợi", specification: "Mì sợi tươi, gói 500g",
-      unit: "gói", category: "Ngũ cốc", basePrice: "8000", baseQuantity: "200"
-    },
-    {
-      productCode: "SP033", name: "Bún tươi", specification: "Bún tươi, gói 500g",
-      unit: "gói", category: "Ngũ cốc", basePrice: "7000", baseQuantity: "180"
-    },
-    {
-      productCode: "SP034", name: "Bánh phở", specification: "Bánh phở tươi, gói 1kg",
-      unit: "gói", category: "Ngũ cốc", basePrice: "15000", baseQuantity: "100"
-    },
-    {
-      productCode: "SP035", name: "Gạo nếp", specification: "Gạo nếp thơm, bao 10kg",
-      unit: "bao", category: "Ngũ cốc", basePrice: "400000", baseQuantity: "15"
+      productCode: "FISH002",
+      name: "Tôm Sú Tươi",
+      category: "Seafood",
+      unit: "kg",
+      description: "Tôm sú size 20-30 tươi sống",
+      supplierId: sampleSuppliers[1].id
     }
   ]).returning();
 
-  console.log("✅ Created comprehensive product catalog (35 products)");
+  console.log(`✅ Created ${sampleProducts.length} products`);
 
-  // 9. Create Sample Kitchen Demands (only for active kitchens)
-  const currentPeriod = new Date().toISOString().slice(0, 7) + "-01";
-  const activeKitchens = kitchenTeams.filter(k => k.status === 'active');
+  // 9. Generate Sample Kitchen Period Demands
+  const demandData = [];
+  const periods = ['2024-Q1', '2024-Q2', '2024-Q3', '2024-Q4'];
 
-  console.log(`🔄 Creating demands for ${activeKitchens.length} active kitchens...`);
-
-  const demands = [];
-  let demandCounter = 0;
-
-  // Create demands in smaller batches to avoid memory issues
-  for (const kitchen of activeKitchens) {
-    for (const product of sampleProducts) {
-      // Create realistic demand quantities
-      let baseQuantity = parseFloat(product.baseQuantity || "50");
-
-      // Adjust by category
-      if (product.category === "Thịt") baseQuantity = baseQuantity * 0.6;
-      if (product.category === "Rau củ") baseQuantity = baseQuantity * 1.2;
-      if (product.category === "Gia vị") baseQuantity = baseQuantity * 0.3;
-      if (product.category === "Hải sản") baseQuantity = baseQuantity * 0.4;
-      if (product.category === "Ngũ cốc") baseQuantity = baseQuantity * 0.7;
-
-      // Add randomness
-      const randomFactor = 0.5 + (Math.random() * 1.0); // 0.5 to 1.5
-      const finalQuantity = (baseQuantity * randomFactor).toFixed(2);
-
-      demands.push({
-        teamId: kitchen.id,
-        productId: product.id,
-        period: currentPeriod,
-        quantity: finalQuantity,
-        unit: product.unit,
-        notes: `Nhu cầu ${currentPeriod} cho ${kitchen.name}`,
-        createdBy: kitchen.managerId || superAdmin.id
-      });
-
-      demandCounter++;
+  for (const kitchen of kitchenTeams.slice(0, 20)) { // Use first 20 kitchens
+    for (const period of periods) {
+      for (const product of sampleProducts.slice(0, 5)) { // Use first 5 products
+        const quantity = Math.floor(Math.random() * 500) + 50; // 50-550 units
+        demandData.push({
+          kitchenId: kitchen.id,
+          productId: product.id,
+          period: period,
+          demandQuantity: quantity,
+          demandDate: getRandomPastDate()
+        });
+      }
     }
   }
 
-  // Insert demands in batches
-  const demandBatchSize = 100;
-  for (let i = 0; i < demands.length; i += demandBatchSize) {
-    const batch = demands.slice(i, i + demandBatchSize);
-    await db.insert(kitchenPeriodDemands).values(batch);
+  if (demandData.length > 0) {
+    await db.insert(kitchenPeriodDemands).values(demandData);
+    console.log(`✅ Created ${demandData.length} period demand entries`);
   }
 
-  console.log(`✅ Created ${demands.length} kitchen demands`);
-
-  // 10. Create Activity Logs
-  await db.insert(activityLogs).values([
-    {
-      teamId: officeTeam.id,
-      userId: superAdmin.id,
-      action: "SEED_DATABASE",
-      ipAddress: "127.0.0.1"
-    },
-    {
-      teamId: kitchenTeams[0]?.id || officeTeam.id,
-      userId: managerUsers[0]?.id || superAdmin.id,
-      action: "ASSIGN_MANAGER",
-      ipAddress: "127.0.0.1"
-    }
-  ]);
-
-  console.log("✅ Created activity logs");
-
-  // 11. Summary Statistics
-  const activeKitchenCount = kitchenTeams.filter(k => k.status === 'active').length;
-  const inactiveKitchenCount = kitchenTeams.filter(k => k.status === 'inactive').length;
-  const regionStats = regions.map(region => ({
-    region,
-    count: kitchenTeams.filter(k => k.region === region).length
+  // 10. Create Activity Logs for audit trail
+  const activityData = kitchenTeams.slice(0, 10).map((kitchen, index) => ({
+    teamId: kitchen.id,
+    action: index % 2 === 0 ? 'created' : 'updated',
+    details: `Kitchen ${kitchen.name} was ${index % 2 === 0 ? 'created' : 'updated'} in the system`,
+    performedAt: getRandomPastDate(),
   }));
 
-  console.log("\n📊 LARGE DATASET SEEDING SUMMARY:");
-  console.log(`   👥 Users: ${managerUsers.length + 1} total`);
-  console.log(`      - 1 Super Admin (owner)`);
-  console.log(`      - ${managerUsers.length} Manager Users (diverse roles)`);
-  console.log(`   🏢 Teams: ${kitchenTeams.length + 1} total`);
-  console.log(`      - 1 Office team`);
-  console.log(`      - ${kitchenTeams.length} Kitchen teams (${activeKitchenCount} active, ${inactiveKitchenCount} inactive)`);
-  console.log(`   🌍 Region Distribution:`);
-  regionStats.forEach(stat => {
-    if (stat.count > 0) {
-      console.log(`      - ${stat.region}: ${stat.count} kitchens`);
-    }
-  });
-  console.log(`   🏪 Suppliers: ${sampleSuppliers.length} total`);
-  console.log(`   📦 Products: ${sampleProducts.length} total (5 categories)`);
-  console.log(`   📋 Demands: ${demands.length} total (${activeKitchenCount} active kitchens × ${sampleProducts.length} products)`);
+  if (activityData.length > 0) {
+    await db.insert(activityLogs).values(activityData);
+    console.log(`✅ Created ${activityData.length} activity log entries`);
+  }
 
-  console.log("\n✅ Large QuoteMaster Dataset seeding completed!");
+  console.log("\n🎉 Database seeding completed successfully!");
+  console.log("\n📋 Summary:");
+  console.log(`   👤 Users: ${1 + managerUsers.length} (1 super admin, ${managerUsers.length} managers)`);
+  console.log(`   🏢 Teams: ${1 + kitchenTeams.length} (1 office, ${kitchenTeams.length} kitchens)`);
+  console.log(`   🤝 Team Members: ${teamMemberData.length}`);
+  console.log(`   🏭 Suppliers: ${sampleSuppliers.length}`);
+  console.log(`   📦 Products: ${sampleProducts.length}`);
+  console.log(`   📊 Demand Records: ${demandData.length}`);
+  console.log(`   📝 Activity Logs: ${activityData.length}`);
+  console.log("\n🔐 Login Credentials:");
+  console.log("   Email: admin@quotemaster.local");
+  console.log("   Password: admin123!");
+  console.log("   Role: owner + ADMIN_SUPER_ADMIN");
 }
 
-async function seed() {
-  await seedLargeQuoteMasterDataset();
-  console.log("🎉 Large-scale QuoteMaster seeding completed successfully!");
+// Run the seeding if this file is executed directly
+if (require.main === module) {
+  seedDatabase()
+    .then(() => {
+      console.log("✅ Seeding completed successfully");
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error("❌ Seeding failed:", error);
+      process.exit(1);
+    });
 }
-
-seed()
-  .catch((error) => {
-    console.error('Seed process failed:', error);
-    process.exit(1);
-  })
-  .finally(() => {
-    console.log('Seed process finished. Exiting...');
-    process.exit(0);
-  });
