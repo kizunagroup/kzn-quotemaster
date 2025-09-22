@@ -33,6 +33,9 @@ import { Badge } from '@/components/ui/badge';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
 import { StaffTableToolbar } from './staff-table-toolbar';
+import { StaffFormModal } from './staff-form-modal';
+import { StaffDeleteDialog } from './staff-delete-dialog';
+import { TeamAssignmentModal } from './team-assignment-modal';
 
 // Status badge variant mapping
 const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
@@ -204,6 +207,32 @@ export function StaffDataTable() {
     } finally {
       setActivatingId(null);
     }
+  };
+
+  // Modal close handlers
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
+    setSelectedStaff(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedStaff(null);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setSelectedStaff(null);
+  };
+
+  const handleCloseTeamAssignModal = () => {
+    setIsTeamAssignModalOpen(false);
+    setSelectedStaff(null);
+  };
+
+  // Success handlers that refresh data and close modals
+  const handleModalSuccess = () => {
+    refresh();
   };
 
   // Table column definitions
@@ -547,36 +576,34 @@ export function StaffDataTable() {
         />
       )}
 
-      {/* TODO: Modal Components will be added in subsequent tasks */}
-      {/*
+      {/* Modal Components */}
       <StaffFormModal
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={refresh}
+        onClose={handleCloseCreateModal}
+        onSuccess={handleModalSuccess}
         staff={null}
       />
 
       <StaffFormModal
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSuccess={refresh}
+        onClose={handleCloseEditModal}
+        onSuccess={handleModalSuccess}
         staff={selectedStaff}
       />
 
       <StaffDeleteDialog
         isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onSuccess={refresh}
+        onClose={handleCloseDeleteModal}
+        onSuccess={handleModalSuccess}
         staff={selectedStaff}
       />
 
       <TeamAssignmentModal
         isOpen={isTeamAssignModalOpen}
-        onClose={() => setIsTeamAssignModalOpen(false)}
-        onSuccess={refresh}
+        onClose={handleCloseTeamAssignModal}
+        onSuccess={handleModalSuccess}
         staff={selectedStaff}
       />
-      */}
     </div>
   );
 }
