@@ -23,7 +23,8 @@ async function isKitchenCodeUnique(kitchenCode: string, excludeId?: number): Pro
   const conditions = [
     eq(teams.teamType, 'KITCHEN'),
     ilike(teams.kitchenCode, trimmedCode),
-    isNull(teams.deletedAt), // Only check active kitchens
+    // BUSINESS RULE: Kitchen codes must be unique forever, regardless of status
+    // Do not filter by deletedAt or status - check ALL kitchens
   ];
 
   // Exclude current record when updating
