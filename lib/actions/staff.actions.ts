@@ -524,17 +524,21 @@ export async function deactivateStaff(values: DeleteStaffInput): Promise<ActionR
 
     const staff = existingStaff[0];
 
-    if (staff.status === 'inactive' || staff.deletedAt) {
+    if (staff.status === 'inactive') {
       return { error: 'Nhân viên này đã được tạm dừng hoạt động' };
     }
 
-    // 5. Deactivate staff by setting status to inactive and deletedAt timestamp
+    if (staff.deletedAt) {
+      return { error: 'Nhân viên này đã bị xóa khỏi hệ thống' };
+    }
+
+    // 5. Deactivate staff by setting status to inactive (do NOT set deletedAt)
     // Note: Team assignments are preserved for audit trail
+    // deletedAt should only be set for actual deletion, not deactivation
     const deactivatedStaff = await db
       .update(users)
       .set({
         status: 'inactive',
-        deletedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(users.id, validatedData.id))

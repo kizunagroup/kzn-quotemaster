@@ -113,11 +113,6 @@ export async function GET(request: NextRequest) {
       isNull(users.deletedAt), // Only non-deleted users
     ];
 
-    // Exclude terminated staff from default view unless specifically requested
-    if (params.status !== 'terminated' && params.status !== 'all') {
-      baseWhereConditions.push(sql`${users.status} != 'terminated'`);
-    }
-
     // 5. Task 2.2.2: Role-based data filtering (CRITICAL SECURITY REQUIREMENT) - PURE TEAM-BASED RBAC
     let roleBasedConditions: any[] = [];
 
@@ -177,9 +172,13 @@ export async function GET(request: NextRequest) {
       baseWhereConditions.push(eq(users.department, params.department));
     }
 
-    // 8. Apply status filter
+    // 8. Apply status filter - FIXED: Proper status filtering logic
     if (params.status && params.status !== 'all') {
+      // When a specific status is requested, filter by that exact status
       baseWhereConditions.push(eq(users.status, params.status));
+    } else {
+      // When status is 'all' or not specified, show active and inactive staff by default (exclude terminated)
+      baseWhereConditions.push(inArray(users.status, ['active', 'inactive']));
     }
 
     // 9. Apply team filter (if specified)
@@ -310,7 +309,7 @@ export async function GET(request: NextRequest) {
         page: params.page,
         limit: params.limit,
         total: totalCount,
-        totalPages: Math.ceil(totalCount / params.limit),
+        pages: Math.ceil(totalCount / params.limit),
       },
       filters: {
         search: params.search,

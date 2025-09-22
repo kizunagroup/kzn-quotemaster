@@ -31,7 +31,7 @@ export interface StaffResponse {
     page: number;
     limit: number;
     total: number;
-    totalPages: number;
+    pages: number;
   };
   filters: {
     search?: string;
@@ -218,13 +218,13 @@ export function useStaff() {
     hasActiveFilters,
 
     // Pagination helpers
-    hasNextPage: data?.pagination ? data.pagination.page < data.pagination.totalPages : false,
+    hasNextPage: data?.pagination ? data.pagination.page < data.pagination.pages : false,
     hasPrevPage: data?.pagination ? data.pagination.page > 1 : false,
 
     // Summary data
     totalStaff: data?.pagination?.total || 0,
     currentPageSize: data?.data?.length || 0,
-    totalPages: data?.pagination?.totalPages || 0,
+    totalPages: data?.pagination?.pages || 0,
 
     // Staff-specific helpers
     activeStaff: data?.data?.filter(staff => staff.status === 'active') || [],
