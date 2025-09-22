@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useDebounce } from 'use-debounce';
-import { Plus } from 'lucide-react';
+import { Plus, Settings2 } from 'lucide-react';
+import { Table } from '@tanstack/react-table';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -11,7 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
+import type { Kitchen } from '@/lib/hooks/use-kitchens';
 
 // Single source of truth for status options
 const statusOptions = [
@@ -37,6 +47,9 @@ interface KitchensTableToolbarProps {
   onClearFilters: () => void;
   hasActiveFilters: boolean;
 
+  // Table instance for column visibility
+  table: Table<Kitchen>;
+
   // Actions
   onCreateClick: () => void;
 }
@@ -52,6 +65,7 @@ export function KitchensTableToolbar({
   onStatusChange,
   onClearFilters,
   hasActiveFilters,
+  table,
   onCreateClick,
 }: KitchensTableToolbarProps) {
   // Local state for search input to enable debouncing
@@ -85,10 +99,49 @@ export function KitchensTableToolbar({
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
       actions={
-        <Button onClick={onCreateClick}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm Bếp
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Column Visibility Toggle */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-auto hidden h-8 lg:flex"
+              >
+                <Settings2 className="mr-2 h-4 w-4" />
+                Cột
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[150px]">
+              <DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table
+                .getAllColumns()
+                .filter(
+                  (column) =>
+                    typeof column.accessorFn !== "undefined" && column.getCanHide()
+                )
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                    >
+                      {getColumnDisplayName(column.id)}
+                    </DropdownMenuCheckboxItem>
+                  )
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Create Button */}
+          <Button onClick={onCreateClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm Bếp
+          </Button>
+        </div>
       }
     >
       {/* Region Filter */}
@@ -121,6 +174,20 @@ export function KitchensTableToolbar({
       </Select>
     </DataTableToolbar>
   );
+}
+
+// Helper function to get display names for columns
+function getColumnDisplayName(columnId: string): string {
+  const columnNames: Record<string, string> = {
+    kitchenCode: 'Mã Bếp',
+    name: 'Tên Bếp',
+    region: 'Khu Vực',
+    teamType: 'Loại Hình',
+    managerName: 'Quản Lý',
+    status: 'Trạng Thái',
+  };
+
+  return columnNames[columnId] || columnId;
 }
 
 // Export status options for use in other components

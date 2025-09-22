@@ -403,6 +403,7 @@ export function KitchensDataTable() {
         onStatusChange={handleStatusChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        table={table}
         onCreateClick={handleCreateClick}
       />
 
