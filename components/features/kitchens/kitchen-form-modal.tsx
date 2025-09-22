@@ -118,7 +118,16 @@ export function KitchenFormModal({
         onSuccess();
         onClose();
       } else if (result.error) {
-        toast.error(result.error);
+        // Check for specific field errors and display under respective fields
+        if (result.error.includes('Mã bếp đã tồn tại')) {
+          form.setError('kitchenCode', {
+            type: 'server',
+            message: result.error
+          });
+        } else {
+          // Show general error for other cases
+          toast.error(result.error);
+        }
       }
     } catch (error) {
       console.error('Form submission error:', error);
@@ -138,7 +147,10 @@ export function KitchenFormModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>
             {isEditMode ? 'Chỉnh sửa Bếp' : 'Thêm Bếp mới'}
