@@ -70,8 +70,8 @@ export function KitchenDeleteDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-              <AlertTriangle className="h-5 w-5 text-destructive" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
+              <AlertTriangle className="h-5 w-5 text-orange-600" />
             </div>
             <div>
               <AlertDialogTitle>Xác nhận tạm dừng bếp</AlertDialogTitle>
@@ -105,12 +105,12 @@ export function KitchenDeleteDialog({
           </div>
         </div>
 
-        <div className="rounded-lg border-l-4 border-l-destructive bg-destructive/5 p-4">
+        <div className="rounded-lg border-l-4 border-l-orange-500 bg-orange-50 p-4">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+            <AlertTriangle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
-              <p className="font-medium text-destructive mb-1">Lưu ý quan trọng:</p>
-              <ul className="text-muted-foreground space-y-1">
+              <p className="font-medium text-orange-800 mb-1">Lưu ý quan trọng:</p>
+              <ul className="text-orange-700 space-y-1">
                 <li>• Bếp sẽ được đánh dấu là tạm dừng hoạt động</li>
                 <li>• Dữ liệu lịch sử vẫn được bảo toàn trong hệ thống</li>
                 <li>• Bạn có thể kích hoạt lại bếp này bất cứ lúc nào</li>

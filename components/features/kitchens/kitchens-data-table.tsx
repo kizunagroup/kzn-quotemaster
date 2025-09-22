@@ -8,11 +8,12 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Edit, PowerOff, Play } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { useKitchens, type Kitchen } from '@/lib/hooks/use-kitchens';
 import { useDataTableUrlState } from '@/lib/hooks/use-data-table-url-state';
-import { getRegions } from '@/lib/actions/kitchen.actions';
+import { getRegions, activateKitchen } from '@/lib/actions/kitchen.actions';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -87,6 +88,7 @@ export function KitchensDataTable() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedKitchen, setSelectedKitchen] = useState<Kitchen | null>(null);
+  const [activatingId, setActivatingId] = useState<number | null>(null);
 
   // Independent regions data for filter dropdown
   const [allRegions, setAllRegions] = useState<string[]>([]);
@@ -198,6 +200,27 @@ export function KitchensDataTable() {
     setIsDeleteModalOpen(true);
   };
 
+  // Handle activating a kitchen directly
+  const handleActivateClick = async (kitchen: Kitchen) => {
+    setActivatingId(kitchen.id);
+
+    try {
+      const result = await activateKitchen({ id: kitchen.id });
+
+      if (result.success) {
+        toast.success(result.success);
+        refresh(); // Refresh data to show updated status
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error('Activate kitchen error:', error);
+      toast.error('Có lỗi xảy ra khi kích hoạt bếp');
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   // Table column definitions
   const columns: ColumnDef<Kitchen>[] = [
     {
@@ -307,13 +330,24 @@ export function KitchensDataTable() {
                   Chỉnh sửa
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => handleDeleteClick(kitchen)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Ngưng hoạt động
-                </DropdownMenuItem>
+                {kitchen.status === 'active' ? (
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteClick(kitchen)}
+                    className="text-orange-600 focus:text-orange-600"
+                  >
+                    <PowerOff className="mr-2 h-4 w-4" />
+                    Tạm Dừng
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => handleActivateClick(kitchen)}
+                    className="text-green-600 focus:text-green-600"
+                    disabled={activatingId === kitchen.id}
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    {activatingId === kitchen.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
