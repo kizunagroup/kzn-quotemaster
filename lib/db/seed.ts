@@ -38,7 +38,7 @@ const regions = [
   'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Vũng Tàu', 'Nha Trang', 'Huế'
 ];
 
-const managerRoles = [
+const managerRoles: string[] = [
   'kitchen_manager',
   'procurement_manager',
   'admin',
@@ -70,10 +70,6 @@ function generatePhone(): string {
   return prefix + suffix;
 }
 
-function generateKitchenCode(index: number): string {
-  return `BEP${String(index).padStart(3, '0')}`;
-}
-
 function generateAddress(region: string): string {
   const streetNumber = Math.floor(Math.random() * 999) + 1;
   const streets = [
@@ -89,6 +85,27 @@ function getRandomPastDate(): Date {
   const now = new Date();
   const pastMonths = Math.floor(Math.random() * 12) + 1; // 1-12 months ago
   return new Date(now.getFullYear(), now.getMonth() - pastMonths, Math.floor(Math.random() * 28) + 1);
+}
+
+// Generate valid period dates in YYYY-MM-DD format for quotation cycles
+function generatePeriodDates(): string[] {
+  const periods = [];
+  const currentYear = 2024;
+
+  // Generate specific quotation periods throughout the year
+  // These represent quotation cycle dates, not quarters
+  periods.push(
+    `${currentYear}-01-15`, // Mid-January quotation cycle
+    `${currentYear}-04-01`, // Q2 start quotation cycle
+    `${currentYear}-07-01`, // Q3 start quotation cycle
+    `${currentYear}-10-01`, // Q4 start quotation cycle
+    `${currentYear}-02-15`, // Mid-February quotation cycle
+    `${currentYear}-05-15`, // Mid-May quotation cycle
+    `${currentYear}-08-15`, // Mid-August quotation cycle
+    `${currentYear}-11-15`  // Mid-November quotation cycle
+  );
+
+  return periods;
 }
 
 async function cleanupExistingData() {
@@ -117,14 +134,14 @@ export async function seedDatabase() {
   // 1. Clean up existing data first
   await cleanupExistingData();
 
-  // 2. Create Super Admin User (CRITICAL: This admin will have full access)
+  // 2. Create Super Admin User (CRITICAL: Admin power comes from team assignment)
   const [superAdmin] = await db.insert(users).values({
     name: "QuoteMaster Admin",
     email: "admin@quotemaster.local",
     passwordHash: await hashPassword("admin123!"),
     employeeCode: "ADMIN001",
     phone: "0901234567",
-    role: "owner", // This ensures root-level access
+    // REMOVED: role field - admin power comes from ADMIN_SUPER_ADMIN role in Office Team
     department: "ADMIN",
     jobTitle: "System Administrator",
     status: "active"
@@ -132,24 +149,27 @@ export async function seedDatabase() {
 
   console.log("✅ Created super admin user");
 
-  // 3. Generate 15 Manager Users with diverse roles
+  // 3. Generate 15 Manager Users (roles assigned via team memberships)
   const managerUsers = [];
+  const managerUserRoles: string[] = []; // Track intended roles for team assignment
+
   for (let i = 1; i <= 15; i++) {
     const name = generateRandomName();
-    const role = managerRoles[Math.floor(Math.random() * managerRoles.length)];
+    const intendedRole = managerRoles[Math.floor(Math.random() * managerRoles.length)];
     const manager = await db.insert(users).values({
       name: name,
       email: generateEmail(name, i),
       passwordHash: await hashPassword("manager123!"),
       employeeCode: generateEmployeeCode("MG", i),
       phone: generatePhone(),
-      role: role,
+      // REMOVED: role field - roles now assigned via team memberships
       department: "ADMIN",
       jobTitle: "Manager",
       status: "active"
     }).returning();
 
     managerUsers.push(manager[0]);
+    managerUserRoles.push(intendedRole); // Store for team assignment
   }
 
   console.log(`✅ Created ${managerUsers.length} manager users`);
@@ -197,11 +217,12 @@ export async function seedDatabase() {
       role: "ADMIN_SUPER_ADMIN" // This role allows staff management
     },
     // Assign manager users to office team with appropriate roles
-    ...managerUsers.map(manager => {
-      // Convert old role format to new enhanced role format
+    ...managerUsers.map((manager, index) => {
+      // Convert intended role to enhanced role format
       let enhancedRole = "ADMIN_STAFF"; // Default role
+      const intendedRole = managerUserRoles[index];
 
-      switch (manager.role) {
+      switch (intendedRole) {
         case 'super_admin':
           enhancedRole = "ADMIN_SUPER_ADMIN";
           break;
@@ -365,20 +386,24 @@ export async function seedDatabase() {
 
   console.log(`✅ Created ${sampleProducts.length} products`);
 
-  // 9. Generate Sample Kitchen Period Demands
+  // 9. Generate Sample Kitchen Period Demands - FIXED PERIOD FORMAT
   const demandData = [];
-  const periods = ['2024-Q1', '2024-Q2', '2024-Q3', '2024-Q4'];
+  const periods = generatePeriodDates(); // FIXED: Now generates YYYY-MM-DD format periods
 
   for (const kitchen of kitchenTeams.slice(0, 20)) { // Use first 20 kitchens
     for (const period of periods) {
       for (const product of sampleProducts.slice(0, 5)) { // Use first 5 products
         const quantity = Math.floor(Math.random() * 500) + 50; // 50-550 units
         demandData.push({
-          kitchenId: kitchen.id,
+          teamId: kitchen.id,           // FIXED: Use teamId instead of kitchenId
           productId: product.id,
-          period: period,
-          demandQuantity: quantity,
-          demandDate: getRandomPastDate()
+          period: period,               // FIXED: Now uses YYYY-MM-DD format
+          quantity: quantity.toString(), // FIXED: Use quantity field (decimal as string)
+          unit: product.unit,           // FIXED: Add required unit field
+          notes: `Nhu cầu cho chu kỳ ${period} - ${kitchen.name}`,
+          status: "active",
+          createdBy: superAdmin.id,
+          createdAt: getRandomPastDate()
         });
       }
     }
@@ -411,10 +436,12 @@ export async function seedDatabase() {
   console.log(`   📦 Products: ${sampleProducts.length}`);
   console.log(`   📊 Demand Records: ${demandData.length}`);
   console.log(`   📝 Activity Logs: ${activityData.length}`);
+  console.log(`   📅 Period Formats: ${periods.join(', ')}`);
   console.log("\n🔐 Login Credentials:");
   console.log("   Email: admin@quotemaster.local");
   console.log("   Password: admin123!");
-  console.log("   Role: owner + ADMIN_SUPER_ADMIN");
+  console.log("   Permissions: ADMIN_SUPER_ADMIN role in Office Team");
+  console.log("   RBAC Model: Pure team-based authorization via team_members table");
 }
 
 // Run the seeding if this file is executed directly
