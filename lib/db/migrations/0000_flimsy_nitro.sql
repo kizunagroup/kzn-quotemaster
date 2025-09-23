@@ -163,14 +163,19 @@ CREATE TABLE "users" (
 	"name" varchar(100) NOT NULL,
 	"email" varchar(255) NOT NULL,
 	"password_hash" text NOT NULL,
-	"role" varchar(20) DEFAULT 'member' NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"deleted_at" timestamp,
 	"employee_code" varchar(50),
 	"phone" varchar(20),
+	"job_title" varchar(100),
+	"department" varchar(50),
+	"hire_date" timestamp,
+	"status" varchar(20) DEFAULT 'active' NOT NULL,
 	CONSTRAINT "users_email_unique" UNIQUE("email"),
-	CONSTRAINT "users_employee_code_unique" UNIQUE("employee_code")
+	CONSTRAINT "users_employee_code_unique" UNIQUE("employee_code"),
+	CONSTRAINT "employee_code_format" CHECK ("users"."employee_code" ~ '^[A-Z0-9_-]+$'),
+	CONSTRAINT "status_values" CHECK ("users"."status" IN ('active', 'inactive', 'terminated'))
 );
 --> statement-breakpoint
 ALTER TABLE "activity_logs" ADD CONSTRAINT "activity_logs_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE cascade;--> statement-breakpoint
@@ -197,4 +202,7 @@ CREATE INDEX "idx_teams_team_type" ON "teams" USING btree ("team_type");--> stat
 CREATE INDEX "idx_teams_region_status" ON "teams" USING btree ("region","deleted_at");--> statement-breakpoint
 CREATE INDEX "idx_teams_name_search" ON "teams" USING btree ("name") WHERE "teams"."team_type" = 'KITCHEN';--> statement-breakpoint
 CREATE INDEX "idx_teams_manager_id" ON "teams" USING btree ("manager_id") WHERE "teams"."manager_id" IS NOT NULL;--> statement-breakpoint
-CREATE INDEX "idx_teams_kitchen_composite" ON "teams" USING btree ("team_type","region","deleted_at","name");
+CREATE INDEX "idx_teams_kitchen_composite" ON "teams" USING btree ("team_type","region","deleted_at","name");--> statement-breakpoint
+CREATE INDEX "idx_users_employee_code" ON "users" USING btree ("employee_code") WHERE "users"."employee_code" IS NOT NULL;--> statement-breakpoint
+CREATE INDEX "idx_users_department" ON "users" USING btree ("department");--> statement-breakpoint
+CREATE INDEX "idx_users_status" ON "users" USING btree ("status");

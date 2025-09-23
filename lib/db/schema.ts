@@ -66,8 +66,8 @@ export const teams = pgTable('teams', {
   stripeProductId: text('stripe_product_id'),
   planName: varchar('plan_name', { length: 50 }),
   subscriptionStatus: varchar('subscription_status', { length: 20 }),
-  // QuoteMaster extensions for kitchen mapping
-  kitchenCode: varchar('kitchen_code', { length: 50 }).unique(),
+  // QuoteMaster extensions for team mapping (renamed from kitchenCode)
+  teamCode: varchar('team_code', { length: 50 }).unique(),
   region: varchar('region', { length: 50 }),
   address: text('address'),
   // Manager relationship (NORMALIZED)
@@ -75,8 +75,8 @@ export const teams = pgTable('teams', {
   teamType: varchar('team_type', { length: 20 }).default('OFFICE').notNull(),
   status: varchar('status', { length: 20 }).default('active').notNull(),
 }, (table) => ({
-  // Performance indexes for Kitchen Management
-  kitchenCodeIdx: index('idx_teams_kitchen_code').on(table.kitchenCode).where(sql`${table.kitchenCode} IS NOT NULL`),
+  // Performance indexes for Team Management (renamed from Kitchen Management)
+  teamCodeIdx: index('idx_teams_team_code').on(table.teamCode).where(sql`${table.teamCode} IS NOT NULL`),
   teamTypeIdx: index('idx_teams_team_type').on(table.teamType),
   regionStatusIdx: index('idx_teams_region_status').on(table.region, table.deletedAt),
   nameSearchIdx: index('idx_teams_name_search').on(table.name).where(sql`${table.teamType} = 'KITCHEN'`),

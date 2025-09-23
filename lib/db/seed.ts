@@ -38,6 +38,16 @@ const regions = [
   'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Vũng Tàu', 'Nha Trang', 'Huế'
 ];
 
+// ENHANCED: Company names for suppliers
+const companyTypes = [
+  'Công ty TNHH', 'Công ty Cổ Phần', 'Tập Đoàn', 'Hợp Tác Xã', 'Doanh Nghiệp Tư Nhân'
+];
+
+const businessSectors = [
+  'Thực Phẩm An Toàn', 'Nông Sản Sạch', 'Thực Phẩm Hữu Cơ', 'Nông Nghiệp Công Nghệ Cao',
+  'Chế Biến Thực Phẩm', 'Phân Phối Thực Phẩm', 'Xuất Nhập Khẩu Nông Sản'
+];
+
 // RBAC-focused organizational structure
 const organizationalStructure = {
   ADMIN: {
@@ -65,11 +75,13 @@ const organizationalStructure = {
     count: 3, // 1 manager + 2 staff
     baseJobTitles: ['Operations Manager', 'Operations Coordinator', 'Logistics Specialist']
   },
-  // Additional users without specific departments for testing edge cases
+  // FIXED: GENERAL users now get proper departments instead of NULL
   GENERAL: {
     roles: ['general_staff'],
     count: 14, // Additional users to reach 30+ total
-    baseJobTitles: ['General Staff', 'Assistant', 'Coordinator', 'Specialist']
+    baseJobTitles: ['General Staff', 'Assistant', 'Coordinator', 'Specialist'],
+    // FIXED: Assign proper departments for GENERAL users
+    departments: ['OPERATIONS', 'ADMIN', 'KITCHEN', 'PROCUREMENT', 'ACCOUNTING']
   }
 };
 
@@ -91,14 +103,16 @@ function generateEmployeeCode(prefix: string, index: number): string {
   return `${prefix}${String(index).padStart(3, '0')}`;
 }
 
-// FIXED: Kitchen code generator function
+// Team code generator function (generalized from kitchen codes)
 function generateKitchenCode(index: number): string {
   return `BEP${String(index).padStart(3, '0')}`;
 }
 
+// ENHANCED: More comprehensive mock data generators
 function generatePhone(): string {
-  const prefix = '09';
-  const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
+  const prefixes = ['090', '091', '092', '093', '094', '095', '096', '097', '098', '099'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const suffix = Math.floor(Math.random() * 10000000).toString().padStart(7, '0');
   return prefix + suffix;
 }
 
@@ -107,16 +121,37 @@ function generateAddress(region: string): string {
   const streets = [
     'Đường Nguyễn Huệ', 'Đường Lê Lợi', 'Đường Trần Hưng Đạo', 'Đường Hai Bà Trưng',
     'Đường Võ Văn Tần', 'Đường Cách Mạng Tháng 8', 'Đường Điện Biên Phủ',
-    'Đường Nguyễn Thị Minh Khai', 'Đường Lý Tự Trọng', 'Đường Pasteur'
+    'Đường Nguyễn Thị Minh Khai', 'Đường Lý Tự Trọng', 'Đường Pasteur',
+    'Đường Nguyễn Du', 'Đường Nam Kỳ Khởi Nghĩa', 'Đường Phạm Ngũ Lão'
   ];
   const street = streets[Math.floor(Math.random() * streets.length)];
   return `${streetNumber} ${street}, ${region}, TP.HCM`;
+}
+
+function generateHireDate(): Date {
+  const now = new Date();
+  const yearsAgo = Math.floor(Math.random() * 5) + 1; // 1-5 years ago
+  const monthsAgo = Math.floor(Math.random() * 12); // 0-11 months within that year
+  return new Date(now.getFullYear() - yearsAgo, now.getMonth() - monthsAgo, Math.floor(Math.random() * 28) + 1);
 }
 
 function getRandomPastDate(): Date {
   const now = new Date();
   const pastMonths = Math.floor(Math.random() * 12) + 1; // 1-12 months ago
   return new Date(now.getFullYear(), now.getMonth() - pastMonths, Math.floor(Math.random() * 28) + 1);
+}
+
+// ENHANCED: Tax ID generator for suppliers
+function generateTaxId(): string {
+  return Math.floor(Math.random() * 9000000000) + 1000000000 + '';
+}
+
+// ENHANCED: Company name generator
+function generateCompanyName(): string {
+  const type = companyTypes[Math.floor(Math.random() * companyTypes.length)];
+  const sector = businessSectors[Math.floor(Math.random() * businessSectors.length)];
+  const regionName = regions[Math.floor(Math.random() * regions.length)];
+  return `${type} ${sector} ${regionName}`;
 }
 
 // Generate valid period dates in YYYY-MM-DD format for quotation cycles
@@ -180,15 +215,21 @@ export async function seedDatabase() {
       const intendedRole = config.roles[roleIndex] || config.roles[0];
       const jobTitle = config.baseJobTitles[i] || config.baseJobTitles[0];
 
+      // FIXED: Assign proper departments for GENERAL users
+      let userDepartment = department;
+      if (department === 'GENERAL' && config.departments) {
+        userDepartment = config.departments[i % config.departments.length];
+      }
+
       const userData = {
         name: name,
         email: generateEmail(name, userCounter),
         passwordHash: await hashPassword("password123!"),
         employeeCode: generateEmployeeCode(department.substring(0, 3), userCounter),
-        phone: generatePhone(),
-        department: department === 'GENERAL' ? null : department, // GENERAL users have no specific department
-        jobTitle: jobTitle,
-        hireDate: getRandomPastDate(),
+        phone: generatePhone(), // ENHANCED: All users get phone numbers
+        department: userDepartment, // FIXED: No more NULL departments
+        jobTitle: jobTitle, // ENHANCED: All users get job titles
+        hireDate: generateHireDate(), // ENHANCED: All users get hire dates
         status: Math.random() < 0.9 ? 'active' : 'inactive', // 90% active, 10% inactive for testing
         intendedRole: intendedRole // Store for team assignment later
       };
@@ -208,9 +249,10 @@ export async function seedDatabase() {
     email: "admin@quotemaster.local",
     passwordHash: await hashPassword("admin123!"),
     employeeCode: "ADMIN001",
-    phone: "0901234567",
+    phone: generatePhone(), // ENHANCED: Super admin gets phone
     department: "ADMIN",
     jobTitle: "System Administrator",
+    hireDate: generateHireDate(), // FIXED: Super admin gets hire date
     status: "active"
   }).returning();
 
@@ -221,9 +263,9 @@ export async function seedDatabase() {
     name: "Văn Phòng Trung Tâm",
     teamType: "OFFICE",
     region: "Trung Tâm",
-    address: "123 Đường ABC, Quận 1, TP.HCM",
+    address: generateAddress("Quận 1"), // ENHANCED: Generated address for office team
     managerId: superAdmin.id,
-    kitchenCode: null, // FIXED: NULL for office teams
+    teamCode: null, // FIXED: NULL for office teams
     status: "active"
   }).returning();
 
@@ -244,9 +286,9 @@ export async function seedDatabase() {
     const kitchen = await db.insert(teams).values({
       name: `Bếp ${randomRegion} ${i}`,
       teamType: "KITCHEN",
-      kitchenCode: generateKitchenCode(i), // FIXED: Generate unique kitchen codes (BEP001, BEP002, etc.)
+      teamCode: generateKitchenCode(i), // FIXED: Generate unique team codes (BEP001, BEP002, etc.)
       region: randomRegion,
-      address: generateAddress(randomRegion),
+      address: generateAddress(randomRegion), // ENHANCED: All kitchen teams get addresses
       managerId: assignedManager.id,
       status: i % 15 === 0 ? "inactive" : "active" // 1 in 15 kitchens inactive for testing
     }).returning();
@@ -343,47 +385,26 @@ export async function seedDatabase() {
     console.log(`✅ Created ${teamMemberAssignments.length} team member assignments`);
   }
 
-  // 7. Create Enhanced Suppliers
-  const sampleSuppliers = await db.insert(suppliers).values([
-    {
-      supplierCode: "NCC001",
-      name: "Công ty TNHH Thực Phẩm An Toàn",
-      taxId: "0123456789",
-      address: "123 Đường Cầu Giấy, Hà Nội",
-      contactPerson: "Nguyễn Văn E",
-      phone: "0243456789",
-      email: "contact@antoancorp.vn"
-    },
-    {
-      supplierCode: "NCC002",
-      name: "Tập Đoàn Thực Phẩm Sạch",
-      taxId: "9876543210",
-      address: "456 Đường Lê Lợi, Quận 1, TP.HCM",
-      contactPerson: "Trần Thị F",
-      phone: "0287654321",
-      email: "info@cleanfood.vn"
-    },
-    {
-      supplierCode: "NCC003",
-      name: "Công ty Cổ Phần Nông Sản Việt",
-      taxId: "1357924680",
-      address: "789 Đường Hoàng Văn Thụ, Đà Nẵng",
-      contactPerson: "Lê Văn G",
-      phone: "0236789123",
-      email: "sales@nongsanviet.com"
-    },
-    {
-      supplierCode: "NCC004",
-      name: "Hợp Tác Xã Nông Nghiệp Hữu Cơ",
-      taxId: "2468135790",
-      address: "321 Đường Nguyễn Huệ, Cần Thơ",
-      contactPerson: "Võ Thị H",
-      phone: "0292456789",
-      email: "organic@huuco.vn"
-    }
-  ]).returning();
+  // 7. Create Enhanced Suppliers with COMPLETE optional data
+  const enhancedSuppliers = [];
+  for (let i = 1; i <= 6; i++) {
+    const supplierName = generateCompanyName();
+    const region = regions[Math.floor(Math.random() * regions.length)];
+    const contactName = generateRandomName();
 
-  console.log(`✅ Created ${sampleSuppliers.length} suppliers`);
+    enhancedSuppliers.push({
+      supplierCode: `NCC${String(i).padStart(3, '0')}`,
+      name: supplierName,
+      taxId: generateTaxId(), // ENHANCED: All suppliers get tax IDs
+      address: generateAddress(region), // ENHANCED: All suppliers get addresses
+      contactPerson: contactName, // ENHANCED: All suppliers get contact persons
+      phone: generatePhone(), // ENHANCED: All suppliers get phone numbers
+      email: generateEmail(contactName, i) // ENHANCED: All suppliers get email addresses
+    });
+  }
+
+  const sampleSuppliers = await db.insert(suppliers).values(enhancedSuppliers).returning();
+  console.log(`✅ Created ${sampleSuppliers.length} suppliers with complete data`);
 
   // 8. Create Enhanced Products with realistic Vietnamese food data
   const sampleProducts = await db.insert(products).values([
@@ -462,7 +483,7 @@ export async function seedDatabase() {
       category: "Seafood",
       unit: "kg",
       description: "Cá basa phi lê tươi sống",
-      supplierId: sampleSuppliers[0].id
+      supplierId: sampleSuppliers[4].id
     },
     {
       productCode: "FISH002",
@@ -470,7 +491,7 @@ export async function seedDatabase() {
       category: "Seafood",
       unit: "kg",
       description: "Tôm sú size 20-30 tươi sống",
-      supplierId: sampleSuppliers[1].id
+      supplierId: sampleSuppliers[5].id
     }
   ]).returning();
 
@@ -526,8 +547,8 @@ export async function seedDatabase() {
   console.log("\n📋 RBAC Testing Summary:");
   console.log(`   👤 Total Users: ${totalUsers}`);
   console.log(`   🏢 Teams: ${1 + kitchenTeams.length} (1 office, ${kitchenTeams.length} kitchens)`);
-  console.log(`   🏢 Office Team: kitchenCode = NULL`);
-  console.log(`   🍳 Kitchen Teams: kitchenCode = BEP001-BEP120 (unique)`);
+  console.log(`   🏢 Office Team: teamCode = NULL`);
+  console.log(`   🍳 Kitchen Teams: teamCode = BEP001-BEP120 (unique)`);
 
   console.log("\n📊 Department Breakdown:");
   for (const [dept, users] of Object.entries(departmentUsers)) {
@@ -558,6 +579,8 @@ export async function seedDatabase() {
   console.log("   ✅ Kitchen managers assigned to specific kitchens");
   console.log("   ✅ Office team with diverse role hierarchy");
   console.log("   ✅ Production-ready data relationships");
+  console.log("   ✅ FIXED: All users have proper departments (no NULL)");
+  console.log("   ✅ ENHANCED: All optional fields populated with realistic data");
 }
 
 // Run the seeding if this file is executed directly

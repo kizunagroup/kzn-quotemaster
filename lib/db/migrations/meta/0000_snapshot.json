@@ -1,5 +1,5 @@
 {
-  "id": "cdb08431-061d-4886-88de-8781a5e90b13",
+  "id": "19ca90c4-dc00-466d-bb6a-8b63ad88ee5f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1319,13 +1319,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "role": {
-          "name": "role",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'member'"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -1357,9 +1350,81 @@
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": false
+        },
+        "job_title": {
+          "name": "job_title",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "department": {
+          "name": "department",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "hire_date": {
+          "name": "hire_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'active'"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "idx_users_employee_code": {
+          "name": "idx_users_employee_code",
+          "columns": [
+            {
+              "expression": "employee_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"users\".\"employee_code\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_users_department": {
+          "name": "idx_users_department",
+          "columns": [
+            {
+              "expression": "department",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_users_status": {
+          "name": "idx_users_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
@@ -1379,7 +1444,16 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "employee_code_format": {
+          "name": "employee_code_format",
+          "value": "\"users\".\"employee_code\" ~ '^[A-Z0-9_-]+$'"
+        },
+        "status_values": {
+          "name": "status_values",
+          "value": "\"users\".\"status\" IN ('active', 'inactive', 'terminated')"
+        }
+      },
       "isRLSEnabled": false
     }
   },
