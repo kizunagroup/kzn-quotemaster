@@ -63,7 +63,19 @@ export function ManagerCombobox({
           setError(result.error);
           setManagers([]);
         } else {
-          setManagers(result);
+          // Validate and sanitize manager data to prevent runtime errors
+          const validManagers = (result || []).filter(manager =>
+            manager &&
+            typeof manager === 'object' &&
+            typeof manager.id === 'number'
+          ).map(manager => ({
+            id: manager.id,
+            name: manager.name || '',
+            email: manager.email || '',
+            role: manager.role || ''
+          }));
+
+          setManagers(validManagers);
         }
       } catch (err) {
         console.error('Error fetching managers:', err);
@@ -83,16 +95,23 @@ export function ManagerCombobox({
     return managers.find(manager => manager.id === value) || null;
   }, [value, managers]);
 
-  // Filter managers based on search query - FIXED CLIENT-SIDE FILTERING
+  // Filter managers based on search query - DEFENSIVE PROGRAMMING APPLIED
   const filteredManagers = useMemo(() => {
     if (!searchQuery.trim()) return managers;
 
     const query = searchQuery.toLowerCase().trim();
-    return managers.filter(manager =>
-      manager.name.toLowerCase().includes(query) ||
-      manager.email.toLowerCase().includes(query) ||
-      manager.role.toLowerCase().includes(query)
-    );
+    return managers.filter(manager => {
+      // Defensive programming: ensure all properties exist and are strings
+      const name = manager?.name?.toString() || '';
+      const email = manager?.email?.toString() || '';
+      const role = manager?.role?.toString() || '';
+
+      return (
+        name.toLowerCase().includes(query) ||
+        email.toLowerCase().includes(query) ||
+        role.toLowerCase().includes(query)
+      );
+    });
   }, [managers, searchQuery]);
 
   // Handle manager selection
@@ -156,8 +175,8 @@ export function ManagerCombobox({
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
             <div className="flex flex-col">
-              <span className="text-sm font-medium">{selectedManager.name}</span>
-              <span className="text-xs text-muted-foreground">{selectedManager.email}</span>
+              <span className="text-sm font-medium">{selectedManager.name || 'Không có tên'}</span>
+              <span className="text-xs text-muted-foreground">{selectedManager.email || 'Không có email'}</span>
             </div>
           </div>
           {!disabled && (
@@ -195,9 +214,9 @@ export function ManagerCombobox({
       <div className="flex items-center gap-2">
         <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-sm font-medium truncate">{manager.name}</span>
-          <span className="text-xs text-muted-foreground truncate">{manager.email}</span>
-          <span className="text-xs text-muted-foreground/70 capitalize">{manager.role}</span>
+          <span className="text-sm font-medium truncate">{manager.name || 'Không có tên'}</span>
+          <span className="text-xs text-muted-foreground truncate">{manager.email || 'Không có email'}</span>
+          <span className="text-xs text-muted-foreground/70 capitalize">{manager.role || 'Không có vai trò'}</span>
         </div>
       </div>
       <Check
@@ -262,7 +281,19 @@ export function ManagerCombobox({
                           setError(result.error);
                           setManagers([]);
                         } else {
-                          setManagers(result);
+                          // Validate and sanitize manager data to prevent runtime errors
+                          const validManagers = (result || []).filter(manager =>
+                            manager &&
+                            typeof manager === 'object' &&
+                            typeof manager.id === 'number'
+                          ).map(manager => ({
+                            id: manager.id,
+                            name: manager.name || '',
+                            email: manager.email || '',
+                            role: manager.role || ''
+                          }));
+
+                          setManagers(validManagers);
                         }
                       } catch (err) {
                         setError('Có lỗi xảy ra khi tải danh sách quản lý');
