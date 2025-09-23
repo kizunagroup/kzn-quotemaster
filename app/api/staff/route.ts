@@ -109,9 +109,7 @@ export async function GET(request: NextRequest) {
     });
 
     // 4. Build base where conditions for all staff queries
-    const baseWhereConditions = [
-      isNull(users.deletedAt), // Only non-deleted users
-    ];
+    const baseWhereConditions: any[] = [];
 
     // 5. Task 2.2.2: Role-based data filtering (CRITICAL SECURITY REQUIREMENT) - PURE TEAM-BASED RBAC
     let roleBasedConditions: any[] = [];
@@ -167,20 +165,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 7. Apply department filter
+    // 7. Apply department filter - FIXED: Ensure department filtering works correctly
     if (params.department && params.department !== 'all') {
       baseWhereConditions.push(eq(users.department, params.department));
     }
 
-    // 8. Apply status filter - FIXED: Proper status filtering logic
-    if (params.status && params.status !== 'all') {
-      // When a specific status is requested, filter by that exact status
+    // 8. Apply status filter - ARCHITECTURAL PRINCIPLE: status column is single source of truth
+    // REFACTORED: Implement correct status filtering logic
+    if (params.status === 'all') {
+      // Show all statuses: active, inactive, terminated
+      baseWhereConditions.push(inArray(users.status, ['active', 'inactive', 'terminated']));
+    } else if (params.status && params.status !== 'all') {
+      // Specific status filter - exact match only
       baseWhereConditions.push(eq(users.status, params.status));
-    } else if (params.status === 'all') {
-      // When status is explicitly 'all', show staff with all statuses (active, inactive, terminated)
-      // No additional filter needed - show all statuses
     } else {
-      // When no status filter is specified, show active and inactive staff by default (exclude terminated)
+      // Default behavior (no status param): Show active and inactive only
       baseWhereConditions.push(inArray(users.status, ['active', 'inactive']));
     }
 

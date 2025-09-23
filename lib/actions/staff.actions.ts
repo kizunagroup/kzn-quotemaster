@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
-import { eq, and, isNull, ilike, sql } from 'drizzle-orm';
+import { eq, and, ilike, sql } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 import { checkPermission } from '@/lib/auth/permissions';
 import { hashPassword } from '@/lib/auth/session';
@@ -29,7 +29,8 @@ async function isEmployeeCodeUnique(employeeCode: string, excludeId?: number): P
 
   const conditions = [
     ilike(users.employeeCode, trimmedCode),
-    isNull(users.deletedAt), // Only check active users
+    // REFACTORED: Use status column as single source of truth
+    sql`${users.status} IN ('active', 'inactive')`, // Only check active and inactive users
   ];
 
   // Exclude current record when updating
@@ -52,7 +53,8 @@ async function isEmailUnique(email: string, excludeId?: number): Promise<boolean
 
   const conditions = [
     ilike(users.email, trimmedEmail),
-    isNull(users.deletedAt), // Only check active users
+    // REFACTORED: Use status column as single source of truth
+    sql`${users.status} IN ('active', 'inactive')`, // Only check active and inactive users
   ];
 
   // Exclude current record when updating
@@ -105,6 +107,7 @@ export async function getStaff(): Promise<Staff[] | { error: string }> {
     }
 
     // 3. Query users table with left join to teamMembers and teams
+    // REFACTORED: Use status column as single source of truth - show active and inactive by default
     const staffData = await db
       .select({
         id: users.id,
@@ -129,10 +132,8 @@ export async function getStaff(): Promise<Staff[] | { error: string }> {
       .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
       .leftJoin(teams, eq(teamMembers.teamId, teams.id))
       .where(
-        and(
-          isNull(users.deletedAt), // Only active users
-          sql`${users.status} != 'terminated'` // Exclude terminated staff
-        )
+        // REFACTORED: Only filter by status - show active and inactive staff
+        sql`${users.status} IN ('active', 'inactive')`
       )
       .orderBy(users.name);
 
@@ -245,7 +246,6 @@ export async function createStaff(values: CreateStaffInput): Promise<ActionResul
         department: validatedData.department.trim(),
         hireDate: validatedData.hireDate ? new Date(validatedData.hireDate) : null,
         status: 'active', // Default status for new staff
-        role: 'member', // Default template role
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -311,10 +311,8 @@ export async function getStaffById(id: number): Promise<Staff | { error: string 
       .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
       .leftJoin(teams, eq(teamMembers.teamId, teams.id))
       .where(
-        and(
-          eq(users.id, id),
-          isNull(users.deletedAt)
-        )
+        // REFACTORED: Only filter by ID - status filtering handled by business logic
+        eq(users.id, id)
       );
 
     if (staffData.length === 0) {
@@ -406,8 +404,9 @@ export async function updateStaff(values: UpdateStaffInput): Promise<ActionResul
 
     const currentStaff = existingStaff[0];
 
-    if (currentStaff.deletedAt) {
-      return { error: 'Không thể cập nhật nhân viên đã bị xóa' };
+    // REFACTORED: Check status instead of deletedAt
+    if (currentStaff.status === 'terminated') {
+      return { error: 'Không thể cập nhật nhân viên đã chấm dứt hợp đồng' };
     }
 
     // 5. Check email uniqueness if being changed
@@ -529,17 +528,17 @@ export async function deactivateStaff(values: DeleteStaffInput): Promise<ActionR
       return { error: 'Nhân viên này đã được tạm dừng hoạt động' };
     }
 
-    if (staff.deletedAt) {
-      return { error: 'Nhân viên này đã bị xóa khỏi hệ thống' };
+    if (staff.status === 'terminated') {
+      return { error: 'Không thể tạm dừng nhân viên đã chấm dứt hợp đồng' };
     }
 
-    // 5. Deactivate staff by setting status to inactive (do NOT set deletedAt)
-    // Note: Team assignments are preserved for audit trail
-    // deletedAt should only be set for actual deletion, not deactivation
+    // 5. Deactivate staff by setting status to inactive AND deletedAt for audit
+    // REFACTORED: Set both status and deletedAt for complete audit trail
     const deactivatedStaff = await db
       .update(users)
       .set({
         status: 'inactive',
+        deletedAt: new Date(), // Set deletedAt for audit purposes
         updatedAt: new Date(),
       })
       .where(eq(users.id, validatedData.id))
@@ -603,7 +602,7 @@ export async function activateStaff(data: { id: number }): Promise<ActionResult>
 
     const staff = existingStaff[0];
 
-    if (staff.status === 'active' && !staff.deletedAt) {
+    if (staff.status === 'active') {
       return { error: 'Nhân viên này đã đang hoạt động' };
     }
 
@@ -684,10 +683,6 @@ export async function terminateStaff(data: { id: number }): Promise<ActionResult
       return { error: 'Nhân viên này đã được chấm dứt hợp đồng' };
     }
 
-    if (staff.deletedAt) {
-      return { error: 'Nhân viên này đã bị xóa khỏi hệ thống' };
-    }
-
     // 5. Terminate staff by setting status to terminated and deletedAt timestamp
     const terminatedStaff = await db
       .update(users)
@@ -740,10 +735,8 @@ export async function getTeamsForAssignment(): Promise<{ id: number; name: strin
       })
       .from(teams)
       .where(
-        and(
-          isNull(teams.deletedAt), // Only active teams
-          eq(teams.status, 'active') // Only teams with active status
-        )
+        // REFACTORED: Use status column as single source of truth
+        eq(teams.status, 'active') // Only teams with active status
       )
       .orderBy(teams.teamType, teams.name); // Sort by type, then name
 
@@ -807,7 +800,8 @@ export async function assignStaffToTeam(staffId: number, teamId: number, role: s
       return { error: 'Không tìm thấy nhân viên' };
     }
 
-    if (staff[0].deletedAt || staff[0].status !== 'active') {
+    // REFACTORED: Check only status column
+    if (staff[0].status !== 'active') {
       return { error: 'Không thể phân công nhân viên không hoạt động' };
     }
 
@@ -828,7 +822,8 @@ export async function assignStaffToTeam(staffId: number, teamId: number, role: s
       return { error: 'Không tìm thấy nhóm' };
     }
 
-    if (team[0].deletedAt || team[0].status !== 'active') {
+    // REFACTORED: Check only status column
+    if (team[0].status !== 'active') {
       return { error: 'Không thể phân công vào nhóm không hoạt động' };
     }
 
