@@ -962,3 +962,93 @@ export async function removeStaffFromTeam(staffId: number, teamId: number): Prom
     return { error: 'Có lỗi xảy ra khi hủy phân công nhân viên. Vui lòng thử lại.' };
   }
 }
+
+// Dedicated action to get staff team assignments for modal refresh
+export async function getStaffAssignments(staffId: number) {
+  try {
+    // 1. Input validation (fail fast)
+    if (!staffId || typeof staffId !== 'number' || staffId <= 0) {
+      throw new Error('ID nhân viên không hợp lệ');
+    }
+
+    // 2. Authorization check
+    const user = await getUser();
+    if (!user) {
+      throw new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+
+    // 3. Check if user has staff management permission OR can view their own teams
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+
+    // If user can't manage staff, they can only view assignments for themselves
+    if (!canManageStaff && user.id !== staffId) {
+      throw new Error('Bạn chỉ có thể xem thông tin phân công của chính mình');
+    }
+
+    // 4. Validate staffId with Zod schema
+    const staffIdSchema = z.number().positive('ID nhân viên phải là số dương');
+    const validatedStaffId = staffIdSchema.parse(staffId);
+
+    // 5. Verify staff exists and is active
+    const staffExists = await db
+      .select({ id: users.id, status: users.status, name: users.name })
+      .from(users)
+      .where(eq(users.id, validatedStaffId))
+      .limit(1);
+
+    if (staffExists.length === 0) {
+      throw new Error('Không tìm thấy nhân viên với ID này');
+    }
+
+    if (staffExists[0].status === 'terminated') {
+      throw new Error('Không thể xem phân công của nhân viên đã nghỉ việc');
+    }
+
+    // 6. Get staff assignments with comprehensive team info
+    const assignments = await db
+      .select({
+        id: teamMembers.id,
+        teamId: teamMembers.teamId,
+        teamName: teams.name,
+        teamType: teams.teamType,
+        role: teamMembers.role,
+        joinedAt: teamMembers.joinedAt,
+      })
+      .from(teamMembers)
+      .innerJoin(teams, eq(teamMembers.teamId, teams.id))
+      .where(
+        and(
+          eq(teamMembers.userId, validatedStaffId),
+          eq(teams.status, 'active'), // Only show active teams
+          sql`${teams.deletedAt} IS NULL` // Exclude soft-deleted teams
+        )
+      )
+      .orderBy(teamMembers.joinedAt);
+
+    // 7. Transform and return data with proper typing
+    return assignments.map(assignment => ({
+      id: assignment.id,
+      teamId: assignment.teamId,
+      teamName: assignment.teamName,
+      teamType: assignment.teamType || 'OFFICE', // Default fallback
+      role: assignment.role,
+      joinedAt: assignment.joinedAt,
+    }));
+
+  } catch (error) {
+    console.error('Get staff assignments error:', error);
+
+    // Handle specific error types for better user experience
+    if (error instanceof z.ZodError) {
+      throw new Error('Dữ liệu không hợp lệ: ' + error.errors[0].message);
+    }
+
+    if (error instanceof Error) {
+      // Re-throw known errors with original message
+      throw error;
+    }
+
+    // Generic fallback for unknown errors
+    throw new Error('Có lỗi xảy ra khi tải danh sách phân công. Vui lòng thử lại.');
+  }
+}
