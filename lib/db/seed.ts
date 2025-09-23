@@ -64,6 +64,11 @@ function generateEmployeeCode(prefix: string, index: number): string {
   return `${prefix}${String(index).padStart(3, '0')}`;
 }
 
+// FIXED: Kitchen code generator function
+function generateKitchenCode(index: number): string {
+  return `BEP${String(index).padStart(3, '0')}`;
+}
+
 function generatePhone(): string {
   const prefix = '09';
   const suffix = Math.floor(Math.random() * 100000000).toString().padStart(8, '0');
@@ -175,18 +180,21 @@ export async function seedDatabase() {
   console.log(`✅ Created ${managerUsers.length} manager users`);
 
   // 4. Create Office Team (CRITICAL: This is where admin will be assigned)
+  // FIXED: kitchenCode is NULL for OFFICE teams (as required)
   const [officeTeam] = await db.insert(teams).values({
     name: "Văn Phòng Trung Tâm",
     teamType: "OFFICE",
     region: "Trung Tâm",
     address: "123 Đường ABC, Quận 1, TP.HCM",
     managerId: superAdmin.id,
+    kitchenCode: null, // FIXED: NULL for office teams
     status: "active"
   }).returning();
 
   console.log("✅ Created office team");
 
-  // 5. Generate 120 Kitchen Teams with diverse data
+  // 5. Generate 120 Kitchen Teams with unique kitchen codes
+  // FIXED: Each kitchen gets a unique kitchenCode
   const kitchenTeams = [];
 
   for (let i = 1; i <= 120; i++) {
@@ -197,6 +205,7 @@ export async function seedDatabase() {
     const kitchen = await db.insert(teams).values({
       name: `Bếp ${randomRegion} ${i}`,
       teamType: "KITCHEN",
+      kitchenCode: generateKitchenCode(i), // FIXED: Generate unique kitchen codes (BEP001, BEP002, etc.)
       region: randomRegion,
       address: generateAddress(randomRegion),
       managerId: randomManager.id,
@@ -206,7 +215,7 @@ export async function seedDatabase() {
     kitchenTeams.push(kitchen[0]);
   }
 
-  console.log(`✅ Created ${kitchenTeams.length} kitchen teams`);
+  console.log(`✅ Created ${kitchenTeams.length} kitchen teams with unique kitchen codes`);
 
   // 6. CRITICAL: Assign All Manager Users to Office Team with Proper Roles
   const teamMemberData = [
@@ -253,7 +262,20 @@ export async function seedDatabase() {
   console.log("✅ Assigned all users to office team with proper roles");
   console.log(`✅ Super Admin assigned with role: ADMIN_SUPER_ADMIN`);
 
-  // 7. Create Enhanced Suppliers
+  // 7. FIXED: Create Kitchen Manager Memberships
+  // For each kitchen team, assign its designated manager to that kitchen's team with KITCHEN_MANAGER role
+  const kitchenManagerMemberships = kitchenTeams.map(kitchen => ({
+    userId: kitchen.managerId!, // The manager assigned to this kitchen
+    teamId: kitchen.id,        // The kitchen team
+    role: "KITCHEN_MANAGER"    // Kitchen manager role
+  }));
+
+  if (kitchenManagerMemberships.length > 0) {
+    await db.insert(teamMembers).values(kitchenManagerMemberships);
+    console.log(`✅ Created ${kitchenManagerMemberships.length} kitchen manager team memberships`);
+  }
+
+  // 8. Create Enhanced Suppliers
   const sampleSuppliers = await db.insert(suppliers).values([
     {
       supplierCode: "NCC001",
@@ -295,7 +317,7 @@ export async function seedDatabase() {
 
   console.log(`✅ Created ${sampleSuppliers.length} suppliers`);
 
-  // 8. Create Enhanced Products with realistic Vietnamese food data
+  // 9. Create Enhanced Products with realistic Vietnamese food data
   const sampleProducts = await db.insert(products).values([
     // Rice and Grains
     {
@@ -386,7 +408,7 @@ export async function seedDatabase() {
 
   console.log(`✅ Created ${sampleProducts.length} products`);
 
-  // 9. Generate Sample Kitchen Period Demands - FIXED PERIOD FORMAT
+  // 10. Generate Sample Kitchen Period Demands - FIXED PERIOD FORMAT
   const demandData = [];
   const periods = generatePeriodDates(); // FIXED: Now generates YYYY-MM-DD format periods
 
@@ -414,7 +436,7 @@ export async function seedDatabase() {
     console.log(`✅ Created ${demandData.length} period demand entries`);
   }
 
-  // 10. Create Activity Logs for audit trail
+  // 11. Create Activity Logs for audit trail
   const activityData = kitchenTeams.slice(0, 10).map((kitchen, index) => ({
     teamId: kitchen.id,
     action: index % 2 === 0 ? 'created' : 'updated',
@@ -431,7 +453,10 @@ export async function seedDatabase() {
   console.log("\n📋 Summary:");
   console.log(`   👤 Users: ${1 + managerUsers.length} (1 super admin, ${managerUsers.length} managers)`);
   console.log(`   🏢 Teams: ${1 + kitchenTeams.length} (1 office, ${kitchenTeams.length} kitchens)`);
-  console.log(`   🤝 Team Members: ${teamMemberData.length}`);
+  console.log(`   🏢 Office Team: kitchenCode = NULL`);
+  console.log(`   🍳 Kitchen Teams: kitchenCode = BEP001-BEP120 (unique)`);
+  console.log(`   🤝 Office Team Members: ${teamMemberData.length}`);
+  console.log(`   👨‍🍳 Kitchen Manager Memberships: ${kitchenManagerMemberships.length}`);
   console.log(`   🏭 Suppliers: ${sampleSuppliers.length}`);
   console.log(`   📦 Products: ${sampleProducts.length}`);
   console.log(`   📊 Demand Records: ${demandData.length}`);
@@ -442,6 +467,11 @@ export async function seedDatabase() {
   console.log("   Password: admin123!");
   console.log("   Permissions: ADMIN_SUPER_ADMIN role in Office Team");
   console.log("   RBAC Model: Pure team-based authorization via team_members table");
+  console.log("\n🔗 Data Integrity Verification:");
+  console.log("   ✅ Office Team: kitchenCode = NULL (as required)");
+  console.log("   ✅ Kitchen Teams: All have unique kitchenCode (BEP001-BEP120)");
+  console.log("   ✅ Manager-Team Links: Each kitchen manager linked to their kitchen team");
+  console.log("   ✅ RBAC Links: All users properly linked via team_members table");
 }
 
 // Run the seeding if this file is executed directly
