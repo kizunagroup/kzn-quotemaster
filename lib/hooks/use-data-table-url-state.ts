@@ -8,6 +8,8 @@ export interface DataTableFilters {
   search?: string;
   region?: string;
   status?: string;
+  department?: string;
+  team?: string;
   [key: string]: string | undefined;
 }
 
@@ -80,10 +82,20 @@ export function useDataTableUrlState(
     const search = params.get('search');
     const region = params.get('region');
     const status = params.get('status');
+    const department = params.get('department');
+    const team = params.get('team');
 
     if (search) filters.search = search;
     if (region && region !== 'all') filters.region = region;
     if (status && status !== 'all') filters.status = status;
+    if (department && department !== 'all') filters.department = department;
+    if (team && team !== 'all') filters.team = team;
+
+    // Debug logging for department filter
+    if (process.env.NODE_ENV === 'development') {
+      console.log('useDataTableUrlState - URL department param:', department);
+      console.log('useDataTableUrlState - Final filters:', filters);
+    }
 
     // Parse sort
     const sortColumn = params.get('sort');
@@ -205,7 +217,9 @@ export function useDataTableUrlState(
     return Boolean(
       currentState.filters.search ||
       currentState.filters.region ||
-      (currentState.filters.status && currentState.filters.status !== 'all')
+      currentState.filters.status ||
+      currentState.filters.department ||
+      currentState.filters.team
     );
   }, [currentState.filters]);
 
