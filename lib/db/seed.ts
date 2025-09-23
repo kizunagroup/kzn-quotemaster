@@ -18,7 +18,7 @@ import { hashPassword } from '@/lib/auth/session';
 // Helper function to generate random Vietnamese names
 const firstNames = [
   'Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Phan', 'Vũ', 'Võ', 'Đặng',
-  'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý', 'Đinh', 'Cao', 'Tran', 'Lưu'
+  'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý', 'Đinh', 'Cao', 'Mai', 'Lưu'
 ];
 
 const middleNames = [
@@ -38,13 +38,40 @@ const regions = [
   'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Vũng Tàu', 'Nha Trang', 'Huế'
 ];
 
-const managerRoles: string[] = [
-  'kitchen_manager',
-  'procurement_manager',
-  'admin',
-  'manager',
-  'super_admin'
-];
+// RBAC-focused organizational structure
+const organizationalStructure = {
+  ADMIN: {
+    roles: ['super_admin', 'admin_manager'],
+    count: 3, // 1 super admin + 2 admin managers
+    baseJobTitles: ['System Administrator', 'Admin Manager', 'IT Manager']
+  },
+  PROCUREMENT: {
+    roles: ['procurement_manager', 'procurement_staff'],
+    count: 3, // 1 manager + 2 staff
+    baseJobTitles: ['Procurement Manager', 'Purchasing Officer', 'Vendor Relations Specialist']
+  },
+  KITCHEN: {
+    roles: ['kitchen_manager', 'kitchen_staff'],
+    count: 4, // 2 managers + 2 staff
+    baseJobTitles: ['Kitchen Manager', 'Head Chef', 'Sous Chef', 'Kitchen Assistant']
+  },
+  ACCOUNTING: {
+    roles: ['accounting_manager', 'accounting_staff'],
+    count: 3, // 1 manager + 2 staff
+    baseJobTitles: ['Accounting Manager', 'Financial Analyst', 'Bookkeeper']
+  },
+  OPERATIONS: {
+    roles: ['operations_manager', 'operations_staff'],
+    count: 3, // 1 manager + 2 staff
+    baseJobTitles: ['Operations Manager', 'Operations Coordinator', 'Logistics Specialist']
+  },
+  // Additional users without specific departments for testing edge cases
+  GENERAL: {
+    roles: ['general_staff'],
+    count: 14, // Additional users to reach 30+ total
+    baseJobTitles: ['General Staff', 'Assistant', 'Coordinator', 'Specialist']
+  }
+};
 
 function generateRandomName(): string {
   const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
@@ -98,7 +125,6 @@ function generatePeriodDates(): string[] {
   const currentYear = 2024;
 
   // Generate specific quotation periods throughout the year
-  // These represent quotation cycle dates, not quarters
   periods.push(
     `${currentYear}-01-15`, // Mid-January quotation cycle
     `${currentYear}-04-01`, // Q2 start quotation cycle
@@ -134,19 +160,55 @@ async function cleanupExistingData() {
 }
 
 export async function seedDatabase() {
-  console.log("🌱 Starting database seeding...");
+  console.log("🌱 Starting comprehensive RBAC database seeding...");
 
   // 1. Clean up existing data first
   await cleanupExistingData();
 
-  // 2. Create Super Admin User (CRITICAL: Admin power comes from team assignment)
+  // 2. Create comprehensive organizational structure for RBAC testing
+  const allUsers: any[] = [];
+  const departmentUsers: Record<string, any[]> = {};
+  let userCounter = 1;
+
+  // Create users for each department with proper RBAC structure
+  for (const [department, config] of Object.entries(organizationalStructure)) {
+    departmentUsers[department] = [];
+
+    for (let i = 0; i < config.count; i++) {
+      const name = generateRandomName();
+      const roleIndex = Math.floor(i / Math.ceil(config.count / config.roles.length));
+      const intendedRole = config.roles[roleIndex] || config.roles[0];
+      const jobTitle = config.baseJobTitles[i] || config.baseJobTitles[0];
+
+      const userData = {
+        name: name,
+        email: generateEmail(name, userCounter),
+        passwordHash: await hashPassword("password123!"),
+        employeeCode: generateEmployeeCode(department.substring(0, 3), userCounter),
+        phone: generatePhone(),
+        department: department === 'GENERAL' ? null : department, // GENERAL users have no specific department
+        jobTitle: jobTitle,
+        hireDate: getRandomPastDate(),
+        status: Math.random() < 0.9 ? 'active' : 'inactive', // 90% active, 10% inactive for testing
+        intendedRole: intendedRole // Store for team assignment later
+      };
+
+      const [user] = await db.insert(users).values(userData).returning();
+      allUsers.push({ ...user, intendedRole });
+      departmentUsers[department].push({ ...user, intendedRole });
+      userCounter++;
+    }
+  }
+
+  console.log(`✅ Created ${allUsers.length} users across ${Object.keys(organizationalStructure).length} departments`);
+
+  // 3. Create the Super Admin user (separate from organizational structure)
   const [superAdmin] = await db.insert(users).values({
-    name: "QuoteMaster Admin",
+    name: "QuoteMaster Super Admin",
     email: "admin@quotemaster.local",
     passwordHash: await hashPassword("admin123!"),
     employeeCode: "ADMIN001",
     phone: "0901234567",
-    // REMOVED: role field - admin power comes from ADMIN_SUPER_ADMIN role in Office Team
     department: "ADMIN",
     jobTitle: "System Administrator",
     status: "active"
@@ -154,33 +216,7 @@ export async function seedDatabase() {
 
   console.log("✅ Created super admin user");
 
-  // 3. Generate 15 Manager Users (roles assigned via team memberships)
-  const managerUsers = [];
-  const managerUserRoles: string[] = []; // Track intended roles for team assignment
-
-  for (let i = 1; i <= 15; i++) {
-    const name = generateRandomName();
-    const intendedRole = managerRoles[Math.floor(Math.random() * managerRoles.length)];
-    const manager = await db.insert(users).values({
-      name: name,
-      email: generateEmail(name, i),
-      passwordHash: await hashPassword("manager123!"),
-      employeeCode: generateEmployeeCode("MG", i),
-      phone: generatePhone(),
-      // REMOVED: role field - roles now assigned via team memberships
-      department: "ADMIN",
-      jobTitle: "Manager",
-      status: "active"
-    }).returning();
-
-    managerUsers.push(manager[0]);
-    managerUserRoles.push(intendedRole); // Store for team assignment
-  }
-
-  console.log(`✅ Created ${managerUsers.length} manager users`);
-
-  // 4. Create Office Team (CRITICAL: This is where admin will be assigned)
-  // FIXED: kitchenCode is NULL for OFFICE teams (as required)
+  // 4. Create Office Team (Central command for admin operations)
   const [officeTeam] = await db.insert(teams).values({
     name: "Văn Phòng Trung Tâm",
     teamType: "OFFICE",
@@ -193,13 +229,16 @@ export async function seedDatabase() {
 
   console.log("✅ Created office team");
 
-  // 5. Generate 120 Kitchen Teams with unique kitchen codes
-  // FIXED: Each kitchen gets a unique kitchenCode
+  // 5. Generate 120 Kitchen Teams with unique kitchen codes and diverse management
   const kitchenTeams = [];
+  const kitchenManagers = departmentUsers.KITCHEN.filter(user =>
+    user.intendedRole === 'kitchen_manager'
+  );
 
   for (let i = 1; i <= 120; i++) {
-    // Random assignments
-    const randomManager = managerUsers[Math.floor(Math.random() * managerUsers.length)];
+    // Cycle through available kitchen managers, or assign random users if not enough managers
+    const assignedManager = kitchenManagers[i % kitchenManagers.length] ||
+                           allUsers[Math.floor(Math.random() * allUsers.length)];
     const randomRegion = regions[Math.floor(Math.random() * regions.length)];
 
     const kitchen = await db.insert(teams).values({
@@ -208,8 +247,8 @@ export async function seedDatabase() {
       kitchenCode: generateKitchenCode(i), // FIXED: Generate unique kitchen codes (BEP001, BEP002, etc.)
       region: randomRegion,
       address: generateAddress(randomRegion),
-      managerId: randomManager.id,
-      status: i % 15 === 0 ? "inactive" : "active" // 1 in 15 kitchens inactive
+      managerId: assignedManager.id,
+      status: i % 15 === 0 ? "inactive" : "active" // 1 in 15 kitchens inactive for testing
     }).returning();
 
     kitchenTeams.push(kitchen[0]);
@@ -217,65 +256,94 @@ export async function seedDatabase() {
 
   console.log(`✅ Created ${kitchenTeams.length} kitchen teams with unique kitchen codes`);
 
-  // 6. CRITICAL: Assign All Manager Users to Office Team with Proper Roles
-  const teamMemberData = [
-    // SUPER ADMIN assignment - this is the critical fix
-    {
-      userId: superAdmin.id,
-      teamId: officeTeam.id,
-      role: "ADMIN_SUPER_ADMIN" // This role allows staff management
-    },
-    // Assign manager users to office team with appropriate roles
-    ...managerUsers.map((manager, index) => {
-      // Convert intended role to enhanced role format
-      let enhancedRole = "ADMIN_STAFF"; // Default role
-      const intendedRole = managerUserRoles[index];
+  // 6. COMPREHENSIVE RBAC TEAM ASSIGNMENTS
+  const teamMemberAssignments = [];
 
-      switch (intendedRole) {
+  // 6a. Assign Super Admin to Office Team
+  teamMemberAssignments.push({
+    userId: superAdmin.id,
+    teamId: officeTeam.id,
+    role: "ADMIN_SUPER_ADMIN"
+  });
+
+  // 6b. Assign department users to Office Team with appropriate roles
+  for (const [department, users] of Object.entries(departmentUsers)) {
+    if (department === 'KITCHEN') continue; // Kitchen users handled separately
+    if (department === 'GENERAL') continue; // General users get no team assignments initially
+
+    for (const user of users) {
+      let teamRole = "ADMIN_STAFF"; // Default role
+
+      // Map intended roles to team roles
+      switch (user.intendedRole) {
         case 'super_admin':
-          enhancedRole = "ADMIN_SUPER_ADMIN";
+          teamRole = "ADMIN_SUPER_ADMIN";
           break;
-        case 'admin':
-        case 'manager':
-          enhancedRole = "ADMIN_MANAGER";
-          break;
-        case 'kitchen_manager':
-          enhancedRole = "KITCHEN_MANAGER";
+        case 'admin_manager':
+          teamRole = "ADMIN_MANAGER";
           break;
         case 'procurement_manager':
-          enhancedRole = "PROCUREMENT_MANAGER";
+          teamRole = "PROCUREMENT_MANAGER";
+          break;
+        case 'procurement_staff':
+          teamRole = "PROCUREMENT_STAFF";
+          break;
+        case 'accounting_manager':
+          teamRole = "ACCOUNTING_MANAGER";
+          break;
+        case 'accounting_staff':
+          teamRole = "ACCOUNTING_STAFF";
+          break;
+        case 'operations_manager':
+          teamRole = "OPERATIONS_MANAGER";
+          break;
+        case 'operations_staff':
+          teamRole = "OPERATIONS_STAFF";
           break;
         default:
-          enhancedRole = "ADMIN_STAFF";
+          teamRole = "ADMIN_STAFF";
       }
 
-      return {
-        userId: manager.id,
+      teamMemberAssignments.push({
+        userId: user.id,
         teamId: officeTeam.id,
-        role: enhancedRole
-      };
-    })
-  ];
-
-  await db.insert(teamMembers).values(teamMemberData);
-
-  console.log("✅ Assigned all users to office team with proper roles");
-  console.log(`✅ Super Admin assigned with role: ADMIN_SUPER_ADMIN`);
-
-  // 7. FIXED: Create Kitchen Manager Memberships
-  // For each kitchen team, assign its designated manager to that kitchen's team with KITCHEN_MANAGER role
-  const kitchenManagerMemberships = kitchenTeams.map(kitchen => ({
-    userId: kitchen.managerId!, // The manager assigned to this kitchen
-    teamId: kitchen.id,        // The kitchen team
-    role: "KITCHEN_MANAGER"    // Kitchen manager role
-  }));
-
-  if (kitchenManagerMemberships.length > 0) {
-    await db.insert(teamMembers).values(kitchenManagerMemberships);
-    console.log(`✅ Created ${kitchenManagerMemberships.length} kitchen manager team memberships`);
+        role: teamRole
+      });
+    }
   }
 
-  // 8. Create Enhanced Suppliers
+  // 6c. Assign kitchen users to specific kitchen teams
+  const kitchenUsers = departmentUsers.KITCHEN;
+  for (let i = 0; i < kitchenUsers.length; i++) {
+    const user = kitchenUsers[i];
+    // Distribute kitchen users across different kitchen teams
+    const assignedKitchen = kitchenTeams[i % Math.min(kitchenTeams.length, 10)]; // Assign to first 10 kitchens
+
+    const kitchenRole = user.intendedRole === 'kitchen_manager' ? 'KITCHEN_MANAGER' : 'KITCHEN_STAFF';
+
+    teamMemberAssignments.push({
+      userId: user.id,
+      teamId: assignedKitchen.id,
+      role: kitchenRole
+    });
+  }
+
+  // 6d. Create kitchen manager memberships for all kitchen teams
+  for (const kitchen of kitchenTeams) {
+    teamMemberAssignments.push({
+      userId: kitchen.managerId!,
+      teamId: kitchen.id,
+      role: "KITCHEN_MANAGER"
+    });
+  }
+
+  // Insert all team assignments
+  if (teamMemberAssignments.length > 0) {
+    await db.insert(teamMembers).values(teamMemberAssignments);
+    console.log(`✅ Created ${teamMemberAssignments.length} team member assignments`);
+  }
+
+  // 7. Create Enhanced Suppliers
   const sampleSuppliers = await db.insert(suppliers).values([
     {
       supplierCode: "NCC001",
@@ -317,7 +385,7 @@ export async function seedDatabase() {
 
   console.log(`✅ Created ${sampleSuppliers.length} suppliers`);
 
-  // 9. Create Enhanced Products with realistic Vietnamese food data
+  // 8. Create Enhanced Products with realistic Vietnamese food data
   const sampleProducts = await db.insert(products).values([
     // Rice and Grains
     {
@@ -408,20 +476,20 @@ export async function seedDatabase() {
 
   console.log(`✅ Created ${sampleProducts.length} products`);
 
-  // 10. Generate Sample Kitchen Period Demands - FIXED PERIOD FORMAT
+  // 9. Generate Sample Kitchen Period Demands
   const demandData = [];
-  const periods = generatePeriodDates(); // FIXED: Now generates YYYY-MM-DD format periods
+  const periods = generatePeriodDates();
 
   for (const kitchen of kitchenTeams.slice(0, 20)) { // Use first 20 kitchens
     for (const period of periods) {
       for (const product of sampleProducts.slice(0, 5)) { // Use first 5 products
         const quantity = Math.floor(Math.random() * 500) + 50; // 50-550 units
         demandData.push({
-          teamId: kitchen.id,           // FIXED: Use teamId instead of kitchenId
+          teamId: kitchen.id,
           productId: product.id,
-          period: period,               // FIXED: Now uses YYYY-MM-DD format
-          quantity: quantity.toString(), // FIXED: Use quantity field (decimal as string)
-          unit: product.unit,           // FIXED: Add required unit field
+          period: period,
+          quantity: quantity.toString(),
+          unit: product.unit,
           notes: `Nhu cầu cho chu kỳ ${period} - ${kitchen.name}`,
           status: "active",
           createdBy: superAdmin.id,
@@ -436,7 +504,7 @@ export async function seedDatabase() {
     console.log(`✅ Created ${demandData.length} period demand entries`);
   }
 
-  // 11. Create Activity Logs for audit trail
+  // 10. Create Activity Logs for audit trail
   const activityData = kitchenTeams.slice(0, 10).map((kitchen, index) => ({
     teamId: kitchen.id,
     action: index % 2 === 0 ? 'created' : 'updated',
@@ -449,36 +517,54 @@ export async function seedDatabase() {
     console.log(`✅ Created ${activityData.length} activity log entries`);
   }
 
-  console.log("\n🎉 Database seeding completed successfully!");
-  console.log("\n📋 Summary:");
-  console.log(`   👤 Users: ${1 + managerUsers.length} (1 super admin, ${managerUsers.length} managers)`);
+  // 11. Summary reporting with RBAC breakdown
+  const totalUsers = allUsers.length + 1; // +1 for super admin
+  const officeTeamMembers = teamMemberAssignments.filter(tm => tm.teamId === officeTeam.id).length;
+  const kitchenMemberships = teamMemberAssignments.filter(tm => tm.teamId !== officeTeam.id).length;
+
+  console.log("\n🎉 Comprehensive RBAC database seeding completed successfully!");
+  console.log("\n📋 RBAC Testing Summary:");
+  console.log(`   👤 Total Users: ${totalUsers}`);
   console.log(`   🏢 Teams: ${1 + kitchenTeams.length} (1 office, ${kitchenTeams.length} kitchens)`);
   console.log(`   🏢 Office Team: kitchenCode = NULL`);
   console.log(`   🍳 Kitchen Teams: kitchenCode = BEP001-BEP120 (unique)`);
-  console.log(`   🤝 Office Team Members: ${teamMemberData.length}`);
-  console.log(`   👨‍🍳 Kitchen Manager Memberships: ${kitchenManagerMemberships.length}`);
+
+  console.log("\n📊 Department Breakdown:");
+  for (const [dept, users] of Object.entries(departmentUsers)) {
+    console.log(`   ${dept}: ${users.length} users`);
+  }
+
+  console.log("\n🤝 Team Assignments:");
+  console.log(`   📝 Office Team Members: ${officeTeamMembers}`);
+  console.log(`   👨‍🍳 Kitchen Memberships: ${kitchenMemberships}`);
+  console.log(`   📊 Total Team Assignments: ${teamMemberAssignments.length}`);
+
+  console.log("\n🏭 Business Data:");
   console.log(`   🏭 Suppliers: ${sampleSuppliers.length}`);
   console.log(`   📦 Products: ${sampleProducts.length}`);
   console.log(`   📊 Demand Records: ${demandData.length}`);
   console.log(`   📝 Activity Logs: ${activityData.length}`);
   console.log(`   📅 Period Formats: ${periods.join(', ')}`);
+
   console.log("\n🔐 Login Credentials:");
   console.log("   Email: admin@quotemaster.local");
   console.log("   Password: admin123!");
   console.log("   Permissions: ADMIN_SUPER_ADMIN role in Office Team");
-  console.log("   RBAC Model: Pure team-based authorization via team_members table");
-  console.log("\n🔗 Data Integrity Verification:");
-  console.log("   ✅ Office Team: kitchenCode = NULL (as required)");
-  console.log("   ✅ Kitchen Teams: All have unique kitchenCode (BEP001-BEP120)");
-  console.log("   ✅ Manager-Team Links: Each kitchen manager linked to their kitchen team");
-  console.log("   ✅ RBAC Links: All users properly linked via team_members table");
+
+  console.log("\n🔗 RBAC Testing Features:");
+  console.log("   ✅ Multi-department users with varied roles");
+  console.log("   ✅ Users with no team assignments (GENERAL department)");
+  console.log("   ✅ Mixed active/inactive users for status filtering");
+  console.log("   ✅ Kitchen managers assigned to specific kitchens");
+  console.log("   ✅ Office team with diverse role hierarchy");
+  console.log("   ✅ Production-ready data relationships");
 }
 
 // Run the seeding if this file is executed directly
 if (require.main === module) {
   seedDatabase()
     .then(() => {
-      console.log("✅ Seeding completed successfully");
+      console.log("✅ Comprehensive RBAC seeding completed successfully");
       process.exit(0);
     })
     .catch((error) => {

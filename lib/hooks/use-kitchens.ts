@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import { useSearchParams } from 'next/navigation';
+import { useDataTableUrlState } from './use-data-table-url-state';
 
 // TypeScript interfaces for type safety
 interface Kitchen {
@@ -76,12 +76,59 @@ const fetcher = async (url: string): Promise<KitchensResponse> => {
   }
 };
 
-// Main SWR hook for kitchen data management
+// Main SWR hook for kitchen data management with URL state integration
 export function useKitchens() {
-  const searchParams = useSearchParams();
+  // Get current URL state for filters, sorting, and pagination
+  const {
+    filters,
+    sort,
+    pagination,
+    setFilters,
+    setSort,
+    clearSort,
+    setPagination,
+    setSearch,
+    setFilter,
+    clearFilters,
+    hasActiveFilters,
+    updateUrl,
+  } = useDataTableUrlState({
+    defaultFilters: {},
+    defaultSort: { column: 'kitchenCode', order: 'asc' }, // FIXED: Default sort by kitchenCode ascending
+    defaultPagination: { page: 1, limit: 10 },
+  });
 
-  // Build API URL dynamically based on current search parameters
-  const apiUrl = `/api/kitchens?${searchParams.toString()}`;
+  // Build API URL dynamically based on current URL state
+  const buildApiUrl = () => {
+    const params = new URLSearchParams();
+
+    // Add filters
+    if (filters.search) {
+      params.set('search', filters.search);
+    }
+    if (filters.region && filters.region !== 'all') {
+      params.set('region', filters.region);
+    }
+    if (filters.status && filters.status !== 'all') {
+      params.set('status', filters.status);
+    }
+
+    // Add sorting
+    if (sort.column) {
+      params.set('sort', sort.column);
+    }
+    if (sort.order) {
+      params.set('order', sort.order);
+    }
+
+    // Add pagination
+    params.set('page', pagination.page.toString());
+    params.set('limit', pagination.limit.toString());
+
+    return `/api/kitchens?${params.toString()}`;
+  };
+
+  const apiUrl = buildApiUrl();
 
   // Configure SWR with optimized settings for kitchen data
   const { data, error, isLoading, mutate } = useSWR<KitchensResponse>(
@@ -125,19 +172,37 @@ export function useKitchens() {
     pagination: data?.pagination,
     filters: data?.filters,
 
-    // State
+    // State management from URL hook
+    urlState: {
+      filters,
+      sort,
+      pagination,
+    },
+
+    // State update functions (from URL hook)
+    setFilters,
+    setSort,
+    clearSort,
+    setPagination,
+    setSearch,
+    setFilter,
+    clearFilters,
+    updateUrl,
+
+    // Loading and error states
     isLoading,
     error,
-
-    // Functions
-    mutate, // For manual revalidation after mutations
 
     // Computed properties for convenience
     isEmpty: !isLoading && (!data?.data || data.data.length === 0),
     isValidating: isLoading, // Alias for consistency
 
     // Helper methods
-    refresh: () => mutate(), // Convenient refresh method
+    refresh: () => mutate(), // Convenient refresh method (alias for mutate)
+    mutate, // Direct access to SWR mutate function
+
+    // Utility properties
+    hasActiveFilters,
 
     // Pagination helpers
     hasNextPage: data?.pagination ? data.pagination.page < data.pagination.pages : false,
