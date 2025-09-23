@@ -229,45 +229,85 @@ export async function GET(request: NextRequest) {
     const sortColumn = getSortColumn(params.sort);
     const sortDirection = params.order === 'desc' ? desc(sortColumn) : asc(sortColumn);
 
-    // 12. Execute optimized queries with Promise.all for efficiency
-    const [staffData, totalCount] = await Promise.all([
-      // Fetch staff data with team assignments
+    // 12. CRITICAL PAGINATION FIX: Two-step query to avoid JOIN duplication issues
+    // Step 1: Get paginated user IDs and total count (without JOINs to avoid duplication)
+    const [paginatedUserIds, totalCount] = await Promise.all([
+      // Fetch only user IDs for the current page with proper pagination
       db
         .select({
           id: users.id,
+          // Include columns needed for sorting to ensure correct order
           employeeCode: users.employeeCode,
           name: users.name,
           email: users.email,
-          phone: users.phone,
-          jobTitle: users.jobTitle,
           department: users.department,
-          hireDate: users.hireDate,
+          jobTitle: users.jobTitle,
           status: users.status,
+          hireDate: users.hireDate,
           createdAt: users.createdAt,
-          updatedAt: users.updatedAt,
-          // Team assignment info
-          teamMemberId: teamMembers.id,
-          teamId: teamMembers.teamId,
-          teamName: teams.name,
-          teamRole: teamMembers.role,
-          joinedAt: teamMembers.joinedAt,
         })
         .from(users)
-        .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-        .leftJoin(teams, eq(teamMembers.teamId, teams.id))
         .where(allWhereConditions.length > 0 ? and(...allWhereConditions) : undefined)
         .orderBy(sortDirection)
         .limit(params.limit)
         .offset(offset),
 
-      // Get total count for pagination
+      // Get total count for pagination (simple query without JOINs)
       db
-        .select({ count: sql<number>`COUNT(DISTINCT ${users.id})` })
+        .select({ count: sql<number>`COUNT(*)` })
         .from(users)
-        .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
         .where(allWhereConditions.length > 0 ? and(...allWhereConditions) : undefined)
         .then(result => result[0]?.count || 0)
     ]);
+
+    // If no users found, return empty result
+    if (paginatedUserIds.length === 0) {
+      return NextResponse.json({
+        data: [],
+        pagination: {
+          page: params.page,
+          limit: params.limit,
+          total: totalCount,
+          pages: Math.ceil(totalCount / params.limit),
+        },
+        filters: {
+          search: params.search,
+          department: params.department,
+          status: params.status,
+          team: params.team,
+          sort: params.sort,
+          order: params.order,
+        },
+      });
+    }
+
+    // Step 2: Fetch full staff data with team assignments for the paginated user IDs
+    const userIds = paginatedUserIds.map(user => user.id);
+    const staffData = await db
+      .select({
+        id: users.id,
+        employeeCode: users.employeeCode,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+        jobTitle: users.jobTitle,
+        department: users.department,
+        hireDate: users.hireDate,
+        status: users.status,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+        // Team assignment info (can be null for users without teams)
+        teamMemberId: teamMembers.id,
+        teamId: teamMembers.teamId,
+        teamName: teams.name,
+        teamRole: teamMembers.role,
+        joinedAt: teamMembers.joinedAt,
+      })
+      .from(users)
+      .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
+      .leftJoin(teams, eq(teamMembers.teamId, teams.id))
+      .where(inArray(users.id, userIds))
+      .orderBy(sortDirection); // Maintain the same sort order as Step 1
 
     // 13. Group results by user and collect team assignments
     const staffMap = new Map<number, StaffResponse>();
@@ -290,7 +330,7 @@ export async function GET(request: NextRequest) {
         });
       }
 
-      // Add team assignment if exists
+      // Add team assignment if exists (LEFT JOIN can result in null team data)
       if (row.teamMemberId && row.teamId && row.teamName) {
         staffMap.get(row.id)!.currentTeams.push({
           teamId: row.teamId,

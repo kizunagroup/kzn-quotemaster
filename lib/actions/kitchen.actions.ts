@@ -525,3 +525,80 @@ export async function deactivateKitchen(data: DeleteKitchenInput) {
     return { error: 'Có lỗi xảy ra khi tạm dừng bếp. Vui lòng thử lại.' };
   }
 }
+
+// Server action to activate a kitchen
+export async function activateKitchen(data: DeleteKitchenInput) {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check kitchen management permission
+    const canManageKitchens = await checkPermission(user.id, 'canManageKitchens');
+    if (!canManageKitchens) {
+      return { error: 'Không có quyền kích hoạt bếp' };
+    }
+
+    // 3. Validate input data
+    const validationResult = deleteKitchenSchema.safeParse(data);
+    if (!validationResult.success) {
+      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      return { error: `Dữ liệu không hợp lệ: ${errors}` };
+    }
+
+    const validatedData = validationResult.data;
+
+    // 4. Fetch existing kitchen
+    const existingKitchen = await db
+      .select({
+        id: teams.id,
+        kitchenCode: teams.kitchenCode,
+        name: teams.name,
+        status: teams.status,
+        deletedAt: teams.deletedAt
+      })
+      .from(teams)
+      .where(
+        and(
+          eq(teams.id, validatedData.id),
+          eq(teams.teamType, 'KITCHEN')
+        )
+      )
+      .limit(1);
+
+    if (existingKitchen.length === 0) {
+      return { error: 'Không tìm thấy bếp cần kích hoạt' };
+    }
+
+    const kitchen = existingKitchen[0];
+
+    if (kitchen.status === 'active') {
+      return { error: 'Bếp đã đang hoạt động' };
+    }
+
+    if (kitchen.deletedAt) {
+      return { error: 'Không thể kích hoạt bếp đã bị xóa vĩnh viễn' };
+    }
+
+    // 5. Activate kitchen
+    await db
+      .update(teams)
+      .set({
+        status: 'active',
+        updatedAt: new Date(),
+      })
+      .where(eq(teams.id, validatedData.id));
+
+    // 6. Revalidate cache and return success
+    revalidatePath('/danh-muc/bep');
+    return {
+      success: `Bếp "${kitchen.name}" (${kitchen.kitchenCode}) đã được kích hoạt thành công`
+    };
+
+  } catch (error) {
+    console.error('Activate kitchen error:', error);
+    return { error: 'Có lỗi xảy ra khi kích hoạt bếp. Vui lòng thử lại.' };
+  }
+}

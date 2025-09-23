@@ -98,7 +98,6 @@ export function KitchensDataTable() {
   const {
     filters,
     sort,
-    pagination: urlPagination,
     setSearch,
     setFilter,
     setSort,
@@ -106,13 +105,14 @@ export function KitchensDataTable() {
     clearFilters,
     hasActiveFilters,
   } = useDataTableUrlState({
+    defaultSort: { column: 'kitchenCode', order: 'asc' },
     defaultPagination: { page: 1, limit: 10 },
   });
 
   // Fetch kitchen data using our custom hook
   const {
     kitchens,
-    pagination,
+    pagination: kitchenPagination,
     isLoading,
     error,
     isEmpty,
@@ -136,7 +136,7 @@ export function KitchensDataTable() {
       setSort('');
     } else {
       // Extract the first sort (single column sorting)
-      const { id, desc } = newSorting[0];
+      const { id } = newSorting[0];
       setSort(id);
     }
   };
@@ -481,9 +481,9 @@ export function KitchensDataTable() {
       </div>
 
       {/* Pagination */}
-      {pagination && (
+      {kitchenPagination && (
         <DataTablePagination
-          pagination={pagination}
+          pagination={kitchenPagination}
           onPageChange={handlePageChange}
           onPageSizeChange={handlePageSizeChange}
         />
