@@ -1,6 +1,4 @@
-import { db } from '@/lib/db/drizzle';
-import { users, teams, teamMembers } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { getUserWithTeams, getUserTeams } from '@/lib/db/queries';
 
 // Enhanced role definitions
 export enum Department {
@@ -375,57 +373,6 @@ function mergePermissions(permissionSets: PermissionSet[]): PermissionSet {
 }
 
 // Authorization utility functions
-export async function getUserWithTeams(userId: number) {
-  try {
-    const result = await db
-      .select({
-        user: users,
-        teamMember: teamMembers,
-        team: teams,
-      })
-      .from(users)
-      .leftJoin(teamMembers, eq(users.id, teamMembers.userId))
-      .leftJoin(teams, eq(teamMembers.teamId, teams.id))
-      .where(eq(users.id, userId));
-
-    if (result.length === 0) {
-      return null;
-    }
-
-    const user = result[0].user;
-    const teams = result
-      .filter(row => row.teamMember && row.team)
-      .map(row => ({
-        ...row.teamMember!,
-        team: row.team!,
-      }));
-
-    return {
-      ...user,
-      teams,
-    };
-  } catch (error) {
-    console.error('Error fetching user with teams:', error);
-    return null;
-  }
-}
-
-export async function getUserTeams(userId: number) {
-  try {
-    const result = await db
-      .select({
-        team: teams,
-      })
-      .from(teamMembers)
-      .innerJoin(teams, eq(teamMembers.teamId, teams.id))
-      .where(eq(teamMembers.userId, userId));
-
-    return result.map(row => row.team);
-  } catch (error) {
-    console.error('Error fetching user teams:', error);
-    return [];
-  }
-}
 
 export async function getUserPermissions(userId: number): Promise<PermissionSet> {
   try {
