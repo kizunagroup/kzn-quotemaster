@@ -38,8 +38,10 @@ import {
   getTeamsForAssignment,
   assignStaffToTeam,
   removeStaffFromTeam,
+  getStaffAssignments,
 } from '@/lib/actions/staff.actions';
 import type { Staff } from '@/lib/hooks/use-staff';
+import { TeamCombobox } from './team-combobox';
 
 // Role constants based on team type
 const KITCHEN_ROLES = [
@@ -68,11 +70,6 @@ const assignmentSchema = z.object({
 
 type AssignmentFormData = z.infer<typeof assignmentSchema>;
 
-interface Team {
-  id: number;
-  name: string;
-  type: string;
-}
 
 interface TeamAssignmentModalProps {
   isOpen: boolean;
@@ -87,10 +84,19 @@ export function TeamAssignmentModal({
   onSuccess,
   staff,
 }: TeamAssignmentModalProps) {
-  const [availableTeams, setAvailableTeams] = useState<Team[]>([]);
-  const [loadingTeams, setLoadingTeams] = useState(false);
   const [removingAssignment, setRemovingAssignment] = useState<number | null>(null);
   const [selectedTeamType, setSelectedTeamType] = useState<string>('');
+
+  // Local state for current assignments to enable instant UI refresh
+  const [currentAssignments, setCurrentAssignments] = useState<Array<{
+    id: number;
+    teamId: number;
+    teamName: string;
+    teamType: string;
+    role: string;
+    joinedAt: Date;
+  }>>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
 
   // Form setup for new assignment
   const form = useForm<AssignmentFormData>({
@@ -103,44 +109,57 @@ export function TeamAssignmentModal({
 
   const selectedTeamId = form.watch('teamId');
 
-  // Load available teams when modal opens
+  // Load data when modal opens
   useEffect(() => {
-    if (isOpen) {
-      loadTeams();
+    if (isOpen && staff) {
+      refreshAssignments();
     }
-  }, [isOpen]);
+  }, [isOpen, staff]);
 
-  // Update selected team type when team changes
+  // Update selected team type when team changes - we'll need to get this from the combobox
   useEffect(() => {
     if (selectedTeamId) {
-      const team = availableTeams.find(t => t.id.toString() === selectedTeamId);
-      if (team) {
-        setSelectedTeamType(team.type);
-        // Reset role when team changes
-        form.setValue('role', '');
-      }
+      // We'll derive the team type from the selected team ID via the combobox
+      // Reset role when team changes
+      form.setValue('role', '');
     } else {
       setSelectedTeamType('');
     }
-  }, [selectedTeamId, availableTeams, form]);
+  }, [selectedTeamId, form]);
 
-  // Load available teams
-  const loadTeams = async () => {
-    setLoadingTeams(true);
+
+  // Refresh current assignments
+  const refreshAssignments = async () => {
+    if (!staff) return;
+
+    setLoadingAssignments(true);
     try {
-      const result = await getTeamsForAssignment();
-      if (Array.isArray(result)) {
-        setAvailableTeams(result);
-      } else {
-        toast.error(result.error || 'Lỗi khi tải danh sách nhóm');
-        setAvailableTeams([]);
+      const assignments = await getStaffAssignments(staff.id);
+      setCurrentAssignments(assignments);
+    } catch (error) {
+      console.error('Error refreshing assignments:', error);
+      toast.error('Có lỗi xảy ra khi tải danh sách phân công');
+      setCurrentAssignments([]);
+    } finally {
+      setLoadingAssignments(false);
+    }
+  };
+
+  // Handle team selection and update team type
+  const handleTeamChange = async (teamId: string) => {
+    form.setValue('teamId', teamId);
+
+    // Get team type from the server action to determine available roles
+    try {
+      const teams = await getTeamsForAssignment();
+      if (Array.isArray(teams)) {
+        const selectedTeam = teams.find(t => t.id.toString() === teamId);
+        if (selectedTeam) {
+          setSelectedTeamType(selectedTeam.type);
+        }
       }
     } catch (error) {
-      console.error('Error loading teams:', error);
-      toast.error('Có lỗi xảy ra khi tải danh sách nhóm');
-      setAvailableTeams([]);
-    } finally {
-      setLoadingTeams(false);
+      console.error('Error getting team type:', error);
     }
   };
 
@@ -167,6 +186,8 @@ export function TeamAssignmentModal({
       if (result.success) {
         toast.success(result.success);
         form.reset();
+        // Refresh assignments to show new assignment immediately
+        await refreshAssignments();
         onSuccess();
       } else if (result.error) {
         toast.error(result.error);
@@ -187,6 +208,8 @@ export function TeamAssignmentModal({
 
       if (result.success) {
         toast.success(result.success);
+        // Refresh assignments to remove assignment from UI immediately
+        await refreshAssignments();
         onSuccess();
       } else if (result.error) {
         toast.error(result.error);
@@ -235,9 +258,14 @@ export function TeamAssignmentModal({
               <CardTitle className="text-lg">Nhóm hiện tại</CardTitle>
             </CardHeader>
             <CardContent>
-              {staff.currentTeams && staff.currentTeams.length > 0 ? (
+              {loadingAssignments ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <span>Đang tải phân công...</span>
+                </div>
+              ) : currentAssignments && currentAssignments.length > 0 ? (
                 <div className="space-y-3">
-                  {staff.currentTeams.map((assignment) => (
+                  {currentAssignments.map((assignment) => (
                     <div
                       key={assignment.teamId}
                       className="flex items-center justify-between p-3 border rounded-lg"
@@ -305,36 +333,13 @@ export function TeamAssignmentModal({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Chọn nhóm *</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            disabled={loadingTeams}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder={loadingTeams ? "Đang tải..." : "Chọn nhóm"} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {loadingTeams ? (
-                                <div className="flex items-center justify-center p-4">
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                  <span>Đang tải nhóm...</span>
-                                </div>
-                              ) : (
-                                availableTeams.map((team) => (
-                                  <SelectItem key={team.id} value={team.id.toString()}>
-                                    <div className="flex items-center gap-2">
-                                      <span>{team.name}</span>
-                                      <Badge variant="outline" className="text-xs">
-                                        {team.type}
-                                      </Badge>
-                                    </div>
-                                  </SelectItem>
-                                ))
-                              )}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <TeamCombobox
+                              value={field.value}
+                              onChange={handleTeamChange}
+                              placeholder="Chọn nhóm..."
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}

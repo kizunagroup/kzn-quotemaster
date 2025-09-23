@@ -100,7 +100,7 @@ export function useStaff() {
     updateUrl,
   } = useDataTableUrlState({
     defaultFilters: {},
-    defaultSort: { column: 'name', order: 'asc' },
+    defaultSort: { column: 'employeeCode', order: 'desc' },
     defaultPagination: { page: 1, limit: 10 },
   });
 
