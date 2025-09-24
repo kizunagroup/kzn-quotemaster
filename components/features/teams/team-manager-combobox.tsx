@@ -18,7 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { getKitchenManagers } from '@/lib/actions/kitchen.actions';
+import { getTeamManagers } from '@/lib/actions/team.actions';
 
 // Helper function to display department names in Vietnamese
 const getDepartmentDisplay = (department: string | null): string => {
@@ -52,7 +52,7 @@ interface Manager {
   role: string;
 }
 
-interface ManagerComboboxProps {
+interface TeamManagerComboboxProps {
   value?: number;
   onChange: (managerId: number | undefined) => void;
   placeholder?: string;
@@ -60,13 +60,13 @@ interface ManagerComboboxProps {
   className?: string;
 }
 
-export function ManagerCombobox({
+export function TeamManagerCombobox({
   value,
   onChange,
   placeholder = 'Chọn quản lý...',
   disabled = false,
   className,
-}: ManagerComboboxProps) {
+}: TeamManagerComboboxProps) {
   // Component state
   const [open, setOpen] = useState(false);
   const [managers, setManagers] = useState<Manager[]>([]);
@@ -81,7 +81,7 @@ export function ManagerCombobox({
       setError(null);
 
       try {
-        const result = await getKitchenManagers();
+        const result = await getTeamManagers();
 
         if ('error' in result) {
           setError(result.error);
@@ -323,7 +323,7 @@ export function ManagerCombobox({
                     const fetchManagers = async () => {
                       setLoading(true);
                       try {
-                        const result = await getKitchenManagers();
+                        const result = await getTeamManagers();
                         if ('error' in result) {
                           setError(result.error);
                           setManagers([]);

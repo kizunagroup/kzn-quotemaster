@@ -70,26 +70,8 @@ async function validateManager(managerId: number): Promise<{ valid: boolean; err
       return { valid: false, error: 'Quản lý được chỉ định không ở trạng thái hoạt động' };
     }
 
-    // PURE TEAM-BASED RBAC: Check if user has management permissions via team roles
-    const userWithTeams = await getUserWithTeams(managerId);
-    let hasManagerPermissions = false;
-
-    if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
-      // Check for admin or management roles in any team
-      hasManagerPermissions = userWithTeams.teams.some(tm => {
-        const role = tm.role.toUpperCase();
-        return role.includes('ADMIN_') ||
-               role.includes('MANAGER') ||
-               role.includes('SUPER_ADMIN');
-      });
-    }
-
-    if (!hasManagerPermissions) {
-      return {
-        valid: false,
-        error: 'Người dùng được chỉ định không có quyền quản lý'
-      };
-    }
+    // Management permissions will be assigned when creating the team
+    // No need to check for existing permissions here
 
     return { valid: true, manager: managerData };
   } catch (error) {
@@ -162,7 +144,7 @@ async function manageTeamManagerMembership(
 }
 
 // Server action to get eligible team managers (PURE TEAM-BASED RBAC)
-export async function getTeamManagers(): Promise<{ id: number; name: string; email: string; currentRole: string; }[] | { error: string }> {
+export async function getTeamManagers(): Promise<{ id: number; name: string; email: string; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
   try {
     // 1. Authorization check
     const user = await getUser();
@@ -170,18 +152,20 @@ export async function getTeamManagers(): Promise<{ id: number; name: string; ema
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Check team management permission
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens'); // TODO: Update to canManageTeams
+    // 2. Check team management permission (canManageKitchens covers all team types)
+    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
     if (!canManageTeams) {
       return { error: 'Không có quyền quản lý nhóm' };
     }
 
-    // 3. Get all active users
+    // 3. Get all active users with department and job title
     const allUsers = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
+        department: users.department,
+        jobTitle: users.jobTitle,
         status: users.status,
       })
       .from(users)
@@ -192,38 +176,15 @@ export async function getTeamManagers(): Promise<{ id: number; name: string; ema
         )
       );
 
-    // 4. Filter users who have management permissions via team roles
-    const eligibleManagers = [];
-
-    for (const user of allUsers) {
-      const userWithTeams = await getUserWithTeams(user.id);
-      let hasManagerPermissions = false;
-      let currentRole = 'No Role';
-
-      if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
-        // Check for admin or management roles in any team
-        const managerTeam = userWithTeams.teams.find(tm => {
-          const role = tm.role.toUpperCase();
-          return role.includes('ADMIN_') ||
-                 role.includes('MANAGER') ||
-                 role.includes('SUPER_ADMIN');
-        });
-
-        if (managerTeam) {
-          hasManagerPermissions = true;
-          currentRole = managerTeam.role;
-        }
-      }
-
-      if (hasManagerPermissions) {
-        eligibleManagers.push({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          currentRole: currentRole
-        });
-      }
-    }
+    // 4. Return all active users (management permissions will be assigned when creating the team)
+    const eligibleManagers = allUsers.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      department: user.department,
+      jobTitle: user.jobTitle,
+      role: 'User' // Generic role since permissions are assigned via team membership
+    }));
 
     return eligibleManagers;
   } catch (error) {
@@ -269,8 +230,8 @@ export async function createTeam(data: CreateTeamInput) {
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Check team management permission
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens'); // TODO: Update to canManageTeams
+    // 2. Check team management permission (canManageKitchens covers all team types)
+    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
     if (!canManageTeams) {
       return { error: 'Không có quyền tạo nhóm mới' };
     }
@@ -291,7 +252,7 @@ export async function createTeam(data: CreateTeamInput) {
     }
 
     // 5. Check team code uniqueness if provided (required for kitchen teams)
-    if (validatedData.teamCode) {
+    if (validatedData.teamCode && validatedData.teamCode.trim()) {
       const isUnique = await isTeamCodeUnique(validatedData.teamCode, validatedData.teamType);
       if (!isUnique) {
         return { error: 'Mã nhóm đã tồn tại. Vui lòng chọn mã khác.' };
@@ -302,7 +263,7 @@ export async function createTeam(data: CreateTeamInput) {
     const newTeam = await db
       .insert(teams)
       .values({
-        teamCode: validatedData.teamCode?.trim().toUpperCase() || null,
+        teamCode: validatedData.teamCode && validatedData.teamCode.trim() ? validatedData.teamCode.trim().toUpperCase() : null,
         name: validatedData.name.trim(),
         region: validatedData.region.trim(),
         address: validatedData.address?.trim() || null,
@@ -351,8 +312,8 @@ export async function updateTeam(data: UpdateTeamInput) {
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Check team management permission
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens'); // TODO: Update to canManageTeams
+    // 2. Check team management permission (canManageKitchens covers all team types)
+    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
     if (!canManageTeams) {
       return { error: 'Không có quyền cập nhật nhóm' };
     }
@@ -394,7 +355,7 @@ export async function updateTeam(data: UpdateTeamInput) {
     }
 
     // 5. Check team code uniqueness if being changed
-    if (validatedData.teamCode && validatedData.teamCode !== currentTeam.teamCode) {
+    if (validatedData.teamCode && validatedData.teamCode.trim() && validatedData.teamCode !== currentTeam.teamCode) {
       const isUnique = await isTeamCodeUnique(validatedData.teamCode, currentTeam.teamType, validatedData.id);
       if (!isUnique) {
         return { error: 'Mã nhóm đã tồn tại. Vui lòng chọn mã khác.' };
@@ -413,7 +374,9 @@ export async function updateTeam(data: UpdateTeamInput) {
     const updatedTeam = await db
       .update(teams)
       .set({
-        teamCode: validatedData.teamCode?.trim().toUpperCase() || currentTeam.teamCode,
+        teamCode: validatedData.teamCode !== undefined ?
+          (validatedData.teamCode && validatedData.teamCode.trim() ? validatedData.teamCode.trim().toUpperCase() : null) :
+          currentTeam.teamCode,
         name: validatedData.name?.trim() || currentTeam.name,
         region: validatedData.region?.trim() || currentTeam.region,
         address: validatedData.address?.trim() || currentTeam.address,
@@ -463,8 +426,8 @@ export async function deactivateTeam(data: DeleteTeamInput) {
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Check team management permission
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens'); // TODO: Update to canManageTeams
+    // 2. Check team management permission (canManageKitchens covers all team types)
+    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
     if (!canManageTeams) {
       return { error: 'Không có quyền tạm dừng nhóm' };
     }
@@ -536,8 +499,8 @@ export async function activateTeam(data: DeleteTeamInput) {
       return { error: 'Không có quyền thực hiện thao tác này' };
     }
 
-    // 2. Check team management permission
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens'); // TODO: Update to canManageTeams
+    // 2. Check team management permission (canManageKitchens covers all team types)
+    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
     if (!canManageTeams) {
       return { error: 'Không có quyền kích hoạt nhóm' };
     }

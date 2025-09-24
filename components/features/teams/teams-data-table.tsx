@@ -413,6 +413,12 @@ export function TeamsDataTable() {
     enableMultiSort: false,
     // Enable column hiding
     enableHiding: true,
+    // Set initial column visibility - hide "Ngày Tạo" column by default
+    initialState: {
+      columnVisibility: {
+        createdAt: false, // Hide "Ngày Tạo" column by default
+      },
+    },
     // Provide current sorting state and change handler
     state: {
       sorting,

@@ -9,10 +9,9 @@ export const teamTypeEnum = z.enum(['KITCHEN', 'OFFICE'], {
 export const createTeamSchema = z.object({
   teamCode: z
     .string()
-    .min(1, 'Mã nhóm là bắt buộc')
     .max(20, 'Mã nhóm không được quá 20 ký tự')
     .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang')
-    .optional(), // Optional for OFFICE teams
+    .optional(), // Optional in base schema, conditional validation below
   name: z
     .string()
     .min(1, 'Tên nhóm là bắt buộc')
@@ -31,25 +30,24 @@ export const createTeamSchema = z.object({
     .positive('ID quản lý không hợp lệ'),
   // NEW: Team type field for generic team management
   teamType: teamTypeEnum,
-}).refine((data) => {
+}).superRefine((data, ctx) => {
   // Business rule: KITCHEN teams must have teamCode
-  if (data.teamType === 'KITCHEN' && !data.teamCode) {
-    return false;
+  if (data.teamType === 'KITCHEN' && (!data.teamCode || data.teamCode.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['teamCode'],
+      message: 'Mã Nhóm là bắt buộc cho Nhóm Bếp'
+    });
   }
-  return true;
-}, {
-  message: 'Nhóm bếp phải có mã nhóm',
-  path: ['teamCode']
 });
 
 export const updateTeamSchema = z.object({
   id: z.number().positive('ID nhóm không hợp lệ'),
   teamCode: z
     .string()
-    .min(1, 'Mã nhóm là bắt buộc')
     .max(20, 'Mã nhóm không được quá 20 ký tự')
     .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang')
-    .optional(),
+    .optional(), // Optional in base schema, conditional validation below
   name: z
     .string()
     .min(1, 'Tên nhóm là bắt buộc')
@@ -68,7 +66,17 @@ export const updateTeamSchema = z.object({
     .number()
     .positive('ID quản lý không hợp lệ')
     .optional(),
-  // Team type is not updatable after creation for data integrity
+  // Include teamType for validation but it won't be used in updates (read-only)
+  teamType: teamTypeEnum.optional(),
+}).superRefine((data, ctx) => {
+  // Business rule: KITCHEN teams must have teamCode (same validation as create)
+  if (data.teamType === 'KITCHEN' && (!data.teamCode || data.teamCode.trim() === '')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['teamCode'],
+      message: 'Mã Nhóm là bắt buộc cho Nhóm Bếp'
+    });
+  }
 });
 
 export const deleteTeamSchema = z.object({

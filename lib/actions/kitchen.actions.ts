@@ -158,7 +158,7 @@ async function manageKitchenManagerMembership(
 }
 
 // Server action to get eligible kitchen managers (PURE TEAM-BASED RBAC)
-export async function getKitchenManagers(): Promise<{ id: number; name: string; email: string; currentRole: string; }[] | { error: string }> {
+export async function getKitchenManagers(): Promise<{ id: number; name: string; email: string; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
   try {
     // 1. Authorization check
     const user = await getUser();
@@ -172,12 +172,14 @@ export async function getKitchenManagers(): Promise<{ id: number; name: string; 
       return { error: 'Không có quyền quản lý bếp' };
     }
 
-    // 3. Get all active users
+    // 3. Get all active users with department and job title
     const allUsers = await db
       .select({
         id: users.id,
         name: users.name,
         email: users.email,
+        department: users.department,
+        jobTitle: users.jobTitle,
         status: users.status,
       })
       .from(users)
@@ -188,38 +190,15 @@ export async function getKitchenManagers(): Promise<{ id: number; name: string; 
         )
       );
 
-    // 4. Filter users who have management permissions via team roles
-    const eligibleManagers = [];
-
-    for (const user of allUsers) {
-      const userWithTeams = await getUserWithTeams(user.id);
-      let hasManagerPermissions = false;
-      let currentRole = 'No Role';
-
-      if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
-        // Check for admin or management roles in any team
-        const managerTeam = userWithTeams.teams.find(tm => {
-          const role = tm.role.toUpperCase();
-          return role.includes('ADMIN_') ||
-                 role.includes('MANAGER') ||
-                 role.includes('SUPER_ADMIN');
-        });
-
-        if (managerTeam) {
-          hasManagerPermissions = true;
-          currentRole = managerTeam.role;
-        }
-      }
-
-      if (hasManagerPermissions) {
-        eligibleManagers.push({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          currentRole: currentRole
-        });
-      }
-    }
+    // 4. Return all active users (management permissions will be assigned when creating the team)
+    const eligibleManagers = allUsers.map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      department: user.department,
+      jobTitle: user.jobTitle,
+      role: 'User' // Generic role since permissions are assigned via team membership
+    }));
 
     return eligibleManagers;
   } catch (error) {
