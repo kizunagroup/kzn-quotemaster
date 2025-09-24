@@ -1,0 +1,2 @@
+DROP INDEX "idx_users_manager_search";--> statement-breakpoint
+CREATE INDEX "idx_users_manager_search" ON "users" USING btree ("status","name","email","employee_code","department","job_title") WHERE "users"."deleted_at" IS NULL;

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
-import { eq, and, ilike, sql, isNull } from 'drizzle-orm';
+import { eq, and, or, ilike, sql, isNull } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 import { checkPermission } from '@/lib/auth/permissions';
 import { hashPassword } from '@/lib/auth/session';
@@ -1054,7 +1054,7 @@ export async function getStaffAssignments(staffId: number) {
 }
 
 // PERFORMANCE OPTIMIZATION: Get staff managers with search capability
-export async function getStaffManagers(searchQuery?: string): Promise<{ id: number; name: string; email: string; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
+export async function getStaffManagers(searchQuery?: string): Promise<{ id: number; name: string; email: string; employeeCode: string | null; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
   try {
     // 1. Authorization check
     const user = await getUser();
@@ -1074,11 +1074,17 @@ export async function getStaffManagers(searchQuery?: string): Promise<{ id: numb
       isNull(users.deletedAt)
     ];
 
-    // 4. Add search filter if provided (leverages the managerSearchIdx composite index)
+    // 4. Add unified search filter across all 5 fields (leverages the managerSearchIdx composite index)
     if (searchQuery && searchQuery.trim()) {
       const searchTerm = `%${searchQuery.trim()}%`;
       whereConditions.push(
-        sql`(${users.name} ILIKE ${searchTerm} OR ${users.email} ILIKE ${searchTerm} OR ${users.employeeCode} ILIKE ${searchTerm})`
+        or(
+          ilike(users.name, searchTerm),
+          ilike(users.email, searchTerm),
+          ilike(users.employeeCode, searchTerm),
+          ilike(users.department, searchTerm),
+          ilike(users.jobTitle, searchTerm)
+        )
       );
     }
 
@@ -1088,6 +1094,7 @@ export async function getStaffManagers(searchQuery?: string): Promise<{ id: numb
         id: users.id,
         name: users.name,
         email: users.email,
+        employeeCode: users.employeeCode,
         department: users.department,
         jobTitle: users.jobTitle,
       })
@@ -1097,10 +1104,28 @@ export async function getStaffManagers(searchQuery?: string): Promise<{ id: numb
       .limit(50); // Limit to 50 results for performance
 
     // 6. Add role field (for compatibility with existing interface)
-    return managers.map(manager => ({
+    const result = managers.map(manager => ({
       ...manager,
       role: 'manager' // Default role for all returned managers
     }));
+
+    // Debug logging for development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 getStaffManagers Debug:');
+      console.log('- Search query:', searchQuery);
+      console.log('- Managers found:', result.length);
+      console.log('- Sample manager:', result[0] ? {
+        id: result[0].id,
+        name: result[0].name,
+        email: result[0].email,
+        employeeCode: result[0].employeeCode,
+        department: result[0].department,
+        jobTitle: result[0].jobTitle,
+        role: result[0].role
+      } : 'No managers found');
+    }
+
+    return result;
 
   } catch (error) {
     console.error('Get staff managers error:', error);

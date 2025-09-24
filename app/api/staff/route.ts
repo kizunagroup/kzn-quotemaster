@@ -1,43 +1,97 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
-import { db } from '@/lib/db/drizzle';
-import { users, teamMembers, teams } from '@/lib/db/schema';
-import { and, eq, ilike, isNull, asc, desc, sql, or, inArray } from 'drizzle-orm';
-import { getUser, getUserWithTeams } from '@/lib/db/queries';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { db } from "@/lib/db/drizzle";
+import { users, teamMembers, teams } from "@/lib/db/schema";
+import {
+  and,
+  eq,
+  ilike,
+  isNull,
+  asc,
+  desc,
+  sql,
+  or,
+  inArray,
+} from "drizzle-orm";
+import { getUser, getUserWithTeams } from "@/lib/db/queries";
 
 // Exported constants for valid status values
-export const VALID_STATUSES = ['all', 'active', 'inactive', 'terminated'] as const;
+export const VALID_STATUSES = [
+  "all",
+  "active",
+  "inactive",
+  "terminated",
+] as const;
 
 // Valid sort columns for the users table
-const VALID_SORT_COLUMNS = ['name', 'employeeCode', 'email', 'department', 'jobTitle', 'status', 'hireDate', 'createdAt'] as const;
+const VALID_SORT_COLUMNS = [
+  "name",
+  "employeeCode",
+  "email",
+  "department",
+  "jobTitle",
+  "status",
+  "hireDate",
+  "createdAt",
+] as const;
 
 // Valid departments for filtering
-const VALID_DEPARTMENTS = ['all', 'ADMIN', 'PROCUREMENT', 'KITCHEN', 'ACCOUNTING', 'OPERATIONS'] as const;
+const VALID_DEPARTMENTS = [
+  "all",
+  "ADMIN",
+  "PROCUREMENT",
+  "KITCHEN",
+  "ACCOUNTING",
+  "OPERATIONS",
+] as const;
 
 // Input validation schema for query parameters
 const staffQuerySchema = z.object({
   search: z.string().nullable().optional(),
-  department: z.string().nullable().default('all').transform(val =>
-    val === null || val === '' ? 'all' : val
-  ).pipe(z.enum(VALID_DEPARTMENTS)),
-  status: z.string().nullable().default('all').transform(val =>
-    val === null || val === '' ? 'all' : val
-  ).pipe(z.enum(VALID_STATUSES)),
-  teamId: z.string().nullable().optional().transform(val =>
-    val === null || val === '' ? undefined : parseInt(val)
-  ).pipe(z.number().optional()),
-  sort: z.string().nullable().default('name').transform(val =>
-    val === null || val === '' ? 'name' : val
-  ).pipe(z.enum(VALID_SORT_COLUMNS)),
-  order: z.string().nullable().default('asc').transform(val =>
-    val === null || val === '' ? 'asc' : val
-  ).pipe(z.enum(['asc', 'desc'])),
-  page: z.string().nullable().default('1').transform(val =>
-    val === null || val === '' ? '1' : val
-  ).pipe(z.coerce.number().min(1)),
-  limit: z.string().nullable().default('10').transform(val =>
-    val === null || val === '' ? '10' : val
-  ).pipe(z.coerce.number().min(1).max(100)),
+  department: z
+    .string()
+    .nullable()
+    .default("all")
+    .transform((val) => (val === null || val === "" ? "all" : val))
+    .pipe(z.enum(VALID_DEPARTMENTS)),
+  status: z
+    .string()
+    .nullable()
+    .default("all")
+    .transform((val) => (val === null || val === "" ? "all" : val))
+    .pipe(z.enum(VALID_STATUSES)),
+  teamId: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((val) =>
+      val === null || val === "" ? undefined : parseInt(val)
+    )
+    .pipe(z.number().optional()),
+  sort: z
+    .string()
+    .nullable()
+    .default("name")
+    .transform((val) => (val === null || val === "" ? "name" : val))
+    .pipe(z.enum(VALID_SORT_COLUMNS)),
+  order: z
+    .string()
+    .nullable()
+    .default("asc")
+    .transform((val) => (val === null || val === "" ? "asc" : val))
+    .pipe(z.enum(["asc", "desc"])),
+  page: z
+    .string()
+    .nullable()
+    .default("1")
+    .transform((val) => (val === null || val === "" ? "1" : val))
+    .pipe(z.coerce.number().min(1)),
+  limit: z
+    .string()
+    .nullable()
+    .default("10")
+    .transform((val) => (val === null || val === "" ? "10" : val))
+    .pipe(z.coerce.number().min(1).max(100)),
 });
 
 // Staff interface for API response
@@ -66,10 +120,7 @@ export async function GET(request: NextRequest) {
     // 1. Authorization check - verify user session and staff management permission
     const user = await getUser();
     if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 2. Check staff management permission - PURE TEAM-BASED AUTHORIZATION
@@ -77,12 +128,15 @@ export async function GET(request: NextRequest) {
     let hasStaffManagementPermission = false;
 
     // Check if user has admin roles that grant staff management permissions
-    if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
-      const hasAdminRole = userWithTeams.teams.some(tm => {
+    if (
+      userWithTeams &&
+      userWithTeams.teams &&
+      userWithTeams.teams.length > 0
+    ) {
+      const hasAdminRole = userWithTeams.teams.some((tm) => {
         const role = tm.role.toUpperCase();
         // Admin roles that grant staff management access
-        return role === 'ADMIN_SUPER_ADMIN' ||
-               role === 'ADMIN_MANAGER';
+        return role === "ADMIN_SUPER_ADMIN" || role === "ADMIN_MANAGER";
       });
 
       if (hasAdminRole) {
@@ -92,7 +146,7 @@ export async function GET(request: NextRequest) {
 
     if (!hasStaffManagementPermission) {
       return NextResponse.json(
-        { error: 'Forbidden: Insufficient permissions to manage staff' },
+        { error: "Forbidden: Insufficient permissions to manage staff" },
         { status: 403 }
       );
     }
@@ -100,14 +154,14 @@ export async function GET(request: NextRequest) {
     // 3. Parse and validate query parameters
     const { searchParams } = new URL(request.url);
     const params = staffQuerySchema.parse({
-      search: searchParams.get('search'),
-      department: searchParams.get('department'),
-      status: searchParams.get('status'),
-      teamId: searchParams.get('teamId'),
-      sort: searchParams.get('sort'),
-      order: searchParams.get('order'),
-      page: searchParams.get('page'),
-      limit: searchParams.get('limit'),
+      search: searchParams.get("search"),
+      department: searchParams.get("department"),
+      status: searchParams.get("status"),
+      teamId: searchParams.get("teamId"),
+      sort: searchParams.get("sort"),
+      order: searchParams.get("order"),
+      page: searchParams.get("page"),
+      limit: searchParams.get("limit"),
     });
 
     // 4. Build base where conditions for all staff queries
@@ -123,9 +177,13 @@ export async function GET(request: NextRequest) {
     // Apply role-based restrictions if user is not super admin
     if (!isSuperAdmin) {
       // FIXED: Properly handle users with no teams
-      if (userWithTeams && userWithTeams.teams && userWithTeams.teams.length > 0) {
+      if (
+        userWithTeams &&
+        userWithTeams.teams &&
+        userWithTeams.teams.length > 0
+      ) {
         // User has teams - only see staff from their teams
-        const userTeamIds = userWithTeams.teams.map(tm => tm.team.id);
+        const userTeamIds = userWithTeams.teams.map((tm) => tm.team.id);
 
         if (userTeamIds.length > 0) {
           // Use subquery to find users who are members of the same teams
@@ -134,7 +192,7 @@ export async function GET(request: NextRequest) {
             .from(teamMembers)
             .where(inArray(teamMembers.teamId, userTeamIds));
 
-          const allowedUserIds = teamMemberUserIds.map(tm => tm.userId);
+          const allowedUserIds = teamMemberUserIds.map((tm) => tm.userId);
 
           if (allowedUserIds.length > 0) {
             // Include the user themselves and team members
@@ -156,7 +214,7 @@ export async function GET(request: NextRequest) {
     // Super admin users don't get additional role-based restrictions (can see all staff)
 
     // 6. Apply search filter - search in name, email, and employee code
-    if (params.search && params.search.trim() !== '') {
+    if (params.search && params.search.trim() !== "") {
       const searchTerm = `%${params.search.trim()}%`;
       baseWhereConditions.push(
         or(
@@ -168,32 +226,34 @@ export async function GET(request: NextRequest) {
     }
 
     // 7. Apply department filter - FIXED: Ensure department filtering works correctly
-    if (params.department && params.department !== 'all') {
+    if (params.department && params.department !== "all") {
       baseWhereConditions.push(eq(users.department, params.department));
     }
 
     // 8. Apply status filter - ARCHITECTURAL PRINCIPLE: status column is single source of truth
     // REFACTORED: Implement correct status filtering logic
-    if (params.status === 'all') {
+    if (params.status === "all") {
       // Show all statuses: active, inactive, terminated
-      baseWhereConditions.push(inArray(users.status, ['active', 'inactive', 'terminated']));
-    } else if (params.status && params.status !== 'all') {
+      baseWhereConditions.push(
+        inArray(users.status, ["active", "inactive", "terminated"])
+      );
+    } else if (params.status && params.status !== "all") {
       // Specific status filter - exact match only
       baseWhereConditions.push(eq(users.status, params.status));
     } else {
       // Default behavior (no status param): Show active and inactive only
-      baseWhereConditions.push(inArray(users.status, ['active', 'inactive']));
+      baseWhereConditions.push(inArray(users.status, ["active", "inactive"]));
     }
 
     // 9. Apply team filter (if specified) - PERFORMANCE OPTIMIZED
-    if (params.teamId && typeof params.teamId === 'number') {
+    if (params.teamId && typeof params.teamId === "number") {
       // Find users who are members of the specified team using efficient subquery
       const teamMemberUserIds = await db
         .select({ userId: teamMembers.userId })
         .from(teamMembers)
         .where(eq(teamMembers.teamId, params.teamId));
 
-      const teamUserIds = teamMemberUserIds.map(tm => tm.userId);
+      const teamUserIds = teamMemberUserIds.map((tm) => tm.userId);
       if (teamUserIds.length > 0) {
         baseWhereConditions.push(inArray(users.id, teamUserIds));
       } else {
@@ -213,20 +273,29 @@ export async function GET(request: NextRequest) {
 
     const getSortColumn = (sortField: string) => {
       switch (sortField) {
-        case 'employeeCode': return users.employeeCode;
-        case 'email': return users.email;
-        case 'department': return users.department;
-        case 'jobTitle': return users.jobTitle;
-        case 'status': return users.status;
-        case 'hireDate': return users.hireDate;
-        case 'createdAt': return users.createdAt;
-        case 'name':
-        default: return users.name;
+        case "employeeCode":
+          return users.employeeCode;
+        case "email":
+          return users.email;
+        case "department":
+          return users.department;
+        case "jobTitle":
+          return users.jobTitle;
+        case "status":
+          return users.status;
+        case "hireDate":
+          return users.hireDate;
+        case "createdAt":
+          return users.createdAt;
+        case "name":
+        default:
+          return users.name;
       }
     };
 
     const sortColumn = getSortColumn(params.sort);
-    const sortDirection = params.order === 'desc' ? desc(sortColumn) : asc(sortColumn);
+    const sortDirection =
+      params.order === "desc" ? desc(sortColumn) : asc(sortColumn);
 
     // 12. CRITICAL PAGINATION FIX: Two-step query to avoid JOIN duplication issues
     // Step 1: Get paginated user IDs and total count (without JOINs to avoid duplication)
@@ -246,7 +315,9 @@ export async function GET(request: NextRequest) {
           createdAt: users.createdAt,
         })
         .from(users)
-        .where(allWhereConditions.length > 0 ? and(...allWhereConditions) : undefined)
+        .where(
+          allWhereConditions.length > 0 ? and(...allWhereConditions) : undefined
+        )
         .orderBy(sortDirection)
         .limit(params.limit)
         .offset(offset),
@@ -255,8 +326,10 @@ export async function GET(request: NextRequest) {
       db
         .select({ count: sql<number>`COUNT(*)` })
         .from(users)
-        .where(allWhereConditions.length > 0 ? and(...allWhereConditions) : undefined)
-        .then(result => result[0]?.count || 0)
+        .where(
+          allWhereConditions.length > 0 ? and(...allWhereConditions) : undefined
+        )
+        .then((result) => result[0]?.count || 0),
     ]);
 
     // If no users found, return empty result
@@ -281,7 +354,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Step 2: Fetch full staff data with team assignments for the paginated user IDs
-    const userIds = paginatedUserIds.map(user => user.id);
+    const userIds = paginatedUserIds.map((user) => user.id);
     const staffData = await db
       .select({
         id: users.id,
@@ -311,7 +384,7 @@ export async function GET(request: NextRequest) {
     // 13. Group results by user and collect team assignments
     const staffMap = new Map<number, StaffResponse>();
 
-    staffData.forEach(row => {
+    staffData.forEach((row) => {
       if (!staffMap.has(row.id)) {
         staffMap.set(row.id, {
           id: row.id,
@@ -361,29 +434,28 @@ export async function GET(request: NextRequest) {
         order: params.order,
       },
     });
-
   } catch (error) {
     // 16. Comprehensive error handling
-    console.error('Staff API error:', error);
+    console.error("Staff API error:", error);
 
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         {
-          error: 'Invalid query parameters',
-          details: error.errors
+          error: "Invalid query parameters",
+          details: error.errors,
         },
         { status: 400 }
       );
     }
 
     // Handle database errors
-    if (error instanceof Error && error.message.includes('database')) {
+    if (error instanceof Error && error.message.includes("database")) {
       return NextResponse.json(
         {
-          error: 'Database error',
-          code: 'DATABASE_ERROR',
-          timestamp: new Date().toISOString()
+          error: "Database error",
+          code: "DATABASE_ERROR",
+          timestamp: new Date().toISOString(),
         },
         { status: 500 }
       );
@@ -392,9 +464,9 @@ export async function GET(request: NextRequest) {
     // Generic server error
     return NextResponse.json(
       {
-        error: 'Internal server error',
-        code: 'STAFF_FETCH_FAILED',
-        timestamp: new Date().toISOString()
+        error: "Internal server error",
+        code: "STAFF_FETCH_FAILED",
+        timestamp: new Date().toISOString(),
       },
       { status: 500 }
     );

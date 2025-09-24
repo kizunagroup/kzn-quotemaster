@@ -47,6 +47,7 @@ interface Manager {
   id: number;
   name: string;
   email: string;
+  employeeCode: string | null;
   department: string | null;
   jobTitle: string | null;
   role: string;
@@ -62,6 +63,7 @@ interface ManagerComboboxProps {
     id: number;
     name: string;
     email: string;
+    employeeCode?: string | null;
     department?: string | null;
     jobTitle?: string | null;
   } | null;
@@ -113,6 +115,7 @@ export function ManagerCombobox({
           id: manager.id,
           name: manager.name || '',
           email: manager.email || '',
+          employeeCode: manager.employeeCode || null,
           department: manager.department || null,
           jobTitle: manager.jobTitle || null,
           role: manager.role || ''
@@ -124,6 +127,7 @@ export function ManagerCombobox({
             id: initialValue.id,
             name: initialValue.name,
             email: initialValue.email,
+            employeeCode: initialValue.employeeCode || null,
             department: initialValue.department || null,
             jobTitle: initialValue.jobTitle || null,
             role: 'manager' // Default role for initial value
@@ -132,6 +136,22 @@ export function ManagerCombobox({
         }
 
         setManagers(validManagers);
+
+        // Debug logging for development
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🔍 ManagerCombobox Debug:');
+          console.log('- Search term:', search);
+          console.log('- Managers received:', validManagers.length);
+          console.log('- Sample manager:', validManagers[0] ? {
+            id: validManagers[0].id,
+            name: validManagers[0].name,
+            email: validManagers[0].email,
+            employeeCode: validManagers[0].employeeCode,
+            department: validManagers[0].department,
+            jobTitle: validManagers[0].jobTitle,
+            role: validManagers[0].role
+          } : 'No managers found');
+        }
       }
     } catch (err) {
       console.error('Error fetching managers:', err);
@@ -168,6 +188,7 @@ export function ManagerCombobox({
         id: initialValue.id,
         name: initialValue.name,
         email: initialValue.email,
+        employeeCode: initialValue.employeeCode || null,
         department: initialValue.department || null,
         jobTitle: initialValue.jobTitle || null,
         role: 'manager'
@@ -245,11 +266,17 @@ export function ManagerCombobox({
             <div className="flex flex-col">
               <span className="text-sm font-medium">{selectedManager.name || 'Không có tên'}</span>
               <span className="text-xs text-muted-foreground">{selectedManager.email || 'Không có email'}</span>
-              <div className="flex gap-2 text-xs text-muted-foreground">
+              <div className="flex gap-1 text-xs text-muted-foreground">
+                {selectedManager.employeeCode && (
+                  <>
+                    <span className="font-mono">{selectedManager.employeeCode}</span>
+                    <span>|</span>
+                  </>
+                )}
                 <span>{getDepartmentDisplay(selectedManager.department)}</span>
                 {selectedManager.jobTitle && (
                   <>
-                    <span>•</span>
+                    <span>|</span>
                     <span>{selectedManager.jobTitle}</span>
                   </>
                 )}
@@ -293,11 +320,17 @@ export function ManagerCombobox({
         <div className="flex flex-col min-w-0 flex-1">
           <span className="text-sm font-medium truncate">{manager.name || 'Không có tên'}</span>
           <span className="text-xs text-muted-foreground truncate">{manager.email || 'Không có email'}</span>
-          <div className="flex gap-2 text-xs text-muted-foreground/70">
+          <div className="flex gap-1 text-xs text-muted-foreground/70">
+            {manager.employeeCode && (
+              <>
+                <span className="font-mono shrink-0">{manager.employeeCode}</span>
+                <span>|</span>
+              </>
+            )}
             <span className="truncate">{getDepartmentDisplay(manager.department)}</span>
             {manager.jobTitle && (
               <>
-                <span>•</span>
+                <span>|</span>
                 <span className="truncate">{manager.jobTitle}</span>
               </>
             )}
@@ -339,7 +372,7 @@ export function ManagerCombobox({
         <Command shouldFilter={false}>
           <div className="relative">
             <CommandInput
-              placeholder="Tìm kiếm theo tên hoặc email..."
+              placeholder="Tìm kiếm theo tên, email, mã NV, phòng ban, chức danh..."
               className="h-9"
               value={searchQuery}
               onValueChange={handleSearchChange}

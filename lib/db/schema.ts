@@ -42,9 +42,9 @@ export const users = pgTable(
       .where(sql`${table.employeeCode} IS NOT NULL`),
     departmentIdx: index('idx_users_department').on(table.department),
     statusIdx: index('idx_users_status').on(table.status),
-    // PHASE 1 OPTIMIZATION: Composite index for manager search performance
+    // PHASE 1 OPTIMIZATION: Comprehensive composite index for manager search performance
     managerSearchIdx: index('idx_users_manager_search')
-      .on(table.status, table.name, table.email)
+      .on(table.status, table.name, table.email, table.employeeCode, table.department, table.jobTitle)
       .where(sql`${table.deletedAt} IS NULL`),
 
     // Data integrity constraints

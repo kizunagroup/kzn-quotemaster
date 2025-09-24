@@ -1,6 +1,6 @@
 {
-  "id": "9912462a-4768-449d-8760-043c1feacfe6",
-  "prevId": "03bb257b-2631-4574-8359-d8eecfb9575b",
+  "id": "b371e816-b2ed-450c-a53f-be4d245aa9da",
+  "prevId": "9912462a-4768-449d-8760-043c1feacfe6",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1446,6 +1446,24 @@
             },
             {
               "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "employee_code",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "department",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "job_title",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

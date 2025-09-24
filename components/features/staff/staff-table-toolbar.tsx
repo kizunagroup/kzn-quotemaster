@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useDebounce } from 'use-debounce';
-import { Plus, Settings2 } from 'lucide-react';
-import { Table } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { useDebounce } from "use-debounce";
+import { Plus, Settings2 } from "lucide-react";
+import { Table } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -19,38 +19,38 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
-import { TeamCombobox } from '@/components/features/staff/team-combobox';
-import type { Staff } from '@/lib/hooks/use-staff';
+} from "@/components/ui/tooltip";
+import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
+import { TeamCombobox } from "@/components/features/staff/team-combobox";
+import type { Staff } from "@/lib/hooks/use-staff";
 
 // Single source of truth for department options
 const departmentOptions = [
-  { value: 'all', label: 'Tất cả phòng ban' },
-  { value: 'ADMIN', label: 'Quản Trị' },
-  { value: 'PROCUREMENT', label: 'Mua Sắm' },
-  { value: 'KITCHEN', label: 'Bếp' },
-  { value: 'ACCOUNTING', label: 'Kế Toán' },
-  { value: 'OPERATIONS', label: 'Vận Hành' },
+  { value: "all", label: "Tất cả phòng ban" },
+  { value: "ADMIN", label: "Quản Trị" },
+  { value: "PROCUREMENT", label: "Mua Sắm" },
+  { value: "KITCHEN", label: "Bếp" },
+  { value: "ACCOUNTING", label: "Kế Toán" },
+  { value: "OPERATIONS", label: "Vận Hành" },
 ] as const;
 
 // Single source of truth for status options
 const statusOptions = [
-  { value: 'all', label: 'Tất cả trạng thái' },
-  { value: 'active', label: 'Hoạt Động' },
-  { value: 'inactive', label: 'Tạm Dừng' },
-  { value: 'terminated', label: 'Đã Nghỉ' },
+  { value: "all", label: "Tất cả trạng thái" },
+  { value: "active", label: "Hoạt Động" },
+  { value: "inactive", label: "Tạm Dừng" },
+  { value: "terminated", label: "Đã Nghỉ" },
 ] as const;
 
 // Team options - this could be dynamically loaded in the future
 const teamOptions = [
-  { value: 'all', label: 'Tất cả nhóm' },
+  { value: "all", label: "Tất cả nhóm" },
   // Additional team options will be populated dynamically
 ] as const;
 
@@ -79,13 +79,13 @@ interface StaffTableToolbarProps {
 }
 
 export function StaffTableToolbar({
-  searchValue = '',
+  searchValue = "",
   onSearchChange,
-  selectedDepartment = 'all',
+  selectedDepartment = "all",
   onDepartmentChange,
-  selectedStatus = 'all',
+  selectedStatus = "all",
   onStatusChange,
-  selectedTeam = 'all',
+  selectedTeam = "all",
   onTeamChange,
   onClearFilters,
   hasActiveFilters,
@@ -147,7 +147,8 @@ export function StaffTableToolbar({
                     .getAllColumns()
                     .filter(
                       (column) =>
-                        typeof column.accessorFn !== "undefined" && column.getCanHide()
+                        typeof column.accessorFn !== "undefined" &&
+                        column.getCanHide()
                     )
                     .map((column) => {
                       return (
@@ -155,11 +156,13 @@ export function StaffTableToolbar({
                           key={column.id}
                           className="capitalize"
                           checked={column.getIsVisible()}
-                          onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                          onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                          }
                         >
                           {getColumnDisplayName(column.id)}
                         </DropdownMenuCheckboxItem>
-                      )
+                      );
                     })}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -207,9 +210,9 @@ export function StaffTableToolbar({
 
       {/* Team Filter - mirror department filter pattern */}
       <TeamCombobox
-        value={selectedTeam === 'all' ? '' : selectedTeam}
+        value={selectedTeam === "all" ? "" : selectedTeam}
         onChange={(value: string) => {
-          onTeamChange(value || 'all');
+          onTeamChange(value || "all");
         }}
         placeholder="Tất cả nhóm"
         className="h-8 w-[180px]"
@@ -221,15 +224,15 @@ export function StaffTableToolbar({
 // Helper function to get display names for columns
 function getColumnDisplayName(columnId: string): string {
   const columnNames: Record<string, string> = {
-    employeeCode: 'Mã NV',
-    name: 'Tên Nhân Viên',
-    email: 'Email',
-    phone: 'Điện Thoại',
-    jobTitle: 'Chức Danh',
-    department: 'Phòng Ban',
-    currentTeams: 'Nhóm Làm Việc',
-    hireDate: 'Ngày Vào Làm',
-    status: 'Trạng Thái',
+    employeeCode: "Mã NV",
+    name: "Tên Nhân Viên",
+    email: "Email",
+    phone: "Điện Thoại",
+    jobTitle: "Chức Danh",
+    department: "Phòng Ban",
+    currentTeams: "Nhóm Làm Việc",
+    hireDate: "Ngày Vào Làm",
+    status: "Trạng Thái",
   };
 
   return columnNames[columnId] || columnId;
