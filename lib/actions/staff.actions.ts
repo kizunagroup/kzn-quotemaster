@@ -1078,7 +1078,7 @@ export async function getStaffManagers(searchQuery?: string): Promise<{ id: numb
     if (searchQuery && searchQuery.trim()) {
       const searchTerm = `%${searchQuery.trim()}%`;
       whereConditions.push(
-        sql`(${users.name} ILIKE ${searchTerm} OR ${users.email} ILIKE ${searchTerm})`
+        sql`(${users.name} ILIKE ${searchTerm} OR ${users.email} ILIKE ${searchTerm} OR ${users.employeeCode} ILIKE ${searchTerm})`
       );
     }
 
