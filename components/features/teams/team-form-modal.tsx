@@ -71,10 +71,10 @@ export function TeamFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = Boolean(team);
 
-  // Form setup with conditional schema based on mode - INSTANT VALIDATION ENABLED
+  // Form setup with conditional schema based on mode - IMPROVED VALIDATION UX
   const form = useForm<z.infer<typeof createFormSchema> | z.infer<typeof updateFormSchema>>({
     resolver: zodResolver(isEditMode ? updateFormSchema : createFormSchema),
-    mode: 'onChange', // Enable instant validation for all fields
+    mode: 'onBlur', // Change from onChange to onBlur for better UX
     defaultValues: {
       teamCode: '',
       name: '',
@@ -117,117 +117,46 @@ export function TeamFormModal({
     }
   }, [isOpen, isEditMode, team, form]);
 
-  // Handle form submission
+  // Handle form submission - SIMPLIFIED with discriminatedUnion validation
   const onSubmit = async (values: any) => {
-    console.log('🔥 FRONTEND - Form submission started');
-    console.log('🔥 FRONTEND - Raw form values:', JSON.stringify(values, null, 2));
-    console.log('🔥 FRONTEND - Team type:', values.teamType);
-    console.log('🔥 FRONTEND - Is edit mode:', isEditMode);
-
     setIsSubmitting(true);
 
     try {
-      // Clean up the data for submission
+      // Clean up the data for submission - discriminatedUnion handles validation
       const submitData = { ...values };
-      console.log('🔥 FRONTEND - Initial submitData:', JSON.stringify(submitData, null, 2));
 
-      // Handle teamCode based on team type
+      // For OFFICE teams, ensure teamCode is undefined (not empty string)
       if (submitData.teamType === 'OFFICE') {
-        // For OFFICE teams, teamCode should be null/undefined
-        console.log('🔥 FRONTEND - OFFICE team detected, setting teamCode to null');
-        submitData.teamCode = null;
-      } else if (submitData.teamType === 'KITCHEN') {
-        console.log('🔥 FRONTEND - KITCHEN team detected, validating teamCode');
-        // For KITCHEN teams, teamCode is required and must not be empty
-        if (!submitData.teamCode || !submitData.teamCode.trim()) {
-          console.log('🔥 FRONTEND - KITCHEN team validation failed: empty teamCode');
-          form.setError('teamCode', {
-            type: 'manual',
-            message: 'Mã nhóm là bắt buộc cho nhóm bếp'
-          });
-          setIsSubmitting(false);
-          return;
-        }
-        // Ensure teamCode is properly formatted
-        console.log('🔥 FRONTEND - KITCHEN team teamCode before formatting:', submitData.teamCode);
-        submitData.teamCode = submitData.teamCode.trim().toUpperCase();
-        console.log('🔥 FRONTEND - KITCHEN team teamCode after formatting:', submitData.teamCode);
+        submitData.teamCode = undefined;
       }
-
-      // Validate required fields
-      if (!submitData.name || !submitData.name.trim()) {
-        form.setError('name', {
-          type: 'manual',
-          message: 'Tên nhóm là bắt buộc'
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!submitData.region || !submitData.region.trim()) {
-        form.setError('region', {
-          type: 'manual',
-          message: 'Khu vực là bắt buộc'
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (!submitData.managerId) {
-        form.setError('managerId', {
-          type: 'manual',
-          message: 'Quản lý là bắt buộc'
-        });
-        setIsSubmitting(false);
-        return;
-      }
-
-      console.log('🔥 FRONTEND - Final submitData before API call:', JSON.stringify(submitData, null, 2));
-      console.log('🔥 FRONTEND - About to call server action...');
 
       let result;
 
       if (isEditMode) {
-        // Update existing team
-        console.log('🔥 FRONTEND - Calling updateTeam server action');
         result = await updateTeam(submitData);
       } else {
-        // Create new team
-        console.log('🔥 FRONTEND - Calling createTeam server action');
         result = await createTeam(submitData);
       }
 
-      console.log('🔥 FRONTEND - Server action result:', JSON.stringify(result, null, 2));
-
       if (result.success) {
-        console.log('🔥 FRONTEND - Success result:', result.success);
         toast.success(result.success);
         onSuccess();
         onClose();
       } else if (result.error) {
-        console.log('🔥 FRONTEND - Error result:', result.error);
         // Check for specific field errors and display under respective fields
-        if (result.error.includes('Mã nhóm đã tồn tại')) {
-          console.log('🔥 FRONTEND - Showing teamCode error');
+        if (result.error.includes('Mã nhóm đã tồn tại') || result.error.includes('teamCode')) {
           form.setError('teamCode', {
             type: 'server',
             message: result.error
           });
         } else {
-          // Show general error for other cases
-          console.log('🔥 FRONTEND - Showing general error toast');
           toast.error(result.error);
         }
-      } else {
-        console.log('🔥 FRONTEND - WARNING: No success or error in result!');
-        console.log('🔥 FRONTEND - Full result object:', result);
       }
     } catch (error) {
-      console.log('🔥 FRONTEND - Catch block - Form submission error:', error);
       console.error('Form submission error:', error);
       toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
-      console.log('🔥 FRONTEND - Finally block - Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };

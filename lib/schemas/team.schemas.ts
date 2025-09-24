@@ -5,13 +5,8 @@ export const teamTypeEnum = z.enum(['KITCHEN', 'OFFICE'], {
   errorMap: () => ({ message: 'Loại nhóm phải là KITCHEN hoặc OFFICE' })
 });
 
-// Validation schemas for team operations (GENERALIZED from kitchen schemas)
-export const createTeamSchema = z.object({
-  teamCode: z
-    .string()
-    .max(20, 'Mã nhóm không được quá 20 ký tự')
-    .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang')
-    .optional(), // Optional in base schema, conditional validation below
+// Base schema for common team fields
+const baseTeamSchema = {
   name: z
     .string()
     .min(1, 'Tên nhóm là bắt buộc')
@@ -28,26 +23,30 @@ export const createTeamSchema = z.object({
   managerId: z
     .number()
     .positive('ID quản lý không hợp lệ'),
-  // NEW: Team type field for generic team management
-  teamType: teamTypeEnum,
-}).superRefine((data, ctx) => {
-  // Business rule: KITCHEN teams must have teamCode
-  if (data.teamType === 'KITCHEN' && (!data.teamCode || data.teamCode.trim() === '')) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['teamCode'],
-      message: 'Mã Nhóm là bắt buộc cho Nhóm Bếp'
-    });
-  }
-});
+};
 
-export const updateTeamSchema = z.object({
-  id: z.number().positive('ID nhóm không hợp lệ'),
-  teamCode: z
-    .string()
-    .max(20, 'Mã nhóm không được quá 20 ký tự')
-    .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang')
-    .optional(), // Optional in base schema, conditional validation below
+// Validation schemas using discriminatedUnion for team operations
+export const createTeamSchema = z.discriminatedUnion('teamType', [
+  // KITCHEN team schema - teamCode is required with validation
+  z.object({
+    teamType: z.literal('KITCHEN'),
+    teamCode: z
+      .string()
+      .min(1, 'Mã nhóm là bắt buộc cho Nhóm Bếp')
+      .max(20, 'Mã nhóm không được quá 20 ký tự')
+      .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang'),
+    ...baseTeamSchema,
+  }),
+  // OFFICE team schema - teamCode is optional and not validated
+  z.object({
+    teamType: z.literal('OFFICE'),
+    teamCode: z.string().optional(),
+    ...baseTeamSchema,
+  }),
+]);
+
+// Base schema for common update fields (all optional for partial updates)
+const baseUpdateTeamSchema = {
   name: z
     .string()
     .min(1, 'Tên nhóm là bắt buộc')
@@ -66,18 +65,29 @@ export const updateTeamSchema = z.object({
     .number()
     .positive('ID quản lý không hợp lệ')
     .optional(),
-  // Include teamType for validation but it won't be used in updates (read-only)
-  teamType: teamTypeEnum.optional(),
-}).superRefine((data, ctx) => {
-  // Business rule: KITCHEN teams must have teamCode (same validation as create)
-  if (data.teamType === 'KITCHEN' && (!data.teamCode || data.teamCode.trim() === '')) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['teamCode'],
-      message: 'Mã Nhóm là bắt buộc cho Nhóm Bếp'
-    });
-  }
-});
+};
+
+export const updateTeamSchema = z.discriminatedUnion('teamType', [
+  // KITCHEN team update schema - teamCode validation when provided
+  z.object({
+    id: z.number().positive('ID nhóm không hợp lệ'),
+    teamType: z.literal('KITCHEN'),
+    teamCode: z
+      .string()
+      .min(1, 'Mã nhóm là bắt buộc cho Nhóm Bếp')
+      .max(20, 'Mã nhóm không được quá 20 ký tự')
+      .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang')
+      .optional(),
+    ...baseUpdateTeamSchema,
+  }),
+  // OFFICE team update schema - teamCode optional without validation
+  z.object({
+    id: z.number().positive('ID nhóm không hợp lệ'),
+    teamType: z.literal('OFFICE'),
+    teamCode: z.string().optional(),
+    ...baseUpdateTeamSchema,
+  }),
+]);
 
 export const deleteTeamSchema = z.object({
   id: z.number().positive('ID nhóm không hợp lệ'),

@@ -82,6 +82,12 @@ export const teams = pgTable('teams', {
   nameSearchIdx: index('idx_teams_name_search').on(table.name).where(sql`${table.teamType} = 'KITCHEN'`),
   managerIdx: index('idx_teams_manager_id').on(table.managerId).where(sql`${table.managerId} IS NOT NULL`),
   compositeIdx: index('idx_teams_kitchen_composite').on(table.teamType, table.region, table.deletedAt, table.name),
+
+  // Business rule constraint - KITCHEN teams require team_code, OFFICE teams have null team_code
+  teamCodeBusinessRule: check(
+    'team_code_business_rule',
+    sql`(${table.teamType} = 'KITCHEN' AND ${table.teamCode} IS NOT NULL) OR (${table.teamType} = 'OFFICE')`
+  ),
 }));
 
 export const teamMembers = pgTable('team_members', {

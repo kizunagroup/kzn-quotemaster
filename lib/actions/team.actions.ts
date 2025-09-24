@@ -263,7 +263,10 @@ export async function createTeam(data: CreateTeamInput) {
     const newTeam = await db
       .insert(teams)
       .values({
-        teamCode: validatedData.teamCode && validatedData.teamCode.trim() ? validatedData.teamCode.trim().toUpperCase() : null,
+        // Handle teamCode properly - null for OFFICE teams, formatted for KITCHEN teams
+        teamCode: validatedData.teamType === 'OFFICE'
+          ? null
+          : (validatedData.teamCode ? validatedData.teamCode.trim().toUpperCase() : null),
         name: validatedData.name.trim(),
         region: validatedData.region.trim(),
         address: validatedData.address?.trim() || null,
@@ -374,8 +377,13 @@ export async function updateTeam(data: UpdateTeamInput) {
     const updatedTeam = await db
       .update(teams)
       .set({
+        // Handle teamCode based on team type - consistent with create logic
         teamCode: validatedData.teamCode !== undefined ?
-          (validatedData.teamCode && validatedData.teamCode.trim() ? validatedData.teamCode.trim().toUpperCase() : null) :
+          (currentTeam.teamType === 'OFFICE'
+            ? null
+            : (validatedData.teamCode && validatedData.teamCode.trim()
+                ? validatedData.teamCode.trim().toUpperCase()
+                : null)) :
           currentTeam.teamCode,
         name: validatedData.name?.trim() || currentTeam.name,
         region: validatedData.region?.trim() || currentTeam.region,
