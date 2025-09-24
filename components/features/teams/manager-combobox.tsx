@@ -18,7 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { getTeamManagers } from '@/lib/actions/team.actions';
+import { getStaffManagers } from '@/lib/actions/staff.actions';
 
 // Helper function to display department names in Vietnamese
 const getDepartmentDisplay = (department: string | null): string => {
@@ -52,7 +52,7 @@ interface Manager {
   role: string;
 }
 
-interface TeamManagerComboboxProps {
+interface ManagerComboboxProps {
   value?: number;
   onChange: (managerId: number | undefined) => void;
   placeholder?: string;
@@ -60,13 +60,13 @@ interface TeamManagerComboboxProps {
   className?: string;
 }
 
-export function TeamManagerCombobox({
+export function ManagerCombobox({
   value,
   onChange,
   placeholder = 'Chọn quản lý...',
   disabled = false,
   className,
-}: TeamManagerComboboxProps) {
+}: ManagerComboboxProps) {
   // Component state
   const [open, setOpen] = useState(false);
   const [managers, setManagers] = useState<Manager[]>([]);
@@ -75,7 +75,7 @@ export function TeamManagerCombobox({
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
-  // PHASE 1 OPTIMIZATION: Debounced search (300ms)
+  // PERFORMANCE OPTIMIZATION: Debounced search (300ms)
   useEffect(() => {
     const timeout = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
@@ -84,13 +84,13 @@ export function TeamManagerCombobox({
     return () => clearTimeout(timeout);
   }, [searchQuery]);
 
-  // PHASE 1 OPTIMIZATION: Fetch managers with server-side search
+  // PERFORMANCE OPTIMIZATION: Fetch managers with server-side search
   const fetchManagers = useCallback(async (search?: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      const result = await getTeamManagers(search?.trim() || undefined);
+      const result = await getStaffManagers(search?.trim() || undefined);
 
       if ('error' in result) {
         setError(result.error);
@@ -126,7 +126,7 @@ export function TeamManagerCombobox({
     fetchManagers();
   }, [fetchManagers]);
 
-  // PHASE 1 OPTIMIZATION: Re-fetch when debounced search changes
+  // PERFORMANCE OPTIMIZATION: Re-fetch when debounced search changes
   useEffect(() => {
     if (open) { // Only search when dropdown is open
       fetchManagers(debouncedSearchQuery);
@@ -161,7 +161,7 @@ export function TeamManagerCombobox({
     onChange(undefined);
   };
 
-  // PHASE 1 OPTIMIZATION: Handle search input change (triggers debounced server search)
+  // PERFORMANCE OPTIMIZATION: Handle search input change (triggers debounced server search)
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     // The debounced effect will handle the actual server search
@@ -275,7 +275,7 @@ export function TeamManagerCombobox({
     </div>
   );
 
-  // PHASE 1 OPTIMIZATION: Loading indicator for search in progress
+  // PERFORMANCE OPTIMIZATION: Loading indicator for search in progress
   const isSearching = loading && (searchQuery !== debouncedSearchQuery);
 
   return (

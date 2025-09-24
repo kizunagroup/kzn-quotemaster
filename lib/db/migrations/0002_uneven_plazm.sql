@@ -1,0 +1,1 @@
+CREATE INDEX "idx_users_manager_search" ON "users" USING btree ("status","name","email") WHERE "users"."deleted_at" IS NULL;

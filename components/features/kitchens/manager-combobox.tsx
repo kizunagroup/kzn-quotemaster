@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Check, ChevronsUpDown, X, User, Loader2, AlertCircle } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -73,76 +73,71 @@ export function ManagerCombobox({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
 
-  // Fetch managers data on component mount
+  // PERFORMANCE OPTIMIZATION: Debounced search (300ms)
   useEffect(() => {
-    async function fetchManagers() {
-      setLoading(true);
-      setError(null);
+    const timeout = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
 
-      try {
-        const result = await getKitchenManagers();
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
 
-        if ('error' in result) {
-          setError(result.error);
-          setManagers([]);
-        } else {
-          // Validate and sanitize manager data to prevent runtime errors
-          const validManagers = (result || []).filter(manager =>
-            manager &&
-            typeof manager === 'object' &&
-            typeof manager.id === 'number'
-          ).map(manager => ({
-            id: manager.id,
-            name: manager.name || '',
-            email: manager.email || '',
-            department: manager.department || null,
-            jobTitle: manager.jobTitle || null,
-            role: manager.role || ''
-          }));
+  // PERFORMANCE OPTIMIZATION: Fetch managers with server-side search
+  const fetchManagers = useCallback(async (search?: string) => {
+    setLoading(true);
+    setError(null);
 
-          setManagers(validManagers);
-        }
-      } catch (err) {
-        console.error('Error fetching managers:', err);
-        setError('Có lỗi xảy ra khi tải danh sách quản lý');
+    try {
+      const result = await getKitchenManagers(search?.trim() || undefined);
+
+      if ('error' in result) {
+        setError(result.error);
         setManagers([]);
-      } finally {
-        setLoading(false);
-      }
-    }
+      } else {
+        // Validate and sanitize manager data to prevent runtime errors
+        const validManagers = (result || []).filter(manager =>
+          manager &&
+          typeof manager === 'object' &&
+          typeof manager.id === 'number'
+        ).map(manager => ({
+          id: manager.id,
+          name: manager.name || '',
+          email: manager.email || '',
+          department: manager.department || null,
+          jobTitle: manager.jobTitle || null,
+          role: manager.role || ''
+        }));
 
-    fetchManagers();
+        setManagers(validManagers);
+      }
+    } catch (err) {
+      console.error('Error fetching managers:', err);
+      setError('Có lỗi xảy ra khi tải danh sách quản lý');
+      setManagers([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Initial fetch on component mount
+  useEffect(() => {
+    fetchManagers();
+  }, [fetchManagers]);
+
+  // PERFORMANCE OPTIMIZATION: Re-fetch when debounced search changes
+  useEffect(() => {
+    if (open) { // Only search when dropdown is open
+      fetchManagers(debouncedSearchQuery);
+    }
+  }, [debouncedSearchQuery, open, fetchManagers]);
 
   // Find selected manager
   const selectedManager = useMemo(() => {
     if (!value) return null;
     return managers.find(manager => manager.id === value) || null;
   }, [value, managers]);
-
-  // Filter managers based on search query - DEFENSIVE PROGRAMMING APPLIED
-  const filteredManagers = useMemo(() => {
-    if (!searchQuery.trim()) return managers;
-
-    const query = searchQuery.toLowerCase().trim();
-    return managers.filter(manager => {
-      // Defensive programming: ensure all properties exist and are strings
-      const name = manager?.name?.toString() || '';
-      const email = manager?.email?.toString() || '';
-      const department = manager?.department?.toString() || '';
-      const jobTitle = manager?.jobTitle?.toString() || '';
-      const role = manager?.role?.toString() || '';
-
-      return (
-        name.toLowerCase().includes(query) ||
-        email.toLowerCase().includes(query) ||
-        department.toLowerCase().includes(query) ||
-        jobTitle.toLowerCase().includes(query) ||
-        role.toLowerCase().includes(query)
-      );
-    });
-  }, [managers, searchQuery]);
 
   // Handle manager selection
   const handleSelect = (managerId: string) => {
@@ -166,9 +161,10 @@ export function ManagerCombobox({
     onChange(undefined);
   };
 
-  // Handle search input change - FIXED TO UPDATE SEARCH QUERY
+  // PERFORMANCE OPTIMIZATION: Handle search input change (triggers debounced server search)
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    // The debounced effect will handle the actual server search
   };
 
   // Reset search when popover closes
@@ -176,12 +172,16 @@ export function ManagerCombobox({
     setOpen(newOpen);
     if (!newOpen) {
       setSearchQuery(''); // Clear search when closing
+      // Reset to initial state without search
+      if (debouncedSearchQuery) {
+        setDebouncedSearchQuery('');
+      }
     }
   };
 
   // Render display value
   const renderDisplayValue = () => {
-    if (loading) {
+    if (loading && !managers.length) {
       return (
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -190,7 +190,7 @@ export function ManagerCombobox({
       );
     }
 
-    if (error) {
+    if (error && !managers.length) {
       return (
         <div className="flex items-center gap-2 text-destructive">
           <AlertCircle className="h-4 w-4" />
@@ -275,6 +275,9 @@ export function ManagerCombobox({
     </div>
   );
 
+  // PERFORMANCE OPTIMIZATION: Loading indicator for search in progress
+  const isSearching = loading && (searchQuery !== debouncedSearchQuery);
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -287,7 +290,7 @@ export function ManagerCombobox({
             !selectedManager && 'text-muted-foreground',
             className
           )}
-          disabled={disabled || loading}
+          disabled={disabled}
         >
           {renderDisplayValue()}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -296,19 +299,26 @@ export function ManagerCombobox({
 
       <PopoverContent className="w-[480px] p-0" align="start">
         <Command shouldFilter={false}>
-          <CommandInput
-            placeholder="Tìm kiếm theo tên, email, phòng ban, chức vụ..."
-            className="h-9"
-            value={searchQuery}
-            onValueChange={handleSearchChange}
-          />
+          <div className="relative">
+            <CommandInput
+              placeholder="Tìm kiếm theo tên hoặc email..."
+              className="h-9"
+              value={searchQuery}
+              onValueChange={handleSearchChange}
+            />
+            {isSearching && (
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
           <CommandList>
-            {loading ? (
+            {loading && !isSearching && managers.length === 0 ? (
               <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 <span className="text-sm text-muted-foreground">Đang tải danh sách quản lý...</span>
               </div>
-            ) : error ? (
+            ) : error && managers.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-4 text-center">
                 <AlertCircle className="h-8 w-8 text-destructive mb-2" />
                 <p className="text-sm text-destructive font-medium mb-1">Lỗi tải dữ liệu</p>
@@ -317,47 +327,20 @@ export function ManagerCombobox({
                   variant="outline"
                   size="sm"
                   className="mt-2"
-                  onClick={() => {
-                    setError(null);
-                    // Re-trigger fetch
-                    const fetchManagers = async () => {
-                      setLoading(true);
-                      try {
-                        const result = await getKitchenManagers();
-                        if ('error' in result) {
-                          setError(result.error);
-                          setManagers([]);
-                        } else {
-                          // Validate and sanitize manager data to prevent runtime errors
-                          const validManagers = (result || []).filter(manager =>
-                            manager &&
-                            typeof manager === 'object' &&
-                            typeof manager.id === 'number'
-                          ).map(manager => ({
-                            id: manager.id,
-                            name: manager.name || '',
-                            email: manager.email || '',
-                            department: manager.department || null,
-                            jobTitle: manager.jobTitle || null,
-                            role: manager.role || ''
-                          }));
-
-                          setManagers(validManagers);
-                        }
-                      } catch (err) {
-                        setError('Có lỗi xảy ra khi tải danh sách quản lý');
-                        setManagers([]);
-                      } finally {
-                        setLoading(false);
-                      }
-                    };
-                    fetchManagers();
-                  }}
+                  onClick={() => fetchManagers()}
+                  disabled={loading}
                 >
-                  Thử lại
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Đang tải...
+                    </>
+                  ) : (
+                    'Thử lại'
+                  )}
                 </Button>
               </div>
-            ) : filteredManagers.length === 0 ? (
+            ) : managers.length === 0 ? (
               <CommandEmpty>
                 <div className="flex flex-col items-center justify-center p-4 text-center">
                   <User className="h-8 w-8 text-muted-foreground mb-2" />
@@ -376,7 +359,7 @@ export function ManagerCombobox({
               </CommandEmpty>
             ) : (
               <CommandGroup>
-                {filteredManagers.map((manager) => {
+                {managers.map((manager) => {
                   const isSelected = value === manager.id;
                   return (
                     <CommandItem
@@ -389,6 +372,13 @@ export function ManagerCombobox({
                     </CommandItem>
                   );
                 })}
+                {managers.length >= 50 && (
+                  <div className="p-2 text-center">
+                    <p className="text-xs text-muted-foreground">
+                      Hiển thị 50 kết quả đầu tiên. Sử dụng tìm kiếm để thu hẹp kết quả.
+                    </p>
+                  </div>
+                )}
               </CommandGroup>
             )}
           </CommandList>

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
-import { eq, and, ilike, sql } from 'drizzle-orm';
+import { eq, and, ilike, sql, isNull } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 import { checkPermission } from '@/lib/auth/permissions';
 import { hashPassword } from '@/lib/auth/session';
@@ -1050,5 +1050,60 @@ export async function getStaffAssignments(staffId: number) {
 
     // Generic fallback for unknown errors
     throw new Error('Có lỗi xảy ra khi tải danh sách phân công. Vui lòng thử lại.');
+  }
+}
+
+// PERFORMANCE OPTIMIZATION: Get staff managers with search capability
+export async function getStaffManagers(searchQuery?: string): Promise<{ id: number; name: string; email: string; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check staff management permission
+    const canManageStaff = await checkPermission(user.id, 'canManageStaff');
+    if (!canManageStaff) {
+      return { error: 'Không có quyền quản lý nhân viên' };
+    }
+
+    // 3. Build WHERE conditions for optimized query using composite index
+    const whereConditions = [
+      eq(users.status, 'active'),
+      isNull(users.deletedAt)
+    ];
+
+    // 4. Add search filter if provided (leverages the managerSearchIdx composite index)
+    if (searchQuery && searchQuery.trim()) {
+      const searchTerm = `%${searchQuery.trim()}%`;
+      whereConditions.push(
+        sql`(${users.name} ILIKE ${searchTerm} OR ${users.email} ILIKE ${searchTerm})`
+      );
+    }
+
+    // 5. PERFORMANCE OPTIMIZATION: Select only necessary fields + LIMIT 50
+    const managers = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        department: users.department,
+        jobTitle: users.jobTitle,
+      })
+      .from(users)
+      .where(and(...whereConditions))
+      .orderBy(users.name) // Consistent ordering for better UX
+      .limit(50); // Limit to 50 results for performance
+
+    // 6. Add role field (for compatibility with existing interface)
+    return managers.map(manager => ({
+      ...manager,
+      role: 'manager' // Default role for all returned managers
+    }));
+
+  } catch (error) {
+    console.error('Get staff managers error:', error);
+    return { error: 'Có lỗi xảy ra khi tải danh sách quản lý' };
   }
 }

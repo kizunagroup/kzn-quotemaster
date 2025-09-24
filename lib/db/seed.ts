@@ -347,7 +347,7 @@ export async function seedDatabase() {
   console.log(`✅ Created ${kitchenUsers.length} KITCHEN users across ${kitchenTeams.length} kitchens`);
 
   // 5. Create team member assignments
-  const teamMemberAssignments = [];
+  let teamMemberAssignments = [];
 
   // 5a. Assign Super Admin to first OFFICE team
   teamMemberAssignments.push({

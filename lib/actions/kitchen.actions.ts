@@ -157,8 +157,8 @@ async function manageKitchenManagerMembership(
   }
 }
 
-// Server action to get eligible kitchen managers (PURE TEAM-BASED RBAC)
-export async function getKitchenManagers(): Promise<{ id: number; name: string; email: string; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
+// Server action to get eligible kitchen managers (PERFORMANCE OPTIMIZED: search + limit)
+export async function getKitchenManagers(searchQuery?: string): Promise<{ id: number; name: string; email: string; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
   try {
     // 1. Authorization check
     const user = await getUser();
@@ -172,7 +172,21 @@ export async function getKitchenManagers(): Promise<{ id: number; name: string; 
       return { error: 'Không có quyền quản lý bếp' };
     }
 
-    // 3. Get all active users with department and job title
+    // 3. Build WHERE conditions for optimized query
+    const whereConditions = [
+      eq(users.status, 'active'),
+      isNull(users.deletedAt)
+    ];
+
+    // 4. Add search filter if provided (leverages the composite index)
+    if (searchQuery && searchQuery.trim()) {
+      const searchTerm = `%${searchQuery.trim()}%`;
+      whereConditions.push(
+        sql`(${users.name} ILIKE ${searchTerm} OR ${users.email} ILIKE ${searchTerm})`
+      );
+    }
+
+    // 5. PERFORMANCE OPTIMIZATION: Select only necessary fields + LIMIT 50
     const allUsers = await db
       .select({
         id: users.id,
@@ -180,17 +194,13 @@ export async function getKitchenManagers(): Promise<{ id: number; name: string; 
         email: users.email,
         department: users.department,
         jobTitle: users.jobTitle,
-        status: users.status,
       })
       .from(users)
-      .where(
-        and(
-          eq(users.status, 'active'),
-          isNull(users.deletedAt)
-        )
-      );
+      .where(and(...whereConditions))
+      .orderBy(users.name) // Consistent ordering for better UX
+      .limit(50); // Limit to 50 results for performance
 
-    // 4. Return all active users (management permissions will be assigned when creating the team)
+    // 6. Return optimized results with minimal processing
     const eligibleManagers = allUsers.map(user => ({
       id: user.id,
       name: user.name,
