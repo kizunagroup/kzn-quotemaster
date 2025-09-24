@@ -71,10 +71,10 @@ export function TeamFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = Boolean(team);
 
-  // Form setup with conditional schema based on mode - IMPROVED VALIDATION UX
+  // Form setup with conditional schema based on mode - CONSISTENT VALIDATION STANDARD
   const form = useForm<z.infer<typeof createFormSchema> | z.infer<typeof updateFormSchema>>({
     resolver: zodResolver(isEditMode ? updateFormSchema : createFormSchema),
-    mode: 'onBlur', // Change from onChange to onBlur for better UX
+    mode: 'onChange', // ARCHITECTURAL STANDARD: instant validation for all forms
     defaultValues: {
       teamCode: '',
       name: '',

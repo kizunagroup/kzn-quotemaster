@@ -27,14 +27,24 @@ const baseTeamSchema = {
 
 // Validation schemas using discriminatedUnion for team operations
 export const createTeamSchema = z.discriminatedUnion('teamType', [
-  // KITCHEN team schema - teamCode is required with validation
+  // KITCHEN team schema - teamCode is required with graceful onChange validation
   z.object({
     teamType: z.literal('KITCHEN'),
     teamCode: z
       .string()
       .min(1, 'Mã nhóm là bắt buộc cho Nhóm Bếp')
       .max(20, 'Mã nhóm không được quá 20 ký tự')
-      .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang'),
+      .refine(
+        (val) => {
+          // Only validate pattern if the field has meaningful content (>=2 chars)
+          // This prevents premature validation during typing
+          if (val.length < 2) return true;
+          return /^[A-Z0-9_-]+$/.test(val);
+        },
+        {
+          message: 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang',
+        }
+      ),
     ...baseTeamSchema,
   }),
   // OFFICE team schema - teamCode is optional and not validated
@@ -68,7 +78,7 @@ const baseUpdateTeamSchema = {
 };
 
 export const updateTeamSchema = z.discriminatedUnion('teamType', [
-  // KITCHEN team update schema - teamCode validation when provided
+  // KITCHEN team update schema - teamCode validation when provided with graceful onChange
   z.object({
     id: z.number().positive('ID nhóm không hợp lệ'),
     teamType: z.literal('KITCHEN'),
@@ -76,7 +86,17 @@ export const updateTeamSchema = z.discriminatedUnion('teamType', [
       .string()
       .min(1, 'Mã nhóm là bắt buộc cho Nhóm Bếp')
       .max(20, 'Mã nhóm không được quá 20 ký tự')
-      .regex(/^[A-Z0-9_-]+$/, 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang')
+      .refine(
+        (val) => {
+          // Only validate pattern if the field has meaningful content (>=2 chars)
+          // This prevents premature validation during typing
+          if (val.length < 2) return true;
+          return /^[A-Z0-9_-]+$/.test(val);
+        },
+        {
+          message: 'Mã nhóm chỉ được chứa chữ hoa, số, dấu gạch dưới và dấu gạch ngang',
+        }
+      )
       .optional(),
     ...baseUpdateTeamSchema,
   }),
