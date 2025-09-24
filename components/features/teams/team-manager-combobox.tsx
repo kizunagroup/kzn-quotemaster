@@ -1,10 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Check, ChevronsUpDown, X, User, Loader2, AlertCircle } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  Check,
+  ChevronsUpDown,
+  X,
+  User,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
 
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -12,31 +19,31 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
+} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { getTeamManagers } from '@/lib/actions/team.actions';
+} from "@/components/ui/popover";
+import { getTeamManagers } from "@/lib/actions/team.actions";
 
 // Helper function to display department names in Vietnamese
 const getDepartmentDisplay = (department: string | null): string => {
-  if (!department) return 'Chưa có phòng ban';
+  if (!department) return "Chưa có phòng ban";
 
   switch (department.toUpperCase()) {
-    case 'ADMIN':
-      return 'Quản Trị';
-    case 'PROCUREMENT':
-      return 'Mua Sắm';
-    case 'KITCHEN':
-      return 'Bếp';
-    case 'ACCOUNTING':
-      return 'Kế Toán';
-    case 'OPERATIONS':
-      return 'Vận Hành';
-    case 'GENERAL':
-      return 'Tổng Hợp';
+    case "ADMIN":
+      return "Quản Trị";
+    case "PROCUREMENT":
+      return "Mua Sắm";
+    case "KITCHEN":
+      return "Bếp";
+    case "ACCOUNTING":
+      return "Kế Toán";
+    case "OPERATIONS":
+      return "Vận Hành";
+    case "GENERAL":
+      return "Tổng Hợp";
     default:
       return department;
   }
@@ -47,6 +54,7 @@ interface Manager {
   id: number;
   name: string;
   email: string;
+  employeeCode: string | null;
   department: string | null;
   jobTitle: string | null;
   role: string;
@@ -70,7 +78,7 @@ interface TeamManagerComboboxProps {
 export function TeamManagerCombobox({
   value,
   onChange,
-  placeholder = 'Chọn quản lý...',
+  placeholder = "Chọn quản lý...",
   disabled = false,
   className,
   initialValue,
@@ -80,8 +88,8 @@ export function TeamManagerCombobox({
   const [managers, setManagers] = useState<Manager[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
 
   // PHASE 1 OPTIMIZATION: Debounced search (300ms)
   useEffect(() => {
@@ -93,54 +101,64 @@ export function TeamManagerCombobox({
   }, [searchQuery]);
 
   // PHASE 1 OPTIMIZATION: Fetch managers with server-side search
-  const fetchManagers = useCallback(async (search?: string) => {
-    setLoading(true);
-    setError(null);
+  const fetchManagers = useCallback(
+    async (search?: string) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const result = await getTeamManagers(search?.trim() || undefined);
+      try {
+        const result = await getTeamManagers(search?.trim() || undefined);
 
-      if ('error' in result) {
-        setError(result.error);
-        setManagers([]);
-      } else {
-        // Validate and sanitize manager data to prevent runtime errors
-        let validManagers = (result || []).filter(manager =>
-          manager &&
-          typeof manager === 'object' &&
-          typeof manager.id === 'number'
-        ).map(manager => ({
-          id: manager.id,
-          name: manager.name || '',
-          email: manager.email || '',
-          department: manager.department || null,
-          jobTitle: manager.jobTitle || null,
-          role: manager.role || ''
-        }));
+        if ("error" in result) {
+          setError(result.error);
+          setManagers([]);
+        } else {
+          // Validate and sanitize manager data to prevent runtime errors
+          let validManagers = (result || [])
+            .filter(
+              (manager) =>
+                manager &&
+                typeof manager === "object" &&
+                typeof manager.id === "number"
+            )
+            .map((manager) => ({
+              id: manager.id,
+              name: manager.name || "",
+              email: manager.email || "",
+              employeeCode: manager.employeeCode || null,
+              department: manager.department || null,
+              jobTitle: manager.jobTitle || null,
+              role: manager.role || "",
+            }));
 
-        // Include initialValue if it exists and is not already in the list
-        if (initialValue && !validManagers.find(m => m.id === initialValue.id)) {
-          const initialManager: Manager = {
-            id: initialValue.id,
-            name: initialValue.name,
-            email: initialValue.email,
-            department: initialValue.department || null,
-            jobTitle: initialValue.jobTitle || null,
-            role: 'manager' // Default role for initial value
-          };
-          validManagers = [initialManager, ...validManagers];
+          // Include initialValue if it exists and is not already in the list
+          if (
+            initialValue &&
+            !validManagers.find((m) => m.id === initialValue.id)
+          ) {
+            const initialManager: Manager = {
+              id: initialValue.id,
+              name: initialValue.name,
+              email: initialValue.email,
+              department: initialValue.department || null,
+              jobTitle: initialValue.jobTitle || null,
+              role: "manager", // Default role for initial value
+            };
+            validManagers = [initialManager, ...validManagers];
+          }
+
+          setManagers(validManagers);
         }
-
-        setManagers(validManagers);
+      } catch (err) {
+        console.error("Error fetching managers:", err);
+        setError("Có lỗi xảy ra khi tải danh sách quản lý");
+        setManagers([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error fetching managers:', err);
-      setError('Có lỗi xảy ra khi tải danh sách quản lý');
-      setManagers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [initialValue]);
+    },
+    [initialValue]
+  );
 
   // Initial fetch on component mount
   useEffect(() => {
@@ -149,7 +167,8 @@ export function TeamManagerCombobox({
 
   // PHASE 1 OPTIMIZATION: Re-fetch when debounced search changes
   useEffect(() => {
-    if (open) { // Only search when dropdown is open
+    if (open) {
+      // Only search when dropdown is open
       fetchManagers(debouncedSearchQuery);
     }
   }, [debouncedSearchQuery, open, fetchManagers]);
@@ -159,7 +178,7 @@ export function TeamManagerCombobox({
     if (!value) return null;
 
     // First try to find in the current managers list
-    const managerFromList = managers.find(manager => manager.id === value);
+    const managerFromList = managers.find((manager) => manager.id === value);
     if (managerFromList) return managerFromList;
 
     // Fallback to initialValue if it matches the selected value
@@ -170,7 +189,7 @@ export function TeamManagerCombobox({
         email: initialValue.email,
         department: initialValue.department || null,
         jobTitle: initialValue.jobTitle || null,
-        role: 'manager'
+        role: "manager",
       };
     }
 
@@ -189,7 +208,7 @@ export function TeamManagerCombobox({
     }
 
     setOpen(false);
-    setSearchQuery(''); // Clear search when selection is made
+    setSearchQuery(""); // Clear search when selection is made
   };
 
   // Handle clear selection
@@ -209,10 +228,10 @@ export function TeamManagerCombobox({
   const handleOpenChange = (newOpen: boolean) => {
     setOpen(newOpen);
     if (!newOpen) {
-      setSearchQuery(''); // Clear search when closing
+      setSearchQuery(""); // Clear search when closing
       // Reset to initial state without search
       if (debouncedSearchQuery) {
-        setDebouncedSearchQuery('');
+        setDebouncedSearchQuery("");
       }
     }
   };
@@ -243,8 +262,12 @@ export function TeamManagerCombobox({
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
             <div className="flex flex-col">
-              <span className="text-sm font-medium">{selectedManager.name || 'Không có tên'}</span>
-              <span className="text-xs text-muted-foreground">{selectedManager.email || 'Không có email'}</span>
+              <span className="text-sm font-medium">
+                {selectedManager.name || "Không có tên"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {selectedManager.email || "Không có email"}
+              </span>
               <div className="flex gap-2 text-xs text-muted-foreground">
                 <span>{getDepartmentDisplay(selectedManager.department)}</span>
                 {selectedManager.jobTitle && (
@@ -263,7 +286,7 @@ export function TeamManagerCombobox({
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+                if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   handleClear(e as any);
                 }
@@ -291,10 +314,22 @@ export function TeamManagerCombobox({
       <div className="flex items-center gap-2">
         <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="text-sm font-medium truncate">{manager.name || 'Không có tên'}</span>
-          <span className="text-xs text-muted-foreground truncate">{manager.email || 'Không có email'}</span>
+          <span className="text-sm font-medium truncate">
+            {manager.name || "Không có tên"}
+          </span>
+          <span className="text-xs text-muted-foreground truncate">
+            {manager.email || "Không có email"}
+          </span>
           <div className="flex gap-2 text-xs text-muted-foreground/70">
-            <span className="truncate">{getDepartmentDisplay(manager.department)}</span>
+            {manager.employeeCode && (
+              <>
+                <span className="truncate">Mã: {manager.employeeCode}</span>
+                <span>•</span>
+              </>
+            )}
+            <span className="truncate">
+              {getDepartmentDisplay(manager.department)}
+            </span>
             {manager.jobTitle && (
               <>
                 <span>•</span>
@@ -306,15 +341,15 @@ export function TeamManagerCombobox({
       </div>
       <Check
         className={cn(
-          'h-4 w-4 flex-shrink-0',
-          isSelected ? 'opacity-100' : 'opacity-0'
+          "h-4 w-4 flex-shrink-0",
+          isSelected ? "opacity-100" : "opacity-0"
         )}
       />
     </div>
   );
 
   // PHASE 1 OPTIMIZATION: Loading indicator for search in progress
-  const isSearching = loading && (searchQuery !== debouncedSearchQuery);
+  const isSearching = loading && searchQuery !== debouncedSearchQuery;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -324,8 +359,8 @@ export function TeamManagerCombobox({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            'w-full justify-between h-auto py-2 px-3',
-            !selectedManager && 'text-muted-foreground',
+            "w-full justify-between h-auto py-2 px-3",
+            !selectedManager && "text-muted-foreground",
             className
           )}
           disabled={disabled}
@@ -354,12 +389,16 @@ export function TeamManagerCombobox({
             {loading && !isSearching && managers.length === 0 ? (
               <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                <span className="text-sm text-muted-foreground">Đang tải danh sách quản lý...</span>
+                <span className="text-sm text-muted-foreground">
+                  Đang tải danh sách quản lý...
+                </span>
               </div>
             ) : error && managers.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-4 text-center">
                 <AlertCircle className="h-8 w-8 text-destructive mb-2" />
-                <p className="text-sm text-destructive font-medium mb-1">Lỗi tải dữ liệu</p>
+                <p className="text-sm text-destructive font-medium mb-1">
+                  Lỗi tải dữ liệu
+                </p>
                 <p className="text-xs text-muted-foreground">{error}</p>
                 <Button
                   variant="outline"
@@ -374,7 +413,7 @@ export function TeamManagerCombobox({
                       Đang tải...
                     </>
                   ) : (
-                    'Thử lại'
+                    "Thử lại"
                   )}
                 </Button>
               </div>
@@ -384,9 +423,8 @@ export function TeamManagerCombobox({
                   <User className="h-8 w-8 text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">
                     {searchQuery.trim()
-                      ? 'Không tìm thấy quản lý phù hợp'
-                      : 'Không có quản lý nào khả dụng'
-                    }
+                      ? "Không tìm thấy quản lý phù hợp"
+                      : "Không có quản lý nào khả dụng"}
                   </p>
                   {searchQuery.trim() && (
                     <p className="text-xs text-muted-foreground mt-1">
@@ -413,7 +451,8 @@ export function TeamManagerCombobox({
                 {managers.length >= 50 && (
                   <div className="p-2 text-center">
                     <p className="text-xs text-muted-foreground">
-                      Hiển thị 50 kết quả đầu tiên. Sử dụng tìm kiếm để thu hẹp kết quả.
+                      Hiển thị 50 kết quả đầu tiên. Sử dụng tìm kiếm để thu hẹp
+                      kết quả.
                     </p>
                   </div>
                 )}

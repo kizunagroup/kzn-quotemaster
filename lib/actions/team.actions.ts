@@ -1,12 +1,12 @@
-'use server';
+"use server";
 
-import { z } from 'zod';
-import { revalidatePath } from 'next/cache';
-import { db } from '@/lib/db/drizzle';
-import { teams, users, teamMembers } from '@/lib/db/schema';
-import { eq, and, ilike, isNull, sql, inArray } from 'drizzle-orm';
-import { getUser, getUserWithTeams } from '@/lib/db/queries';
-import { checkPermission } from '@/lib/auth/permissions';
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db/drizzle";
+import { teams, users, teamMembers } from "@/lib/db/schema";
+import { eq, and, ilike, isNull, sql, inArray } from "drizzle-orm";
+import { getUser, getUserWithTeams } from "@/lib/db/queries";
+import { checkPermission } from "@/lib/auth/permissions";
 import {
   createTeamSchema,
   updateTeamSchema,
@@ -14,10 +14,14 @@ import {
   type CreateTeamInput,
   type UpdateTeamInput,
   type DeleteTeamInput,
-} from '@/lib/schemas/team.schemas';
+} from "@/lib/schemas/team.schemas";
 
 // Helper function to check team code uniqueness for kitchen teams
-async function isTeamCodeUnique(teamCode: string, teamType: string, excludeId?: number): Promise<boolean> {
+async function isTeamCodeUnique(
+  teamCode: string,
+  teamType: string,
+  excludeId?: number
+): Promise<boolean> {
   const trimmedCode = teamCode.trim().toUpperCase();
 
   const conditions = [
@@ -42,7 +46,9 @@ async function isTeamCodeUnique(teamCode: string, teamType: string, excludeId?: 
 }
 
 // Helper function to validate manager exists (PURE TEAM-BASED RBAC)
-async function validateManager(managerId: number): Promise<{ valid: boolean; error?: string; manager?: any }> {
+async function validateManager(
+  managerId: number
+): Promise<{ valid: boolean; error?: string; manager?: any }> {
   try {
     const manager = await db
       .select({
@@ -57,17 +63,20 @@ async function validateManager(managerId: number): Promise<{ valid: boolean; err
       .limit(1);
 
     if (manager.length === 0) {
-      return { valid: false, error: 'Không tìm thấy quản lý được chỉ định' };
+      return { valid: false, error: "Không tìm thấy quản lý được chỉ định" };
     }
 
     const managerData = manager[0];
 
     if (managerData.deletedAt) {
-      return { valid: false, error: 'Quản lý được chỉ định đã bị vô hiệu hóa' };
+      return { valid: false, error: "Quản lý được chỉ định đã bị vô hiệu hóa" };
     }
 
-    if (managerData.status !== 'active') {
-      return { valid: false, error: 'Quản lý được chỉ định không ở trạng thái hoạt động' };
+    if (managerData.status !== "active") {
+      return {
+        valid: false,
+        error: "Quản lý được chỉ định không ở trạng thái hoạt động",
+      };
     }
 
     // Management permissions will be assigned when creating the team
@@ -75,8 +84,8 @@ async function validateManager(managerId: number): Promise<{ valid: boolean; err
 
     return { valid: true, manager: managerData };
   } catch (error) {
-    console.error('Manager validation error:', error);
-    return { valid: false, error: 'Lỗi khi kiểm tra thông tin quản lý' };
+    console.error("Manager validation error:", error);
+    return { valid: false, error: "Lỗi khi kiểm tra thông tin quản lý" };
   }
 }
 
@@ -85,15 +94,20 @@ async function manageTeamManagerMembership(
   managerId: number,
   teamId: number,
   teamType: string,
-  action: 'create' | 'update',
+  action: "create" | "update",
   previousManagerId?: number
 ): Promise<void> {
   try {
     // Determine role based on team type
-    const managerRole = teamType === 'KITCHEN' ? 'KITCHEN_MANAGER' : 'OFFICE_MANAGER';
+    const managerRole =
+      teamType === "KITCHEN" ? "KITCHEN_MANAGER" : "OFFICE_MANAGER";
 
     // Remove previous manager from team if updating and manager changed
-    if (action === 'update' && previousManagerId && previousManagerId !== managerId) {
+    if (
+      action === "update" &&
+      previousManagerId &&
+      previousManagerId !== managerId
+    ) {
       await db
         .delete(teamMembers)
         .where(
@@ -110,10 +124,7 @@ async function manageTeamManagerMembership(
       .select({ id: teamMembers.id, role: teamMembers.role })
       .from(teamMembers)
       .where(
-        and(
-          eq(teamMembers.userId, managerId),
-          eq(teamMembers.teamId, teamId)
-        )
+        and(eq(teamMembers.userId, managerId), eq(teamMembers.teamId, teamId))
       )
       .limit(1);
 
@@ -123,52 +134,68 @@ async function manageTeamManagerMembership(
         .update(teamMembers)
         .set({
           role: managerRole,
-          joinedAt: new Date() // Update join time for role change
+          joinedAt: new Date(), // Update join time for role change
         })
         .where(eq(teamMembers.id, existingMembership[0].id));
     } else {
       // Create new team membership with manager role
-      await db
-        .insert(teamMembers)
-        .values({
-          userId: managerId,
-          teamId: teamId,
-          role: managerRole,
-          joinedAt: new Date()
-        });
+      await db.insert(teamMembers).values({
+        userId: managerId,
+        teamId: teamId,
+        role: managerRole,
+        joinedAt: new Date(),
+      });
     }
   } catch (error) {
-    console.error('Error managing team manager membership:', error);
-    throw new Error('Lỗi khi cập nhật quyền quản lý nhóm');
+    console.error("Error managing team manager membership:", error);
+    throw new Error("Lỗi khi cập nhật quyền quản lý nhóm");
   }
 }
 
 // Server action to get eligible team managers (PHASE 1 OPTIMIZED: search + limit)
-export async function getTeamManagers(searchQuery?: string): Promise<{ id: number; name: string; email: string; department: string | null; jobTitle: string | null; role: string; }[] | { error: string }> {
+export async function getTeamManagers(
+  searchQuery?: string
+): Promise<
+  | {
+      id: number;
+      name: string;
+      email: string;
+      department: string | null;
+      jobTitle: string | null;
+      role: string;
+    }[]
+  | { error: string }
+> {
   try {
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // 2. Check team management permission (canManageKitchens covers all team types)
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
+    const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
-      return { error: 'Không có quyền quản lý nhóm' };
+      return { error: "Không có quyền quản lý nhóm" };
     }
 
     // 3. Build WHERE conditions for optimized query
     const whereConditions = [
-      eq(users.status, 'active'),
-      isNull(users.deletedAt)
+      eq(users.status, "active"),
+      isNull(users.deletedAt),
     ];
 
     // 4. Add search filter if provided (leverages the composite index)
     if (searchQuery && searchQuery.trim()) {
       const searchTerm = `%${searchQuery.trim()}%`;
       whereConditions.push(
-        sql`(${users.name} ILIKE ${searchTerm} OR ${users.email} ILIKE ${searchTerm})`
+        sql`(
+          ${users.name} ILIKE ${searchTerm} OR 
+          ${users.email} ILIKE ${searchTerm} OR
+          ${users.employeeCode} ILIKE ${searchTerm} OR
+          ${users.department} ILIKE ${searchTerm} OR
+          ${users.jobTitle} ILIKE ${searchTerm}
+        )`
       );
     }
 
@@ -178,6 +205,7 @@ export async function getTeamManagers(searchQuery?: string): Promise<{ id: numbe
         id: users.id,
         name: users.name,
         email: users.email,
+        employeeCode: users.employeeCode,
         department: users.department,
         jobTitle: users.jobTitle,
       })
@@ -187,19 +215,20 @@ export async function getTeamManagers(searchQuery?: string): Promise<{ id: numbe
       .limit(50); // PHASE 1: Limit to 50 results for performance
 
     // 6. Return optimized results with minimal processing
-    const eligibleManagers = allUsers.map(user => ({
+    const eligibleManagers = allUsers.map((user) => ({
       id: user.id,
       name: user.name,
       email: user.email,
+      employeeCode: user.employeeCode,
       department: user.department,
       jobTitle: user.jobTitle,
-      role: 'User' // Generic role since permissions are assigned via team membership
+      role: "User", // Generic role since permissions are assigned via team membership
     }));
 
     return eligibleManagers;
   } catch (error) {
-    console.error('Get team managers error:', error);
-    return { error: 'Có lỗi xảy ra khi tải danh sách quản lý' };
+    console.error("Get team managers error:", error);
+    return { error: "Có lỗi xảy ra khi tải danh sách quản lý" };
   }
 }
 
@@ -209,7 +238,7 @@ export async function getRegions(): Promise<string[] | { error: string }> {
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // 2. Query distinct regions from existing teams (all types)
@@ -224,10 +253,10 @@ export async function getRegions(): Promise<string[] | { error: string }> {
       )
       .orderBy(teams.region);
 
-    return regions.map(r => r.region).filter(Boolean);
+    return regions.map((r) => r.region).filter(Boolean);
   } catch (error) {
-    console.error('Get regions error:', error);
-    return { error: 'Có lỗi xảy ra khi tải danh sách khu vực' };
+    console.error("Get regions error:", error);
+    return { error: "Có lỗi xảy ra khi tải danh sách khu vực" };
   }
 }
 
@@ -237,19 +266,21 @@ export async function createTeam(data: CreateTeamInput) {
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // 2. Check team management permission (canManageKitchens covers all team types)
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
+    const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
-      return { error: 'Không có quyền tạo nhóm mới' };
+      return { error: "Không có quyền tạo nhóm mới" };
     }
 
     // 3. Validate input data
     const validationResult = createTeamSchema.safeParse(data);
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      const errors = validationResult.error.errors
+        .map((err) => err.message)
+        .join(", ");
       return { error: `Dữ liệu không hợp lệ: ${errors}` };
     }
 
@@ -263,9 +294,12 @@ export async function createTeam(data: CreateTeamInput) {
 
     // 5. Check team code uniqueness if provided (required for kitchen teams)
     if (validatedData.teamCode && validatedData.teamCode.trim()) {
-      const isUnique = await isTeamCodeUnique(validatedData.teamCode, validatedData.teamType);
+      const isUnique = await isTeamCodeUnique(
+        validatedData.teamCode,
+        validatedData.teamType
+      );
       if (!isUnique) {
-        return { error: 'Mã nhóm đã tồn tại. Vui lòng chọn mã khác.' };
+        return { error: "Mã nhóm đã tồn tại. Vui lòng chọn mã khác." };
       }
     }
 
@@ -274,15 +308,18 @@ export async function createTeam(data: CreateTeamInput) {
       .insert(teams)
       .values({
         // Handle teamCode properly - null for OFFICE teams, formatted for KITCHEN teams
-        teamCode: validatedData.teamType === 'OFFICE'
-          ? null
-          : (validatedData.teamCode ? validatedData.teamCode.trim().toUpperCase() : null),
+        teamCode:
+          validatedData.teamType === "OFFICE"
+            ? null
+            : validatedData.teamCode
+            ? validatedData.teamCode.trim().toUpperCase()
+            : null,
         name: validatedData.name.trim(),
         region: validatedData.region.trim(),
         address: validatedData.address?.trim() || null,
         managerId: validatedData.managerId, // NORMALIZED: Reference to users table
         teamType: validatedData.teamType,
-        status: 'active', // Default status for new teams
+        status: "active", // Default status for new teams
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -291,7 +328,7 @@ export async function createTeam(data: CreateTeamInput) {
         teamCode: teams.teamCode,
         name: teams.name,
         teamType: teams.teamType,
-        managerId: teams.managerId
+        managerId: teams.managerId,
       });
 
     const team = newTeam[0];
@@ -301,18 +338,19 @@ export async function createTeam(data: CreateTeamInput) {
       validatedData.managerId,
       team.id,
       validatedData.teamType,
-      'create'
+      "create"
     );
 
     // 8. Revalidate cache and return success
-    revalidatePath('/danh-muc/nhom');
+    revalidatePath("/danh-muc/nhom");
     return {
-      success: `Nhóm "${team.name}" (${team.teamCode || 'No Code'}) đã được tạo thành công và quản lý đã được phân quyền`
+      success: `Nhóm "${team.name}" (${
+        team.teamCode || "No Code"
+      }) đã được tạo thành công và quản lý đã được phân quyền`,
     };
-
   } catch (error) {
-    console.error('Create team error:', error);
-    return { error: 'Có lỗi xảy ra khi tạo nhóm. Vui lòng thử lại.' };
+    console.error("Create team error:", error);
+    return { error: "Có lỗi xảy ra khi tạo nhóm. Vui lòng thử lại." };
   }
 }
 
@@ -322,19 +360,21 @@ export async function updateTeam(data: UpdateTeamInput) {
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // 2. Check team management permission (canManageKitchens covers all team types)
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
+    const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
-      return { error: 'Không có quyền cập nhật nhóm' };
+      return { error: "Không có quyền cập nhật nhóm" };
     }
 
     // 3. Validate input data
     const validationResult = updateTeamSchema.safeParse(data);
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      const errors = validationResult.error.errors
+        .map((err) => err.message)
+        .join(", ");
       return { error: `Dữ liệu không hợp lệ: ${errors}` };
     }
 
@@ -351,32 +391,43 @@ export async function updateTeam(data: UpdateTeamInput) {
         managerId: teams.managerId,
         teamType: teams.teamType,
         status: teams.status,
-        deletedAt: teams.deletedAt
+        deletedAt: teams.deletedAt,
       })
       .from(teams)
       .where(eq(teams.id, validatedData.id))
       .limit(1);
 
     if (existingTeam.length === 0) {
-      return { error: 'Không tìm thấy nhóm cần cập nhật' };
+      return { error: "Không tìm thấy nhóm cần cập nhật" };
     }
 
     const currentTeam = existingTeam[0];
 
     if (currentTeam.deletedAt) {
-      return { error: 'Không thể cập nhật nhóm đã bị xóa' };
+      return { error: "Không thể cập nhật nhóm đã bị xóa" };
     }
 
     // 5. Check team code uniqueness if being changed
-    if (validatedData.teamCode && validatedData.teamCode.trim() && validatedData.teamCode !== currentTeam.teamCode) {
-      const isUnique = await isTeamCodeUnique(validatedData.teamCode, currentTeam.teamType, validatedData.id);
+    if (
+      validatedData.teamCode &&
+      validatedData.teamCode.trim() &&
+      validatedData.teamCode !== currentTeam.teamCode
+    ) {
+      const isUnique = await isTeamCodeUnique(
+        validatedData.teamCode,
+        currentTeam.teamType,
+        validatedData.id
+      );
       if (!isUnique) {
-        return { error: 'Mã nhóm đã tồn tại. Vui lòng chọn mã khác.' };
+        return { error: "Mã nhóm đã tồn tại. Vui lòng chọn mã khác." };
       }
     }
 
     // 6. Validate new manager if being changed
-    if (validatedData.managerId && validatedData.managerId !== currentTeam.managerId) {
+    if (
+      validatedData.managerId &&
+      validatedData.managerId !== currentTeam.managerId
+    ) {
       const managerValidation = await validateManager(validatedData.managerId);
       if (!managerValidation.valid) {
         return { error: managerValidation.error };
@@ -388,13 +439,14 @@ export async function updateTeam(data: UpdateTeamInput) {
       .update(teams)
       .set({
         // Handle teamCode based on team type - consistent with create logic
-        teamCode: validatedData.teamCode !== undefined ?
-          (currentTeam.teamType === 'OFFICE'
-            ? null
-            : (validatedData.teamCode && validatedData.teamCode.trim()
-                ? validatedData.teamCode.trim().toUpperCase()
-                : null)) :
-          currentTeam.teamCode,
+        teamCode:
+          validatedData.teamCode !== undefined
+            ? currentTeam.teamType === "OFFICE"
+              ? null
+              : validatedData.teamCode && validatedData.teamCode.trim()
+              ? validatedData.teamCode.trim().toUpperCase()
+              : null
+            : currentTeam.teamCode,
         name: validatedData.name?.trim() || currentTeam.name,
         region: validatedData.region?.trim() || currentTeam.region,
         address: validatedData.address?.trim() || currentTeam.address,
@@ -407,31 +459,39 @@ export async function updateTeam(data: UpdateTeamInput) {
         teamCode: teams.teamCode,
         name: teams.name,
         teamType: teams.teamType,
-        managerId: teams.managerId
+        managerId: teams.managerId,
       });
 
     const team = updatedTeam[0];
 
     // 8. ENHANCED: Update team membership if manager changed
-    if (validatedData.managerId && validatedData.managerId !== currentTeam.managerId) {
+    if (
+      validatedData.managerId &&
+      validatedData.managerId !== currentTeam.managerId
+    ) {
       await manageTeamManagerMembership(
         validatedData.managerId,
         team.id,
         currentTeam.teamType,
-        'update',
+        "update",
         currentTeam.managerId || undefined
       );
     }
 
     // 9. Revalidate cache and return success
-    revalidatePath('/danh-muc/nhom');
+    revalidatePath("/danh-muc/nhom");
     return {
-      success: `Nhóm "${team.name}" (${team.teamCode || 'No Code'}) đã được cập nhật thành công${validatedData.managerId !== currentTeam.managerId ? ' và quyền quản lý đã được cập nhật' : ''}`
+      success: `Nhóm "${team.name}" (${
+        team.teamCode || "No Code"
+      }) đã được cập nhật thành công${
+        validatedData.managerId !== currentTeam.managerId
+          ? " và quyền quản lý đã được cập nhật"
+          : ""
+      }`,
     };
-
   } catch (error) {
-    console.error('Update team error:', error);
-    return { error: 'Có lỗi xảy ra khi cập nhật nhóm. Vui lòng thử lại.' };
+    console.error("Update team error:", error);
+    return { error: "Có lỗi xảy ra khi cập nhật nhóm. Vui lòng thử lại." };
   }
 }
 
@@ -441,19 +501,21 @@ export async function deactivateTeam(data: DeleteTeamInput) {
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // 2. Check team management permission (canManageKitchens covers all team types)
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
+    const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
-      return { error: 'Không có quyền tạm dừng nhóm' };
+      return { error: "Không có quyền tạm dừng nhóm" };
     }
 
     // 3. Validate input data
     const validationResult = deleteTeamSchema.safeParse(data);
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      const errors = validationResult.error.errors
+        .map((err) => err.message)
+        .join(", ");
       return { error: `Dữ liệu không hợp lệ: ${errors}` };
     }
 
@@ -467,44 +529,45 @@ export async function deactivateTeam(data: DeleteTeamInput) {
         name: teams.name,
         teamType: teams.teamType,
         status: teams.status,
-        deletedAt: teams.deletedAt
+        deletedAt: teams.deletedAt,
       })
       .from(teams)
       .where(eq(teams.id, validatedData.id))
       .limit(1);
 
     if (existingTeam.length === 0) {
-      return { error: 'Không tìm thấy nhóm cần tạm dừng' };
+      return { error: "Không tìm thấy nhóm cần tạm dừng" };
     }
 
     const team = existingTeam[0];
 
     if (team.deletedAt) {
-      return { error: 'Nhóm đã được tạm dừng trước đó' };
+      return { error: "Nhóm đã được tạm dừng trước đó" };
     }
 
-    if (team.status === 'inactive') {
-      return { error: 'Nhóm đã ở trạng thái tạm dừng' };
+    if (team.status === "inactive") {
+      return { error: "Nhóm đã ở trạng thái tạm dừng" };
     }
 
     // 5. Deactivate team (soft delete)
     await db
       .update(teams)
       .set({
-        status: 'inactive',
+        status: "inactive",
         updatedAt: new Date(),
       })
       .where(eq(teams.id, validatedData.id));
 
     // 6. Revalidate cache and return success
-    revalidatePath('/danh-muc/nhom');
+    revalidatePath("/danh-muc/nhom");
     return {
-      success: `Nhóm "${team.name}" (${team.teamCode || 'No Code'}) đã được tạm dừng hoạt động`
+      success: `Nhóm "${team.name}" (${
+        team.teamCode || "No Code"
+      }) đã được tạm dừng hoạt động`,
     };
-
   } catch (error) {
-    console.error('Deactivate team error:', error);
-    return { error: 'Có lỗi xảy ra khi tạm dừng nhóm. Vui lòng thử lại.' };
+    console.error("Deactivate team error:", error);
+    return { error: "Có lỗi xảy ra khi tạm dừng nhóm. Vui lòng thử lại." };
   }
 }
 
@@ -514,19 +577,21 @@ export async function activateTeam(data: DeleteTeamInput) {
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // 2. Check team management permission (canManageKitchens covers all team types)
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
+    const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
-      return { error: 'Không có quyền kích hoạt nhóm' };
+      return { error: "Không có quyền kích hoạt nhóm" };
     }
 
     // 3. Validate input data
     const validationResult = deleteTeamSchema.safeParse(data);
     if (!validationResult.success) {
-      const errors = validationResult.error.errors.map(err => err.message).join(', ');
+      const errors = validationResult.error.errors
+        .map((err) => err.message)
+        .join(", ");
       return { error: `Dữ liệu không hợp lệ: ${errors}` };
     }
 
@@ -540,78 +605,82 @@ export async function activateTeam(data: DeleteTeamInput) {
         name: teams.name,
         teamType: teams.teamType,
         status: teams.status,
-        deletedAt: teams.deletedAt
+        deletedAt: teams.deletedAt,
       })
       .from(teams)
       .where(eq(teams.id, validatedData.id))
       .limit(1);
 
     if (existingTeam.length === 0) {
-      return { error: 'Không tìm thấy nhóm cần kích hoạt' };
+      return { error: "Không tìm thấy nhóm cần kích hoạt" };
     }
 
     const team = existingTeam[0];
 
-    if (team.status === 'active') {
-      return { error: 'Nhóm đã đang hoạt động' };
+    if (team.status === "active") {
+      return { error: "Nhóm đã đang hoạt động" };
     }
 
     if (team.deletedAt) {
-      return { error: 'Không thể kích hoạt nhóm đã bị xóa vĩnh viễn' };
+      return { error: "Không thể kích hoạt nhóm đã bị xóa vĩnh viễn" };
     }
 
     // 5. Activate team
     await db
       .update(teams)
       .set({
-        status: 'active',
+        status: "active",
         updatedAt: new Date(),
       })
       .where(eq(teams.id, validatedData.id));
 
     // 6. Revalidate cache and return success
-    revalidatePath('/danh-muc/nhom');
+    revalidatePath("/danh-muc/nhom");
     return {
-      success: `Nhóm "${team.name}" (${team.teamCode || 'No Code'}) đã được kích hoạt thành công`
+      success: `Nhóm "${team.name}" (${
+        team.teamCode || "No Code"
+      }) đã được kích hoạt thành công`,
     };
-
   } catch (error) {
-    console.error('Activate team error:', error);
-    return { error: 'Có lỗi xảy ra khi kích hoạt nhóm. Vui lòng thử lại.' };
+    console.error("Activate team error:", error);
+    return { error: "Có lỗi xảy ra khi kích hoạt nhóm. Vui lòng thử lại." };
   }
 }
 
 // Get team by ID with manager details - for edit form initialization
-export async function getTeamById(id: number): Promise<{
-  id: number;
-  name: string;
-  teamCode: string | null;
-  teamType: string;
-  region: string | null;
-  address: string | null;
-  managerId: number | null;
-  status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  manager: {
-    id: number;
-    name: string;
-    email: string;
-    department: string | null;
-    jobTitle: string | null;
-  } | null;
-} | { error: string }> {
+export async function getTeamById(id: number): Promise<
+  | {
+      id: number;
+      name: string;
+      teamCode: string | null;
+      teamType: string;
+      region: string | null;
+      address: string | null;
+      managerId: number | null;
+      status: string;
+      createdAt: Date;
+      updatedAt: Date;
+      manager: {
+        id: number;
+        name: string;
+        email: string;
+        department: string | null;
+        jobTitle: string | null;
+      } | null;
+    }
+  | { error: string }
+> {
   try {
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // 2. Check team management permission (canManageKitchens covers all team types)
-    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
+    const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
-      return { error: 'Không có quyền quản lý nhóm' };
+      return { error: "Không có quyền quản lý nhóm" };
     }
 
     // 3. Fetch team with manager details using LEFT JOIN
@@ -645,7 +714,7 @@ export async function getTeamById(id: number): Promise<{
       .limit(1);
 
     if (teamData.length === 0) {
-      return { error: 'Không tìm thấy nhóm' };
+      return { error: "Không tìm thấy nhóm" };
     }
 
     const team = teamData[0];
@@ -662,17 +731,19 @@ export async function getTeamById(id: number): Promise<{
       status: team.status,
       createdAt: team.createdAt,
       updatedAt: team.updatedAt,
-      manager: team.managerId && team.managerName ? {
-        id: team.managerId,
-        name: team.managerName,
-        email: team.managerEmail || '',
-        department: team.managerDepartment,
-        jobTitle: team.managerJobTitle,
-      } : null,
+      manager:
+        team.managerId && team.managerName
+          ? {
+              id: team.managerId,
+              name: team.managerName,
+              email: team.managerEmail || "",
+              department: team.managerDepartment,
+              jobTitle: team.managerJobTitle,
+            }
+          : null,
     };
-
   } catch (error) {
-    console.error('Get team by ID error:', error);
-    return { error: 'Có lỗi xảy ra khi tải thông tin nhóm' };
+    console.error("Get team by ID error:", error);
+    return { error: "Có lỗi xảy ra khi tải thông tin nhóm" };
   }
 }
