@@ -18,13 +18,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-// Department constants with Vietnamese labels
+// Department constants with Vietnamese labels - Official List
 const DEPARTMENTS = [
-  { value: "ADMIN", label: "Quản Trị" },
-  { value: "PROCUREMENT", label: "Mua Sắm" },
-  { value: "KITCHEN", label: "Bếp" },
-  { value: "ACCOUNTING", label: "Kế Toán" },
-  { value: "OPERATIONS", label: "Vận Hành" },
+  { value: "ADMIN", label: "Admin" },
+  { value: "NHAN_SU", label: "Nhân Sự" },
+  { value: "KE_TOAN", label: "Kế Toán" },
+  { value: "SAN_XUAT", label: "Sản Xuất" },
+  { value: "TONG_VU", label: "Tổng Vụ" },
+  { value: "KINH_DOANH", label: "Kinh Doanh" },
+  { value: "PHAT_TRIEN_KINH_DOANH", label: "Phát Triển Kinh Doanh" },
+  { value: "BEP", label: "Bếp" },
 ] as const;
 
 interface DepartmentComboboxProps {

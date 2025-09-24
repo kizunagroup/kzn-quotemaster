@@ -27,9 +27,18 @@ export const createStaffSchema = z.object({
     .max(100, 'Chức danh không được vượt quá 100 ký tự')
     .optional(),
   department: z
-    .string()
-    .min(1, 'Phòng ban là bắt buộc')
-    .max(50, 'Phòng ban không được vượt quá 50 ký tự'),
+    .enum([
+      'ADMIN',
+      'NHAN_SU',
+      'KE_TOAN',
+      'SAN_XUAT',
+      'TONG_VU',
+      'KINH_DOANH',
+      'PHAT_TRIEN_KINH_DOANH',
+      'BEP'
+    ], {
+      errorMap: () => ({ message: 'Vui lòng chọn một phòng ban hợp lệ' })
+    }),
   hireDate: z
     .string()
     .optional()

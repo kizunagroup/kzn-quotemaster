@@ -106,7 +106,7 @@ export function useStaff() {
     updateUrl,
   } = useDataTableUrlState({
     defaultFilters: {},
-    defaultSort: { column: "hireDate", order: "asc" }, // FIXED: Default sort by name ascending
+    defaultSort: { column: "createdAt", order: "desc" }, // UPDATED: Default sort by creation date descending
     defaultPagination: { page: 1, limit: 10 },
   });
 

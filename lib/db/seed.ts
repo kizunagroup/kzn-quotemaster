@@ -48,37 +48,49 @@ const businessSectors = [
   'Chế Biến Thực Phẩm', 'Phân Phối Thực Phẩm', 'Xuất Nhập Khẩu Nông Sản'
 ];
 
-// NEW: Organizational structure for OFFICE departments (as specified in requirements)
+// NEW: Organizational structure for OFFICE departments - Updated with Official Departments
 const officeDepartmentStructure = {
+  'Admin': {
+    roles: ['admin_manager', 'admin_staff'],
+    count: 11, // 1 manager + 10 staff
+    baseJobTitles: ['System Administrator', 'Admin Manager', 'IT Manager', 'Database Admin', 'Security Admin', 'Network Admin', 'System Analyst', 'IT Support', 'Help Desk', 'Technical Lead', 'Staff'],
+    dbValue: 'ADMIN'
+  },
   'Nhân Sự': {
     roles: ['hr_manager', 'hr_staff'],
     count: 11, // 1 manager + 10 staff
-    baseJobTitles: ['Trưởng Phòng Nhân Sự', 'Chuyên Viên Tuyển Dụng', 'Chuyên Viên Đào Tạo', 'Chuyên Viên Lương', 'Nhân Viên Hành Chính', 'Chuyên Viên HSSE', 'Nhân Viên Hỗ Trợ', 'Coordinator', 'Assistant', 'Specialist', 'Staff']
+    baseJobTitles: ['Trưởng Phòng Nhân Sự', 'Chuyên Viên Tuyển Dụng', 'Chuyên Viên Đào Tạo', 'Chuyên Viên Lương', 'Nhân Viên Hành Chính', 'Chuyên Viên HSSE', 'Nhân Viên Hỗ Trợ', 'Coordinator', 'Assistant', 'Specialist', 'Staff'],
+    dbValue: 'NHAN_SU'
   },
-  'Kế toán': {
+  'Kế Toán': {
     roles: ['accounting_manager', 'accounting_staff'],
     count: 11, // 1 manager + 10 staff
-    baseJobTitles: ['Trưởng Phòng Kế Toán', 'Kế Toán Trưởng', 'Kế Toán Thuế', 'Kế Toán Chi Phí', 'Kế Toán Tài Sản', 'Kế Toán Công Nợ', 'Thủ Quỹ', 'Nhân Viên Kế Toán', 'Chuyên Viên Tài Chính', 'Audit', 'Staff']
+    baseJobTitles: ['Trưởng Phòng Kế Toán', 'Kế Toán Trưởng', 'Kế Toán Thuế', 'Kế Toán Chi Phí', 'Kế Toán Tài Sản', 'Kế Toán Công Nợ', 'Thủ Quỹ', 'Nhân Viên Kế Toán', 'Chuyên Viên Tài Chính', 'Audit', 'Staff'],
+    dbValue: 'KE_TOAN'
   },
-  'Sản xuất': {
+  'Sản Xuất': {
     roles: ['production_manager', 'production_staff'],
     count: 11, // 1 manager + 10 staff
-    baseJobTitles: ['Trưởng Phòng Sản Xuất', 'Quản Lý Chất Lượng', 'Kỹ Sư Công Nghệ', 'Trưởng Ca', 'Công Nhân Kỹ Thuật', 'Nhân Viên QC', 'Nhân Viên Bảo Trì', 'Coordinator', 'Technician', 'Operator', 'Staff']
+    baseJobTitles: ['Trưởng Phòng Sản Xuất', 'Quản Lý Chất Lượng', 'Kỹ Sư Công Nghệ', 'Trưởng Ca', 'Công Nhân Kỹ Thuật', 'Nhân Viên QC', 'Nhân Viên Bảo Trì', 'Coordinator', 'Technician', 'Operator', 'Staff'],
+    dbValue: 'SAN_XUAT'
   },
-  'Tổng vụ': {
+  'Tổng Vụ': {
     roles: ['general_manager', 'general_staff'],
     count: 11, // 1 manager + 10 staff
-    baseJobTitles: ['Trưởng Phòng Tổng Vụ', 'Chuyên Viên Hành Chính', 'Thư Ký', 'Lễ Tân', 'Tài Xế', 'Bảo Vệ', 'Nhân Viên Vệ Sinh', 'Nhân Viên Kho', 'Coordinator', 'Assistant', 'Staff']
+    baseJobTitles: ['Trưởng Phòng Tổng Vụ', 'Chuyên Viên Hành Chính', 'Thư Ký', 'Lễ Tân', 'Tài Xế', 'Bảo Vệ', 'Nhân Viên Vệ Sinh', 'Nhân Viên Kho', 'Coordinator', 'Assistant', 'Staff'],
+    dbValue: 'TONG_VU'
   },
-  'Kinh doanh': {
+  'Kinh Doanh': {
     roles: ['sales_manager', 'sales_staff'],
     count: 11, // 1 manager + 10 staff
-    baseJobTitles: ['Trưởng Phòng Kinh Doanh', 'Quản Lý Khu Vực', 'Nhân Viên Kinh Doanh', 'Chuyên Viên Marketing', 'Nhân Viên CSKH', 'Merchandiser', 'Sales Executive', 'Account Manager', 'Coordinator', 'Assistant', 'Staff']
+    baseJobTitles: ['Trưởng Phòng Kinh Doanh', 'Quản Lý Khu Vực', 'Nhân Viên Kinh Doanh', 'Chuyên Viên Marketing', 'Nhân Viên CSKH', 'Merchandiser', 'Sales Executive', 'Account Manager', 'Coordinator', 'Assistant', 'Staff'],
+    dbValue: 'KINH_DOANH'
   },
-  'Phát triển kinh doanh': {
+  'Phát Triển Kinh Doanh': {
     roles: ['bd_manager', 'bd_staff'],
     count: 11, // 1 manager + 10 staff
-    baseJobTitles: ['Trưởng Phòng Phát Triển KD', 'Business Analyst', 'Project Manager', 'Chuyên Viên Nghiên Cứu', 'Chuyên Viên Đối Tác', 'Market Research', 'Strategy Planner', 'Developer', 'Coordinator', 'Assistant', 'Staff']
+    baseJobTitles: ['Trưởng Phòng Phát Triển KD', 'Business Analyst', 'Project Manager', 'Chuyên Viên Nghiên Cứu', 'Chuyên Viên Đối Tác', 'Market Research', 'Strategy Planner', 'Developer', 'Coordinator', 'Assistant', 'Staff'],
+    dbValue: 'PHAT_TRIEN_KINH_DOANH'
   }
 };
 
@@ -254,7 +266,7 @@ export async function seedDatabase() {
         passwordHash: await hashPassword("password123!"),
         employeeCode: generateEmployeeCode('OFF', userCounter),
         phone: generatePhone(),
-        department: departmentName,
+        department: config.dbValue,
         jobTitle: jobTitle,
         hireDate: generateHireDate(),
         status: Math.random() < 0.95 ? 'active' : 'inactive', // 95% active
@@ -312,7 +324,7 @@ export async function seedDatabase() {
           passwordHash: await hashPassword("password123!"),
           employeeCode: generateEmployeeCode('KIT', userCounter),
           phone: generatePhone(),
-          department: 'KITCHEN',
+          department: 'BEP',
           jobTitle: positionName,
           hireDate: generateHireDate(),
           status: Math.random() < 0.98 ? 'active' : 'inactive', // 98% active
@@ -364,22 +376,25 @@ export async function seedDatabase() {
       // Map roles based on position and department
       if (user.isManager) {
         switch (officeTeam.name) {
+          case 'Phòng Admin':
+            teamRole = "ADMIN_MANAGER";
+            break;
           case 'Phòng Nhân Sự':
             teamRole = "HR_MANAGER";
             break;
-          case 'Phòng Kế toán':
+          case 'Phòng Kế Toán':
             teamRole = "ACCOUNTING_MANAGER";
             break;
-          case 'Phòng Sản xuất':
+          case 'Phòng Sản Xuất':
             teamRole = "PRODUCTION_MANAGER";
             break;
-          case 'Phòng Tổng vụ':
+          case 'Phòng Tổng Vụ':
             teamRole = "GENERAL_MANAGER";
             break;
-          case 'Phòng Kinh doanh':
+          case 'Phòng Kinh Doanh':
             teamRole = "SALES_MANAGER";
             break;
-          case 'Phòng Phát triển kinh doanh':
+          case 'Phòng Phát Triển Kinh Doanh':
             teamRole = "BD_MANAGER";
             break;
           default:
@@ -388,22 +403,25 @@ export async function seedDatabase() {
       } else {
         // Staff roles
         switch (officeTeam.name) {
+          case 'Phòng Admin':
+            teamRole = "ADMIN_STAFF";
+            break;
           case 'Phòng Nhân Sự':
             teamRole = "HR_STAFF";
             break;
-          case 'Phòng Kế toán':
+          case 'Phòng Kế Toán':
             teamRole = "ACCOUNTING_STAFF";
             break;
-          case 'Phòng Sản xuất':
+          case 'Phòng Sản Xuất':
             teamRole = "PRODUCTION_STAFF";
             break;
-          case 'Phòng Tổng vụ':
+          case 'Phòng Tổng Vụ':
             teamRole = "GENERAL_STAFF";
             break;
-          case 'Phòng Kinh doanh':
+          case 'Phòng Kinh Doanh':
             teamRole = "SALES_STAFF";
             break;
-          case 'Phòng Phát triển kinh doanh':
+          case 'Phòng Phát Triển Kinh Doanh':
             teamRole = "BD_STAFF";
             break;
           default:

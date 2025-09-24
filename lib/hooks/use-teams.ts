@@ -101,7 +101,7 @@ export function useTeams() {
     updateUrl,
   } = useDataTableUrlState({
     defaultFilters: {},
-    defaultSort: { column: "teamCode", order: "asc" }, // UPDATED: Default sort by teamCode
+    defaultSort: { column: "createdAt", order: "desc" }, // UPDATED: Default sort by creation date descending
     defaultPagination: { page: 1, limit: 10 },
   });
 
