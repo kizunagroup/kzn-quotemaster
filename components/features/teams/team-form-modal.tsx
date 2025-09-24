@@ -36,6 +36,7 @@ import {
 import {
   createTeam,
   updateTeam,
+  getTeamById,
 } from '@/lib/actions/team.actions';
 import {
   createTeamSchema,
@@ -69,6 +70,8 @@ export function TeamFormModal({
   team,
 }: TeamFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingTeamData, setIsLoadingTeamData] = useState(false);
+  const [managerData, setManagerData] = useState<{ id: number; name: string; email: string } | null>(null);
   const isEditMode = Boolean(team);
 
   // Form setup with conditional schema based on mode - CONSISTENT VALIDATION STANDARD
@@ -93,18 +96,11 @@ export function TeamFormModal({
   useEffect(() => {
     if (isOpen) {
       if (isEditMode && team) {
-        // Populate form with team data for editing
-        form.reset({
-          id: team.id,
-          teamCode: team.teamCode || '',
-          name: team.name || '',
-          region: team.region || '',
-          address: team.address || '',
-          managerId: team.managerId || undefined,
-          teamType: team.teamType as 'KITCHEN' | 'OFFICE',
-        });
+        // Load complete team data including manager details for editing
+        loadCompleteTeamData();
       } else {
         // Reset form for create mode
+        setManagerData(null);
         form.reset({
           teamCode: '',
           name: '',
@@ -115,7 +111,41 @@ export function TeamFormModal({
         });
       }
     }
-  }, [isOpen, isEditMode, team, form]);
+  }, [isOpen, isEditMode, team]);
+
+  // Load complete team data with manager details
+  const loadCompleteTeamData = async () => {
+    if (!team?.id) return;
+
+    setIsLoadingTeamData(true);
+    try {
+      const result = await getTeamById(team.id);
+
+      if ('error' in result) {
+        toast.error(result.error);
+        return;
+      }
+
+      // Set manager data for the combobox initialValue
+      setManagerData(result.manager);
+
+      // Populate form with complete team data
+      form.reset({
+        id: result.id,
+        teamCode: result.teamCode || '',
+        name: result.name || '',
+        region: result.region || '',
+        address: result.address || '',
+        managerId: result.managerId || undefined,
+        teamType: result.teamType as 'KITCHEN' | 'OFFICE',
+      });
+    } catch (error) {
+      console.error('Error loading team data:', error);
+      toast.error('Có lỗi xảy ra khi tải thông tin nhóm');
+    } finally {
+      setIsLoadingTeamData(false);
+    }
+  };
 
   // Handle form submission - SIMPLIFIED with discriminatedUnion validation
   const onSubmit = async (values: any) => {
@@ -186,8 +216,14 @@ export function TeamFormModal({
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {isLoadingTeamData ? (
+          <div className="flex items-center justify-center p-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <span className="text-sm text-muted-foreground">Đang tải thông tin nhóm...</span>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Team Type Selection */}
               <FormField
@@ -298,7 +334,8 @@ export function TeamFormModal({
                       value={field.value}
                       onChange={field.onChange}
                       placeholder="Chọn quản lý..."
-                      disabled={isSubmitting}
+                      disabled={isSubmitting || isLoadingTeamData}
+                      initialValue={managerData}
                     />
                   </FormControl>
                   <FormMessage />
@@ -341,6 +378,7 @@ export function TeamFormModal({
             </DialogFooter>
           </form>
         </Form>
+        )}
       </DialogContent>
     </Dialog>
   );

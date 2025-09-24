@@ -23,7 +23,9 @@ const staffQuerySchema = z.object({
   status: z.string().nullable().default('all').transform(val =>
     val === null || val === '' ? 'all' : val
   ).pipe(z.enum(VALID_STATUSES)),
-  team: z.string().nullable().optional(),
+  teamId: z.string().nullable().optional().transform(val =>
+    val === null || val === '' ? undefined : parseInt(val)
+  ).pipe(z.number().optional()),
   sort: z.string().nullable().default('name').transform(val =>
     val === null || val === '' ? 'name' : val
   ).pipe(z.enum(VALID_SORT_COLUMNS)),
@@ -101,7 +103,7 @@ export async function GET(request: NextRequest) {
       search: searchParams.get('search'),
       department: searchParams.get('department'),
       status: searchParams.get('status'),
-      team: searchParams.get('team'),
+      teamId: searchParams.get('teamId'),
       sort: searchParams.get('sort'),
       order: searchParams.get('order'),
       page: searchParams.get('page'),
@@ -183,23 +185,20 @@ export async function GET(request: NextRequest) {
       baseWhereConditions.push(inArray(users.status, ['active', 'inactive']));
     }
 
-    // 9. Apply team filter (if specified)
-    if (params.team && params.team.trim() !== '') {
-      const teamFilter = parseInt(params.team);
-      if (!isNaN(teamFilter)) {
-        // Find users who are members of the specified team
-        const teamMemberUserIds = await db
-          .select({ userId: teamMembers.userId })
-          .from(teamMembers)
-          .where(eq(teamMembers.teamId, teamFilter));
+    // 9. Apply team filter (if specified) - PERFORMANCE OPTIMIZED
+    if (params.teamId && typeof params.teamId === 'number') {
+      // Find users who are members of the specified team using efficient subquery
+      const teamMemberUserIds = await db
+        .select({ userId: teamMembers.userId })
+        .from(teamMembers)
+        .where(eq(teamMembers.teamId, params.teamId));
 
-        const teamUserIds = teamMemberUserIds.map(tm => tm.userId);
-        if (teamUserIds.length > 0) {
-          baseWhereConditions.push(inArray(users.id, teamUserIds));
-        } else {
-          // No users in this team - return empty result
-          baseWhereConditions.push(sql`1 = 0`);
-        }
+      const teamUserIds = teamMemberUserIds.map(tm => tm.userId);
+      if (teamUserIds.length > 0) {
+        baseWhereConditions.push(inArray(users.id, teamUserIds));
+      } else {
+        // No users in this team - return empty result
+        baseWhereConditions.push(sql`1 = 0`);
       }
     }
 
@@ -274,7 +273,7 @@ export async function GET(request: NextRequest) {
           search: params.search,
           department: params.department,
           status: params.status,
-          team: params.team,
+          teamId: params.teamId,
           sort: params.sort,
           order: params.order,
         },
@@ -357,7 +356,7 @@ export async function GET(request: NextRequest) {
         search: params.search,
         department: params.department,
         status: params.status,
-        team: params.team,
+        teamId: params.teamId,
         sort: params.sort,
         order: params.order,
       },

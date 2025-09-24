@@ -58,6 +58,13 @@ interface TeamManagerComboboxProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  initialValue?: {
+    id: number;
+    name: string;
+    email: string;
+    department?: string | null;
+    jobTitle?: string | null;
+  } | null;
 }
 
 export function TeamManagerCombobox({
@@ -66,6 +73,7 @@ export function TeamManagerCombobox({
   placeholder = 'Chọn quản lý...',
   disabled = false,
   className,
+  initialValue,
 }: TeamManagerComboboxProps) {
   // Component state
   const [open, setOpen] = useState(false);
@@ -97,7 +105,7 @@ export function TeamManagerCombobox({
         setManagers([]);
       } else {
         // Validate and sanitize manager data to prevent runtime errors
-        const validManagers = (result || []).filter(manager =>
+        let validManagers = (result || []).filter(manager =>
           manager &&
           typeof manager === 'object' &&
           typeof manager.id === 'number'
@@ -110,6 +118,19 @@ export function TeamManagerCombobox({
           role: manager.role || ''
         }));
 
+        // Include initialValue if it exists and is not already in the list
+        if (initialValue && !validManagers.find(m => m.id === initialValue.id)) {
+          const initialManager: Manager = {
+            id: initialValue.id,
+            name: initialValue.name,
+            email: initialValue.email,
+            department: initialValue.department || null,
+            jobTitle: initialValue.jobTitle || null,
+            role: 'manager' // Default role for initial value
+          };
+          validManagers = [initialManager, ...validManagers];
+        }
+
         setManagers(validManagers);
       }
     } catch (err) {
@@ -119,7 +140,7 @@ export function TeamManagerCombobox({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [initialValue]);
 
   // Initial fetch on component mount
   useEffect(() => {
@@ -133,11 +154,28 @@ export function TeamManagerCombobox({
     }
   }, [debouncedSearchQuery, open, fetchManagers]);
 
-  // Find selected manager
+  // Find selected manager - prioritize from managers list, fallback to initialValue
   const selectedManager = useMemo(() => {
     if (!value) return null;
-    return managers.find(manager => manager.id === value) || null;
-  }, [value, managers]);
+
+    // First try to find in the current managers list
+    const managerFromList = managers.find(manager => manager.id === value);
+    if (managerFromList) return managerFromList;
+
+    // Fallback to initialValue if it matches the selected value
+    if (initialValue && initialValue.id === value) {
+      return {
+        id: initialValue.id,
+        name: initialValue.name,
+        email: initialValue.email,
+        department: initialValue.department || null,
+        jobTitle: initialValue.jobTitle || null,
+        role: 'manager'
+      };
+    }
+
+    return null;
+  }, [value, managers, initialValue]);
 
   // Handle manager selection
   const handleSelect = (managerId: string) => {

@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
+import { TeamCombobox } from '@/components/features/staff/team-combobox';
 import type { Staff } from '@/lib/hooks/use-staff';
 
 // Single source of truth for department options
@@ -63,8 +64,8 @@ interface StaffTableToolbarProps {
   onDepartmentChange: (value: string) => void;
   selectedStatus?: string;
   onStatusChange: (value: string) => void;
-  selectedTeam?: string;
-  onTeamChange: (value: string) => void;
+  selectedTeamId?: number;
+  onTeamChange: (value: number | undefined) => void;
 
   // Filter state
   onClearFilters: () => void;
@@ -84,7 +85,7 @@ export function StaffTableToolbar({
   onDepartmentChange,
   selectedStatus = 'all',
   onStatusChange,
-  selectedTeam = 'all',
+  selectedTeamId,
   onTeamChange,
   onClearFilters,
   hasActiveFilters,
@@ -204,21 +205,16 @@ export function StaffTableToolbar({
         </SelectContent>
       </Select>
 
-      {/* Team Filter - Hidden for now, can be enabled when teams are implemented */}
-      {false && (
-        <Select value={selectedTeam} onValueChange={onTeamChange}>
-          <SelectTrigger className="h-8 w-[150px]">
-            <SelectValue placeholder="Nhóm" />
-          </SelectTrigger>
-          <SelectContent>
-            {teamOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
+      {/* Team Filter with Advanced TeamCombobox */}
+      <TeamCombobox
+        value={selectedTeamId?.toString() || ''}
+        onChange={(value: string) => {
+          const teamId = value && value !== '' ? parseInt(value) : undefined;
+          onTeamChange(teamId);
+        }}
+        placeholder="Tất cả nhóm"
+        className="h-8 w-[180px]"
+      />
     </DataTableToolbar>
   );
 }

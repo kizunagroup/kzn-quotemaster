@@ -580,3 +580,99 @@ export async function activateTeam(data: DeleteTeamInput) {
     return { error: 'Có lỗi xảy ra khi kích hoạt nhóm. Vui lòng thử lại.' };
   }
 }
+
+// Get team by ID with manager details - for edit form initialization
+export async function getTeamById(id: number): Promise<{
+  id: number;
+  name: string;
+  teamCode: string | null;
+  teamType: string;
+  region: string | null;
+  address: string | null;
+  managerId: number | null;
+  status: string;
+  createdAt: Date;
+  updatedAt: Date;
+  manager: {
+    id: number;
+    name: string;
+    email: string;
+    department: string | null;
+    jobTitle: string | null;
+  } | null;
+} | { error: string }> {
+  try {
+    // 1. Authorization check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Check team management permission (canManageKitchens covers all team types)
+    const canManageTeams = await checkPermission(user.id, 'canManageKitchens');
+    if (!canManageTeams) {
+      return { error: 'Không có quyền quản lý nhóm' };
+    }
+
+    // 3. Fetch team with manager details using LEFT JOIN
+    const teamData = await db
+      .select({
+        // Team fields
+        id: teams.id,
+        name: teams.name,
+        teamCode: teams.teamCode,
+        teamType: teams.teamType,
+        region: teams.region,
+        address: teams.address,
+        managerId: teams.managerId,
+        status: teams.status,
+        createdAt: teams.createdAt,
+        updatedAt: teams.updatedAt,
+        // Manager fields (can be null if no manager assigned)
+        managerName: users.name,
+        managerEmail: users.email,
+        managerDepartment: users.department,
+        managerJobTitle: users.jobTitle,
+      })
+      .from(teams)
+      .leftJoin(users, eq(teams.managerId, users.id))
+      .where(
+        and(
+          eq(teams.id, id),
+          isNull(teams.deletedAt) // Only get non-deleted teams
+        )
+      )
+      .limit(1);
+
+    if (teamData.length === 0) {
+      return { error: 'Không tìm thấy nhóm' };
+    }
+
+    const team = teamData[0];
+
+    // 4. Structure the response with manager object
+    return {
+      id: team.id,
+      name: team.name,
+      teamCode: team.teamCode,
+      teamType: team.teamType,
+      region: team.region,
+      address: team.address,
+      managerId: team.managerId,
+      status: team.status,
+      createdAt: team.createdAt,
+      updatedAt: team.updatedAt,
+      manager: team.managerId && team.managerName ? {
+        id: team.managerId,
+        name: team.managerName,
+        email: team.managerEmail || '',
+        department: team.managerDepartment,
+        jobTitle: team.managerJobTitle,
+      } : null,
+    };
+
+  } catch (error) {
+    console.error('Get team by ID error:', error);
+    return { error: 'Có lỗi xảy ra khi tải thông tin nhóm' };
+  }
+}
