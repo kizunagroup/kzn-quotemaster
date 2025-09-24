@@ -1,10 +1,16 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Check, ChevronsUpDown, Search, Building2, ChefHat } from 'lucide-react';
+import { useState, useEffect } from "react";
+import {
+  Check,
+  ChevronsUpDown,
+  Search,
+  Building2,
+  ChefHat,
+} from "lucide-react";
 
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -12,14 +18,14 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '@/components/ui/command';
+} from "@/components/ui/command";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '@/components/ui/popover';
-import { Badge } from '@/components/ui/badge';
-import { getTeamsForAssignment } from '@/lib/actions/staff.actions';
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { getTeamsForAssignment } from "@/lib/actions/staff.actions";
 
 interface Team {
   id: number;
@@ -43,7 +49,7 @@ export function TeamCombobox({
   className,
 }: TeamComboboxProps) {
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,12 +69,12 @@ export function TeamCombobox({
       if (Array.isArray(result)) {
         setTeams(result);
       } else {
-        setError(result.error || 'Không thể tải danh sách nhóm');
+        setError(result.error || "Không thể tải danh sách nhóm");
         setTeams([]);
       }
     } catch (err) {
-      console.error('Error loading teams:', err);
-      setError('Có lỗi xảy ra khi tải danh sách nhóm');
+      console.error("Error loading teams:", err);
+      setError("Có lỗi xảy ra khi tải danh sách nhóm");
       setTeams([]);
     } finally {
       setLoading(false);
@@ -76,9 +82,10 @@ export function TeamCombobox({
   };
 
   // Filter teams based on search query
-  const filteredTeams = teams.filter((team) =>
-    team.name.toLowerCase().includes(search.toLowerCase()) ||
-    team.type.toLowerCase().includes(search.toLowerCase())
+  const filteredTeams = teams.filter(
+    (team) =>
+      team.name.toLowerCase().includes(search.toLowerCase()) ||
+      team.type.toLowerCase().includes(search.toLowerCase())
   );
 
   // Get selected team for display
@@ -87,9 +94,9 @@ export function TeamCombobox({
   // Get appropriate icon for team type
   const getTeamTypeIcon = (type: string) => {
     switch (type) {
-      case 'KITCHEN':
+      case "KITCHEN":
         return <ChefHat className="h-3 w-3" />;
-      case 'OFFICE':
+      case "OFFICE":
       default:
         return <Building2 className="h-3 w-3" />;
     }
@@ -98,11 +105,11 @@ export function TeamCombobox({
   // Get appropriate variant for team type badge
   const getTeamTypeBadgeVariant = (type: string) => {
     switch (type) {
-      case 'KITCHEN':
-        return 'secondary' as const;
-      case 'OFFICE':
+      case "KITCHEN":
+        return "secondary" as const;
+      case "OFFICE":
       default:
-        return 'outline' as const;
+        return "outline" as const;
     }
   };
 
@@ -110,7 +117,7 @@ export function TeamCombobox({
   const handleSelect = (teamId: string) => {
     onChange(teamId);
     setOpen(false);
-    setSearch(''); // Clear search when selection is made
+    setSearch(""); // Clear search when selection is made
   };
 
   // Format team display name
@@ -132,16 +139,18 @@ export function TeamCombobox({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between h-8 px-3 py-2",
+            "w-full justify-between h-9 px-3 py-2 text-sm",
             !selectedTeam && "text-muted-foreground",
             className
           )}
           disabled={disabled || loading}
         >
           {selectedTeam ? (
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 h-full">
               {getTeamTypeIcon(selectedTeam.type)}
-              <span className="truncate">{selectedTeam.name}</span>
+              <span className="truncate text-sm leading-5">
+                {selectedTeam.name}
+              </span>
               <Badge
                 variant={getTeamTypeBadgeVariant(selectedTeam.type)}
                 className="text-xs shrink-0"
@@ -150,7 +159,7 @@ export function TeamCombobox({
               </Badge>
             </div>
           ) : (
-            <span className="truncate">
+            <span className="truncate text-sm leading-5">
               {loading ? "Đang tải..." : placeholder}
             </span>
           )}
@@ -161,7 +170,6 @@ export function TeamCombobox({
       <PopoverContent className="w-[400px] p-0" align="start">
         <Command shouldFilter={false}>
           <div className="flex items-center border-b px-3">
-            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <CommandInput
               placeholder="Tìm kiếm nhóm..."
               value={search}
