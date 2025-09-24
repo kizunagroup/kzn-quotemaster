@@ -132,7 +132,7 @@ export function TeamCombobox({
           role="combobox"
           aria-expanded={open}
           className={cn(
-            "w-full justify-between",
+            "w-full justify-between h-8 px-3 py-2",
             !selectedTeam && "text-muted-foreground",
             className
           )}
