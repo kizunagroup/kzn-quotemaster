@@ -37,7 +37,7 @@ export interface StaffResponse {
     search?: string;
     department?: string;
     status?: string;
-    teamId?: number;
+    team?: string;
     sort?: string;
     order?: string;
   };
@@ -125,9 +125,9 @@ export function useStaff() {
       params.set("status", filters.status);
     }
 
-    // Support for team filter (staff-specific) - using teamId as number
-    if (filters.teamId && typeof filters.teamId === "number") {
-      params.set("teamId", filters.teamId.toString());
+    // Support for team filter (staff-specific) - mirror department filter pattern exactly
+    if (filters.team && filters.team !== "all") {
+      params.set("teamId", filters.team);
     }
 
     // Add sorting

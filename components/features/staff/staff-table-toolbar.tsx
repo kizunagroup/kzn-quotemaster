@@ -64,8 +64,8 @@ interface StaffTableToolbarProps {
   onDepartmentChange: (value: string) => void;
   selectedStatus?: string;
   onStatusChange: (value: string) => void;
-  selectedTeamId?: number;
-  onTeamChange: (value: number | undefined) => void;
+  selectedTeam?: string;
+  onTeamChange: (value: string) => void;
 
   // Filter state
   onClearFilters: () => void;
@@ -85,7 +85,7 @@ export function StaffTableToolbar({
   onDepartmentChange,
   selectedStatus = 'all',
   onStatusChange,
-  selectedTeamId,
+  selectedTeam = 'all',
   onTeamChange,
   onClearFilters,
   hasActiveFilters,
@@ -205,12 +205,11 @@ export function StaffTableToolbar({
         </SelectContent>
       </Select>
 
-      {/* Team Filter with Advanced TeamCombobox */}
+      {/* Team Filter - mirror department filter pattern */}
       <TeamCombobox
-        value={selectedTeamId?.toString() || ''}
+        value={selectedTeam === 'all' ? '' : selectedTeam}
         onChange={(value: string) => {
-          const teamId = value && value !== '' ? parseInt(value) : undefined;
-          onTeamChange(teamId);
+          onTeamChange(value || 'all');
         }}
         placeholder="Tất cả nhóm"
         className="h-8 w-[180px]"
