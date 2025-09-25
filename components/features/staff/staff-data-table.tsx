@@ -8,11 +8,11 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { MoreHorizontal, Edit, UserX, UserCheck, Users, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Edit, UserX, UserCheck, Users, Trash2, RotateCcw, Copy, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useStaff, type Staff } from '@/lib/hooks/use-staff';
-import { activateStaff, terminateStaff } from '@/lib/actions/staff.actions';
+import { activateStaff, terminateStaff, resetPasswordByAdmin } from '@/lib/actions/staff.actions';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -29,6 +29,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
@@ -104,6 +112,11 @@ export function StaffDataTable() {
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
   const [deleteActionType, setDeleteActionType] = useState<'deactivate' | 'terminate'>('deactivate');
+
+  // Reset Password Modal states
+  const [resetPasswordTemp, setResetPasswordTemp] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+  const [isResetting, setIsResetting] = useState<number | null>(null);
 
   // Fetch staff data using our custom hook
   const {
@@ -215,6 +228,51 @@ export function StaffDataTable() {
     } finally {
       setActivatingId(null);
     }
+  };
+
+  // Handle reset password for a staff member - Super Admin Only
+  const handleResetPasswordClick = async (staff: Staff) => {
+    setIsResetting(staff.id);
+
+    try {
+      const result = await resetPasswordByAdmin(staff.id);
+
+      if (result.success && result.tempPassword) {
+        // Set temporary password to trigger confirmation modal
+        setResetPasswordTemp(result.tempPassword);
+        refresh(); // Refresh data
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error('Reset password error:', error);
+      toast.error('Có lỗi xảy ra khi reset mật khẩu nhân viên');
+    } finally {
+      setIsResetting(null);
+    }
+  };
+
+  // Handle copy password to clipboard
+  const handleCopyPassword = async () => {
+    if (resetPasswordTemp) {
+      try {
+        await navigator.clipboard.writeText(resetPasswordTemp);
+        setIsCopied(true);
+        toast.success('Mật khẩu đã được sao chép');
+
+        // Reset copy status after 2 seconds
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (error) {
+        console.error('Failed to copy password:', error);
+        toast.error('Không thể sao chép mật khẩu');
+      }
+    }
+  };
+
+  // Handle reset password confirmation modal close
+  const handleResetPasswordModalClose = () => {
+    setResetPasswordTemp(null);
+    setIsCopied(false);
   };
 
   // Modal close handlers
@@ -426,6 +484,18 @@ export function StaffDataTable() {
                   Quản lý nhóm
                 </DropdownMenuItem>
 
+                {/* Reset Password - Super Admin Only */}
+                {staff.status !== 'terminated' && (
+                  <DropdownMenuItem
+                    onClick={() => handleResetPasswordClick(staff)}
+                    className="text-blue-600 focus:text-blue-600"
+                    disabled={isResetting === staff.id}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    {isResetting === staff.id ? 'Đang reset...' : 'Reset Mật khẩu'}
+                  </DropdownMenuItem>
+                )}
+
                 <DropdownMenuSeparator />
 
                 {staff.status === 'active' ? (
@@ -636,6 +706,60 @@ export function StaffDataTable() {
         onSuccess={handleModalSuccess}
         staff={selectedStaff}
       />
+
+      {/* Reset Password Confirmation Modal */}
+      <AlertDialog open={resetPasswordTemp !== null}>
+        <AlertDialogContent className="sm:max-w-[450px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle2 className="h-5 w-5" />
+              Reset mật khẩu thành công
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                Mật khẩu đã được reset thành công. Mật khẩu mới tạm thời đã được tạo cho tài khoản này.
+              </p>
+
+              <div className="bg-muted p-4 rounded-lg border">
+                <div className="text-sm font-medium text-muted-foreground mb-2">
+                  Mật khẩu mới:
+                </div>
+                <div className="font-mono text-lg font-bold bg-background p-2 rounded border select-all">
+                  {resetPasswordTemp}
+                </div>
+              </div>
+
+              <p className="text-sm text-orange-600">
+                <strong>Lưu ý quan trọng:</strong> Vui lòng sao chép mật khẩu này và gửi cho nhân viên.
+                Họ cần sử dụng mật khẩu này để đăng nhập và thay đổi mật khẩu mới.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCopyPassword}
+              className="flex items-center gap-2"
+            >
+              {isCopied ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Đã sao chép
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Sao chép
+                </>
+              )}
+            </Button>
+            <Button onClick={handleResetPasswordModalClose}>
+              Đóng
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

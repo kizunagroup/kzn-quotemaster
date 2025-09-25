@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Copy, CheckCircle2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -16,6 +16,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Form,
   FormControl,
@@ -60,6 +68,8 @@ export function StaffFormModal({
   staff,
 }: StaffFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
   const isEditMode = Boolean(staff);
 
   // Form setup with conditional schema based on mode
@@ -124,30 +134,51 @@ export function StaffFormModal({
       if (isEditMode) {
         // Update existing staff
         result = await updateStaff(values as UpdateStaffInput);
+
+        if (result.success) {
+          toast.success(result.success);
+          onSuccess();
+          onClose();
+        } else if (result.error) {
+          // Handle update errors
+          if (result.error.includes('Email đã tồn tại') || result.error.includes('email already exists')) {
+            form.setError('email', {
+              type: 'server',
+              message: 'Email này đã được sử dụng'
+            });
+          } else if (result.error.includes('Mã nhân viên đã tồn tại') || result.error.includes('employee code already exists')) {
+            form.setError('employeeCode', {
+              type: 'server',
+              message: 'Mã nhân viên này đã được sử dụng'
+            });
+          } else {
+            toast.error(result.error);
+          }
+        }
       } else {
         // Create new staff
         result = await createStaff(values as CreateStaffInput);
-      }
 
-      if (result.success) {
-        toast.success(result.success);
-        onSuccess();
-        onClose();
-      } else if (result.error) {
-        // Check for specific field errors and display under respective fields
-        if (result.error.includes('Email đã tồn tại') || result.error.includes('email already exists')) {
-          form.setError('email', {
-            type: 'server',
-            message: 'Email này đã được sử dụng'
-          });
-        } else if (result.error.includes('Mã nhân viên đã tồn tại') || result.error.includes('employee code already exists')) {
-          form.setError('employeeCode', {
-            type: 'server',
-            message: 'Mã nhân viên này đã được sử dụng'
-          });
-        } else {
-          // Show general error for other cases
-          toast.error(result.error);
+        if (result.success && result.tempPassword) {
+          // Set temporary password to trigger confirmation modal
+          setTempPassword(result.tempPassword);
+          onSuccess();
+          // Don't close the modal yet - let user see the password first
+        } else if (result.error) {
+          // Handle create errors
+          if (result.error.includes('Email đã tồn tại') || result.error.includes('email already exists')) {
+            form.setError('email', {
+              type: 'server',
+              message: 'Email này đã được sử dụng'
+            });
+          } else if (result.error.includes('Mã nhân viên đã tồn tại') || result.error.includes('employee code already exists')) {
+            form.setError('employeeCode', {
+              type: 'server',
+              message: 'Mã nhân viên này đã được sử dụng'
+            });
+          } else {
+            toast.error(result.error);
+          }
         }
       }
     } catch (error) {
@@ -156,6 +187,31 @@ export function StaffFormModal({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Handle copy to clipboard
+  const handleCopyPassword = async () => {
+    if (tempPassword) {
+      try {
+        await navigator.clipboard.writeText(tempPassword);
+        setIsCopied(true);
+        toast.success('Mật khẩu đã được sao chép');
+
+        // Reset copy status after 2 seconds
+        setTimeout(() => setIsCopied(false), 2000);
+      } catch (error) {
+        console.error('Failed to copy password:', error);
+        toast.error('Không thể sao chép mật khẩu');
+      }
+    }
+  };
+
+  // Handle confirmation modal close
+  const handleConfirmationClose = () => {
+    setTempPassword(null);
+    setIsCopied(false);
+    form.reset();
+    onClose();
   };
 
   // Handle modal close with data loss prevention
@@ -359,6 +415,60 @@ export function StaffFormModal({
           </form>
         </Form>
       </DialogContent>
+
+      {/* Temporary Password Confirmation Modal */}
+      <AlertDialog open={tempPassword !== null}>
+        <AlertDialogContent className="sm:max-w-[450px]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle2 className="h-5 w-5" />
+              Tạo nhân viên thành công
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                Nhân viên đã được tạo thành công. Mật khẩu tạm thời đã được tạo cho tài khoản này.
+              </p>
+
+              <div className="bg-muted p-4 rounded-lg border">
+                <div className="text-sm font-medium text-muted-foreground mb-2">
+                  Mật khẩu tạm thời:
+                </div>
+                <div className="font-mono text-lg font-bold bg-background p-2 rounded border select-all">
+                  {tempPassword}
+                </div>
+              </div>
+
+              <p className="text-sm text-orange-600">
+                <strong>Lưu ý quan trọng:</strong> Vui lòng sao chép mật khẩu này và gửi cho nhân viên.
+                Họ cần sử dụng mật khẩu này để đăng nhập lần đầu và thay đổi mật khẩu mới.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCopyPassword}
+              className="flex items-center gap-2"
+            >
+              {isCopied ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Đã sao chép
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Sao chép
+                </>
+              )}
+            </Button>
+            <Button onClick={handleConfirmationClose}>
+              Đóng
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

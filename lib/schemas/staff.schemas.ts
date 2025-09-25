@@ -86,4 +86,5 @@ export interface Staff {
 export type ActionResult = {
   success?: string;
   error?: string;
+  tempPassword?: string; // For password reset operations
 };

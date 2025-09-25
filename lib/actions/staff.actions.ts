@@ -260,9 +260,8 @@ export async function createStaff(values: CreateStaffInput): Promise<ActionResul
     revalidatePath('/danh-muc/nhan-vien');
 
     return {
-      success: `Nhân viên "${newStaff[0].name}" (${newStaff[0].employeeCode}) đã được tạo thành công. ` +
-               `Mật khẩu tạm thời: ${temporaryPassword}. ` +
-               `Vui lòng thông báo cho nhân viên đổi mật khẩu sau khi đăng nhập lần đầu.`
+      success: `Nhân viên "${newStaff[0].name}" (${newStaff[0].employeeCode}) đã được tạo thành công`,
+      tempPassword: temporaryPassword
     };
 
   } catch (error) {
@@ -1130,5 +1129,89 @@ export async function getStaffManagers(searchQuery?: string): Promise<{ id: numb
   } catch (error) {
     console.error('Get staff managers error:', error);
     return { error: 'Có lỗi xảy ra khi tải danh sách quản lý' };
+  }
+}
+
+// Reset Password By Admin - Super Admin Only
+export async function resetPasswordByAdmin(staffId: number): Promise<ActionResult> {
+  try {
+    // 1. Authorization check - must be logged in
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    // 2. Super Admin authorization check - only Super Admins can reset passwords
+    const isSuperAdmin = await checkPermission(user.id, 'canManageStaff');
+    if (!isSuperAdmin) {
+      return { error: 'Chỉ Super Admin mới có quyền reset mật khẩu nhân viên' };
+    }
+
+    // 3. Additional Super Admin role check
+    const userWithTeams = await getUserTeams(user.id);
+    const hasAdminSuperAdminRole = userWithTeams.some(membership =>
+      membership.role === 'ADMIN_SUPER_ADMIN' || membership.role === 'owner'
+    );
+
+    if (!hasAdminSuperAdminRole) {
+      return { error: 'Chỉ Super Admin mới có quyền reset mật khẩu nhân viên' };
+    }
+
+    // 4. Validate staffId
+    if (!staffId || typeof staffId !== 'number' || staffId <= 0) {
+      return { error: 'ID nhân viên không hợp lệ' };
+    }
+
+    // 5. Verify staff exists and is active
+    const existingStaff = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        employeeCode: users.employeeCode,
+        status: users.status,
+      })
+      .from(users)
+      .where(eq(users.id, staffId))
+      .limit(1);
+
+    if (existingStaff.length === 0) {
+      return { error: 'Không tìm thấy nhân viên cần reset mật khẩu' };
+    }
+
+    const staff = existingStaff[0];
+
+    if (staff.status === 'terminated') {
+      return { error: 'Không thể reset mật khẩu cho nhân viên đã chấm dứt hợp đồng' };
+    }
+
+    // 6. Generate new secure temporary password
+    const newTemporaryPassword = generateSecurePassword();
+    const hashedNewPassword = await hashPassword(newTemporaryPassword);
+
+    // 7. Update password hash in database
+    const updatedStaff = await db
+      .update(users)
+      .set({
+        passwordHash: hashedNewPassword,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, staffId))
+      .returning({
+        name: users.name,
+        employeeCode: users.employeeCode,
+      });
+
+    // 8. Revalidate cache
+    revalidatePath('/danh-muc/nhan-vien');
+
+    // 9. Return success with temporary password
+    return {
+      success: `Mật khẩu của nhân viên "${updatedStaff[0].name}" (${updatedStaff[0].employeeCode}) đã được reset thành công`,
+      tempPassword: newTemporaryPassword
+    };
+
+  } catch (error) {
+    console.error('Reset password by admin error:', error);
+    return { error: 'Có lỗi xảy ra khi reset mật khẩu. Vui lòng thử lại.' };
   }
 }
