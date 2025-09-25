@@ -422,7 +422,7 @@ export function StaffFormModal({
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-green-600">
               <CheckCircle2 className="h-5 w-5" />
-              Tạo nhân viên thành công
+              Mật khẩu đăng nhập tạm thời
             </AlertDialogTitle>
             <div className="space-y-4">
               <div className="relative flex items-center">
