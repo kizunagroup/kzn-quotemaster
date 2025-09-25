@@ -132,19 +132,29 @@ export const invitations = pgTable('invitations', {
 });
 
 // QuoteMaster-specific tables
-export const suppliers = pgTable('suppliers', {
-  id: serial('id').primaryKey(),
-  supplierCode: varchar('supplier_code', { length: 50 }).notNull().unique(),
-  name: varchar('name', { length: 200 }).notNull(),
-  taxId: varchar('tax_id', { length: 50 }),
-  address: text('address'),
-  contactPerson: varchar('contact_person', { length: 100 }),
-  phone: varchar('phone', { length: 20 }),
-  email: varchar('email', { length: 255 }),
-  status: varchar('status', { length: 20 }).default('active').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const suppliers = pgTable(
+  'suppliers',
+  {
+    id: serial('id').primaryKey(),
+    supplierCode: varchar('supplier_code', { length: 20 }).unique(),
+    name: varchar('name', { length: 255 }).notNull(),
+    taxId: varchar('tax_id', { length: 50 }),
+    address: text('address'),
+    contactPerson: varchar('contact_person', { length: 255 }),
+    phone: varchar('phone', { length: 20 }),
+    email: varchar('email', { length: 255 }),
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at'),
+  },
+  (table) => ({
+    supplierCodeIdx: index('idx_suppliers_supplier_code').on(table.supplierCode),
+    nameIdx: index('idx_suppliers_name').on(table.name),
+    statusIdx: index('idx_suppliers_status').on(table.status),
+    deletedAtIdx: index('idx_suppliers_deleted_at').on(table.deletedAt),
+  })
+);
 
 export const products = pgTable('products', {
   id: serial('id').primaryKey(),
