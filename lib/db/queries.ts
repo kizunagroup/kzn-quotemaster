@@ -168,13 +168,17 @@ export async function getUserTeams(userId: number) {
   try {
     const result = await db
       .select({
-        team: teams,
+        teamId: teamMembers.teamId,
+        role: teamMembers.role,
+        joinedAt: teamMembers.joinedAt,
+        teamName: teams.name,
+        teamType: teams.teamType,
       })
       .from(teamMembers)
       .innerJoin(teams, eq(teamMembers.teamId, teams.id))
       .where(eq(teamMembers.userId, userId));
 
-    return result.map(row => row.team);
+    return result;
   } catch (error) {
     console.error('Error fetching user teams:', error);
     return [];

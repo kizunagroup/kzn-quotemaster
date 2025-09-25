@@ -14,6 +14,7 @@ import {
   kitchenPeriodDemands,
 } from "./schema";
 import { hashPassword } from "@/lib/auth/session";
+import { sql } from "drizzle-orm";
 
 // Helper function to generate random Vietnamese names
 const firstNames = [
@@ -299,8 +300,42 @@ function generateEmail(name: string, index: number): string {
   return `${lastName}.${firstName}${index}@quotemaster.local`;
 }
 
+// ENHANCED: Generate employee code with conflict prevention
 function generateEmployeeCode(prefix: string, index: number): string {
   return `${prefix}${String(index).padStart(6, "0")}`;
+}
+
+// NEW: Generate unique employee code with database check (for critical operations)
+async function generateUniqueEmployeeCode(prefix: string, startIndex: number = 1): Promise<string> {
+  let index = startIndex;
+  let maxAttempts = 1000; // Prevent infinite loops
+
+  while (maxAttempts > 0) {
+    const candidate = generateEmployeeCode(prefix, index);
+
+    try {
+      const existing = await db
+        .select({ employeeCode: users.employeeCode })
+        .from(users)
+        .where(sql`${users.employeeCode} = ${candidate}`)
+        .limit(1);
+
+      if (existing.length === 0) {
+        return candidate; // Found unique code
+      }
+    } catch (error) {
+      // If query fails, fall back to original function
+      console.warn(`⚠️  Database check failed for employee code ${candidate}, using without check`);
+      return candidate;
+    }
+
+    index++;
+    maxAttempts--;
+  }
+
+  // Fallback with timestamp if all attempts exhausted
+  const timestamp = Date.now().toString().slice(-6);
+  return `${prefix}${timestamp}`;
 }
 
 // Team code generator function (generalized from kitchen codes)
@@ -409,50 +444,148 @@ async function cleanupExistingData() {
   console.log("🧹 Cleaning up existing data...");
 
   try {
-    // Delete in order of dependencies (child tables first)
+    // ENHANCED: More robust cleanup with CASCADE handling
+    // Delete in strict order of foreign key dependencies (child tables first)
+    console.log("   Deleting kitchen period demands...");
     await db.delete(kitchenPeriodDemands);
+
+    console.log("   Deleting activity logs...");
     await db.delete(activityLogs);
+
+    console.log("   Deleting team members...");
     await db.delete(teamMembers);
+
+    console.log("   Deleting products...");
     await db.delete(products);
+
+    console.log("   Deleting suppliers...");
     await db.delete(suppliers);
+
+    console.log("   Deleting teams...");
     await db.delete(teams);
+
+    console.log("   Deleting users...");
     await db.delete(users);
 
-    console.log("✅ Existing data cleaned up");
+    console.log("✅ Existing data cleaned up successfully");
   } catch (error) {
     console.error("❌ Error cleaning up data:", error);
-    // Continue with seeding even if cleanup fails
+    console.error("   This might be due to existing foreign key constraints");
+    console.error("   Attempting to continue with seeding...");
+
+    // If cleanup fails completely, warn user but continue
+    console.warn("⚠️  WARNING: Cleanup failed. This may cause duplicate key errors.");
+    console.warn("   Consider manually dropping and recreating the database if issues persist.");
+  }
+}
+
+// NEW: Function to check for existing critical data and prevent conflicts
+async function checkExistingData() {
+  console.log("🔍 Checking for existing data...");
+
+  try {
+    // Check for existing users
+    const existingUsers = await db.select({ count: sql`count(*)` }).from(users);
+    const userCount = Number(existingUsers[0]?.count || 0);
+
+    // Check for existing teams
+    const existingTeams = await db.select({ count: sql`count(*)` }).from(teams);
+    const teamCount = Number(existingTeams[0]?.count || 0);
+
+    // Check specifically for the employee code we're trying to use
+    const existingEmployeeCode = await db
+      .select({ employeeCode: users.employeeCode })
+      .from(users)
+      .where(sql`${users.employeeCode} = 'HM000001'`);
+
+    if (userCount > 0 || teamCount > 0) {
+      console.log(`⚠️  Found existing data: ${userCount} users, ${teamCount} teams`);
+      if (existingEmployeeCode.length > 0) {
+        console.log("⚠️  Employee code HM000001 already exists!");
+        return { hasConflicts: true, userCount, teamCount };
+      }
+    }
+
+    console.log("✅ No data conflicts detected");
+    return { hasConflicts: false, userCount, teamCount };
+  } catch (error) {
+    console.warn("⚠️  Error checking existing data:", error);
+    return { hasConflicts: false, userCount: 0, teamCount: 0 };
   }
 }
 
 export async function seedDatabase() {
   console.log("🌱 Starting NEW organizational structure database seeding...");
 
-  // 1. Clean up existing data first
+  // 1. Check for existing data conflicts
+  const dataCheck = await checkExistingData();
+
+  // 2. Clean up existing data first
   await cleanupExistingData();
 
-  // 2. Create Super Admin user (system-level admin)
-  const [superAdmin] = await db
-    .insert(users)
-    .values({
-      name: "QuoteMaster Super Admin",
-      email: "admin@quotemaster.local",
-      passwordHash: await hashPassword("admin123!"),
-      employeeCode: "HM000001",
-      phone: generatePhone(),
-      department: "ADMIN",
-      jobTitle: "System Administrator",
-      hireDate: generateHireDate(),
-      status: "active",
-    })
-    .returning();
+  // 3. Re-check after cleanup to ensure success
+  const postCleanupCheck = await checkExistingData();
+  if (postCleanupCheck.hasConflicts) {
+    throw new Error(
+      "❌ Failed to resolve data conflicts. Please manually clear the database or use different employee codes."
+    );
+  }
 
-  console.log("✅ Created super admin user");
+  // 4. Create Super Admin user (system-level admin) with enhanced error handling
+  let superAdmin;
+  try {
+    [superAdmin] = await db
+      .insert(users)
+      .values({
+        name: "QuoteMaster Super Admin",
+        email: "admin@quotemaster.local",
+        passwordHash: await hashPassword("admin123!"),
+        employeeCode: "HM000001", // This should now be unique after cleanup
+        phone: generatePhone(),
+        department: "ADMIN",
+        jobTitle: "System Administrator",
+        hireDate: generateHireDate(),
+        status: "active",
+      })
+      .returning();
 
-  // 3. Create OFFICE departments and users (6 departments × 11 users each = 66 users)
+    console.log("✅ Created super admin user");
+  } catch (error) {
+    console.error("❌ Failed to create super admin user:", error);
+
+    // Fallback: Try creating with a different employee code
+    console.log("🔄 Attempting to create super admin with alternative employee code...");
+    try {
+      [superAdmin] = await db
+        .insert(users)
+        .values({
+          name: "QuoteMaster Super Admin",
+          email: "admin@quotemaster.local",
+          passwordHash: await hashPassword("admin123!"),
+          employeeCode: `HM000${Date.now().toString().slice(-3)}`, // Unique timestamp-based code
+          phone: generatePhone(),
+          department: "ADMIN",
+          jobTitle: "System Administrator",
+          hireDate: generateHireDate(),
+          status: "active",
+        })
+        .returning();
+
+      console.log(`✅ Created super admin user with fallback employee code: ${superAdmin.employeeCode}`);
+    } catch (fallbackError) {
+      console.error("❌ Failed to create super admin even with fallback code:", fallbackError);
+      throw new Error("Critical error: Cannot create super admin user");
+    }
+  }
+
+  // 5. Create OFFICE departments and users (6 departments × 11 users each = 66 users)
   const officeUsers: any[] = [];
   const officeTeams: any[] = [];
-  let userCounter = 1;
+  let userCounter = 2; // Start from 2 since super admin is HM000001
+
+  // ENHANCED: Track used employee codes to prevent duplicates during seeding
+  const usedEmployeeCodes = new Set<string>();
+  usedEmployeeCodes.add("HM000001"); // Reserve super admin code
 
   for (const [departmentName, config] of Object.entries(
     officeDepartmentStructure
@@ -470,11 +603,25 @@ export async function seedDatabase() {
         config.baseJobTitles[i] ||
         config.baseJobTitles[config.baseJobTitles.length - 1];
 
+      // ENHANCED: Generate unique employee code and check for duplicates
+      let employeeCode;
+      let attempts = 0;
+      do {
+        employeeCode = generateEmployeeCode("HM", userCounter + attempts);
+        attempts++;
+      } while (usedEmployeeCodes.has(employeeCode) && attempts < 100);
+
+      if (usedEmployeeCodes.has(employeeCode)) {
+        // Fallback to timestamp-based code if all attempts fail
+        employeeCode = `HM${Date.now().toString().slice(-6)}`;
+      }
+      usedEmployeeCodes.add(employeeCode);
+
       const userData = {
         name: name,
         email: generateEmail(name, userCounter),
         passwordHash: await hashPassword("password123!"),
-        employeeCode: generateEmployeeCode("HM", userCounter),
+        employeeCode: employeeCode,
         phone: generatePhone(),
         department: config.dbValue,
         jobTitle: jobTitle,
@@ -540,11 +687,25 @@ export async function seedDatabase() {
         const name = generateRandomName();
         const role = config.roles[0];
 
+        // ENHANCED: Generate unique employee code and check for duplicates
+        let employeeCode;
+        let attempts = 0;
+        do {
+          employeeCode = generateEmployeeCode("HM", userCounter + attempts);
+          attempts++;
+        } while (usedEmployeeCodes.has(employeeCode) && attempts < 100);
+
+        if (usedEmployeeCodes.has(employeeCode)) {
+          // Fallback to timestamp-based code if all attempts fail
+          employeeCode = `HM${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 100)}`;
+        }
+        usedEmployeeCodes.add(employeeCode);
+
         const userData = {
           name: name,
           email: generateEmail(name, userCounter),
           passwordHash: await hashPassword("password123!"),
-          employeeCode: generateEmployeeCode("HM", userCounter),
+          employeeCode: employeeCode,
           phone: generatePhone(),
           department: "BEP",
           jobTitle: positionName,

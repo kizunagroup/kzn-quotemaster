@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
 import { eq, and, or, ilike, sql, isNull } from 'drizzle-orm';
-import { getUser } from '@/lib/db/queries';
+import { getUser, getUserTeams } from '@/lib/db/queries';
 import { checkPermission } from '@/lib/auth/permissions';
 import { hashPassword } from '@/lib/auth/session';
 import crypto from 'crypto';
@@ -1147,11 +1147,24 @@ export async function resetPasswordByAdmin(staffId: number): Promise<ActionResul
       return { error: 'Chỉ Super Admin mới có quyền reset mật khẩu nhân viên' };
     }
 
-    // 3. Additional Super Admin role check
+    // 3. Additional Super Admin role check with debugging
     const userWithTeams = await getUserTeams(user.id);
-    const hasAdminSuperAdminRole = userWithTeams.some(membership =>
-      membership.role === 'ADMIN_SUPER_ADMIN' || membership.role === 'owner'
-    );
+
+    // Debug logging for server-side debugging
+    console.log('🔍 Reset Password Debug Info:');
+    console.log('- User ID:', user.id);
+    console.log('- User Teams:', JSON.stringify(userWithTeams, null, 2));
+
+    const hasAdminSuperAdminRole = userWithTeams.some(membership => {
+      const normalizedRole = membership.role?.toUpperCase().trim();
+      console.log('- Checking role:', membership.role, '-> normalized:', normalizedRole);
+      return normalizedRole === 'ADMIN_SUPER_ADMIN' ||
+             normalizedRole === 'OWNER' ||
+             normalizedRole === 'SUPER_ADMIN' ||
+             normalizedRole === 'ADMIN';
+    });
+
+    console.log('- Has Admin/Super Admin Role:', hasAdminSuperAdminRole);
 
     if (!hasAdminSuperAdminRole) {
       return { error: 'Chỉ Super Admin mới có quyền reset mật khẩu nhân viên' };

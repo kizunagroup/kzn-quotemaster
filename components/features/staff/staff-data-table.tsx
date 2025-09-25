@@ -8,7 +8,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
-import { MoreHorizontal, Edit, UserX, UserCheck, Users, Trash2, RotateCcw, Copy, CheckCircle2 } from 'lucide-react';
+import { MoreHorizontal, Edit, UserX, UserCheck, Users, Trash2, RotateCcw, Copy, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useStaff, type Staff } from '@/lib/hooks/use-staff';
@@ -116,6 +116,7 @@ export function StaffDataTable() {
   // Reset Password Modal states
   const [resetPasswordTemp, setResetPasswordTemp] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [isResetting, setIsResetting] = useState<number | null>(null);
 
   // Fetch staff data using our custom hook
@@ -273,6 +274,7 @@ export function StaffDataTable() {
   const handleResetPasswordModalClose = () => {
     setResetPasswordTemp(null);
     setIsCopied(false);
+    setShowResetPassword(false);
   };
 
   // Modal close handlers
@@ -715,7 +717,7 @@ export function StaffDataTable() {
               <CheckCircle2 className="h-5 w-5" />
               Reset mật khẩu thành công
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4">
+            <div className="space-y-4">
               <p>
                 Mật khẩu đã được reset thành công. Mật khẩu mới tạm thời đã được tạo cho tài khoản này.
               </p>
@@ -724,8 +726,22 @@ export function StaffDataTable() {
                 <div className="text-sm font-medium text-muted-foreground mb-2">
                   Mật khẩu mới:
                 </div>
-                <div className="font-mono text-lg font-bold bg-background p-2 rounded border select-all">
-                  {resetPasswordTemp}
+                <div className="flex items-center gap-2">
+                  <div className="font-mono text-lg font-bold bg-background p-2 rounded border select-all flex-1">
+                    {showResetPassword ? resetPasswordTemp : '********'}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowResetPassword(!showResetPassword)}
+                    className="flex-shrink-0"
+                  >
+                    {showResetPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
 
@@ -733,7 +749,7 @@ export function StaffDataTable() {
                 <strong>Lưu ý quan trọng:</strong> Vui lòng sao chép mật khẩu này và gửi cho nhân viên.
                 Họ cần sử dụng mật khẩu này để đăng nhập và thay đổi mật khẩu mới.
               </p>
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
 
           <AlertDialogFooter className="gap-2">

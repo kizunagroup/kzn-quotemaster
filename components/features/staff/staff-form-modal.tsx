@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { Loader2, Copy, CheckCircle2 } from 'lucide-react';
+import { Loader2, Copy, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -70,6 +70,7 @@ export function StaffFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const isEditMode = Boolean(staff);
 
   // Form setup with conditional schema based on mode
@@ -210,6 +211,7 @@ export function StaffFormModal({
   const handleConfirmationClose = () => {
     setTempPassword(null);
     setIsCopied(false);
+    setShowPassword(false);
     form.reset();
     onClose();
   };
@@ -424,7 +426,7 @@ export function StaffFormModal({
               <CheckCircle2 className="h-5 w-5" />
               Tạo nhân viên thành công
             </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-4">
+            <div className="space-y-4">
               <p>
                 Nhân viên đã được tạo thành công. Mật khẩu tạm thời đã được tạo cho tài khoản này.
               </p>
@@ -433,8 +435,22 @@ export function StaffFormModal({
                 <div className="text-sm font-medium text-muted-foreground mb-2">
                   Mật khẩu tạm thời:
                 </div>
-                <div className="font-mono text-lg font-bold bg-background p-2 rounded border select-all">
-                  {tempPassword}
+                <div className="flex items-center gap-2">
+                  <div className="font-mono text-lg font-bold bg-background p-2 rounded border select-all flex-1">
+                    {showPassword ? tempPassword : '********'}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="flex-shrink-0"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
 
@@ -442,7 +458,7 @@ export function StaffFormModal({
                 <strong>Lưu ý quan trọng:</strong> Vui lòng sao chép mật khẩu này và gửi cho nhân viên.
                 Họ cần sử dụng mật khẩu này để đăng nhập lần đầu và thay đổi mật khẩu mới.
               </p>
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
 
           <AlertDialogFooter className="gap-2">
