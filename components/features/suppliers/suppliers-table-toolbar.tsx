@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useDebounce } from 'use-debounce';
-import { Plus, Settings2, Upload } from 'lucide-react';
-import { Table } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { useDebounce } from "use-debounce";
+import { Plus, Settings2 } from "lucide-react";
+import { Table } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -19,21 +19,21 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
-import type { Supplier } from '@/lib/hooks/use-suppliers';
+} from "@/components/ui/tooltip";
+import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
+import type { Supplier } from "@/lib/hooks/use-suppliers";
 
 // Single source of truth for status options - STANDARDIZED to match Staff
 const statusOptions = [
-  { value: 'all', label: 'Tất cả trạng thái' },
-  { value: 'active', label: 'Hoạt Động' },
-  { value: 'inactive', label: 'Tạm Dừng' },
+  { value: "all", label: "Tất cả trạng thái" },
+  { value: "active", label: "Hoạt Động" },
+  { value: "inactive", label: "Tạm Dừng" },
 ] as const;
 
 interface SuppliersTableToolbarProps {
@@ -57,139 +57,135 @@ interface SuppliersTableToolbarProps {
 }
 
 export function SuppliersTableToolbar({
-  searchValue = '',
+  searchValue = "",
   onSearchChange,
-  selectedStatus = 'all',
+  selectedStatus = "all",
   onStatusChange,
   onClearFilters,
   hasActiveFilters,
   table,
   onCreateClick,
 }: SuppliersTableToolbarProps) {
-  // Local search state for immediate UI feedback
+  // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
 
-  // Debounce search input to avoid excessive API calls
+  // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
 
-  // FIXED: Sync with URL state exactly like Staff pattern
+  // Sync local search value with external prop when it changes
   useEffect(() => {
     setLocalSearchValue(searchValue);
   }, [searchValue]);
 
+  // Trigger API call when debounced value changes
   useEffect(() => {
     if (debouncedSearchValue !== searchValue) {
       onSearchChange(debouncedSearchValue);
     }
   }, [debouncedSearchValue, searchValue, onSearchChange]);
 
-  // Handle local search change
-  const handleSearchChange = (value: string) => {
+  // Handle local search input change
+  const handleLocalSearchChange = (value: string) => {
     setLocalSearchValue(value);
   };
-
-  // Status filter component
-  const statusFilter = (
-    <Select value={selectedStatus} onValueChange={onStatusChange}>
-      <SelectTrigger className="w-[180px]">
-        <SelectValue placeholder="Chọn trạng thái" />
-      </SelectTrigger>
-      <SelectContent>
-        {statusOptions.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-
-  // Column visibility dropdown
-  const columnVisibilityDropdown = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="ml-auto hidden h-8 lg:flex">
-          <Settings2 className="mr-2 h-4 w-4" />
-          Cột hiển thị
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
-        <DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {table
-          .getAllColumns()
-          .filter((column) => typeof column.accessorFn !== 'undefined' && column.getCanHide())
-          .map((column) => {
-            // Map column IDs to Vietnamese labels
-            const columnLabels: Record<string, string> = {
-              supplierCode: 'Mã NCC',
-              name: 'Tên nhà cung cấp',
-              contactPerson: 'Người liên hệ',
-              phone: 'Điện thoại',
-              email: 'Email',
-              address: 'Địa chỉ',
-              taxId: 'Mã số thuế',
-              status: 'Trạng thái',
-              createdAt: 'Ngày tạo',
-            };
-
-            const label = columnLabels[column.id] || column.id;
-
-            return (
-              <DropdownMenuCheckboxItem
-                key={column.id}
-                className="capitalize"
-                checked={column.getIsVisible()}
-                onCheckedChange={(value) => column.toggleVisibility(!!value)}
-              >
-                {label}
-              </DropdownMenuCheckboxItem>
-            );
-          })}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  // Action buttons
-  const actionButtons = (
-    <div className="flex items-center space-x-2">
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="outline" size="sm" disabled>
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Tính năng nhập Excel sẽ có trong phiên bản tiếp theo</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      <Button onClick={onCreateClick} size="sm">
-        <Plus className="mr-2 h-4 w-4" />
-        Thêm
-      </Button>
-
-      {columnVisibilityDropdown}
-    </div>
-  );
 
   return (
     <DataTableToolbar
       searchValue={localSearchValue}
-      searchPlaceholder="Tìm theo tên hoặc mã nhà cung cấp..."
-      onSearchChange={handleSearchChange}
+      searchPlaceholder="Tìm kiếm theo tên, mã nhà cung cấp..."
+      onSearchChange={handleLocalSearchChange}
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
-      actions={actionButtons}
-      className="justify-between"
+      actions={
+        <div className="flex items-center gap-2">
+          {/* Column Visibility Toggle */}
+          <TooltipProvider>
+            <Tooltip>
+              <DropdownMenu>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 w-8 p-0 hidden lg:flex"
+                    >
+                      <Settings2 className="h-4 w-4" />
+                      <span className="sr-only">Ẩn/hiện cột</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <DropdownMenuContent align="end" className="w-[150px]">
+                  <DropdownMenuLabel>Hiển thị cột</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {table
+                    .getAllColumns()
+                    .filter(
+                      (column) =>
+                        typeof column.accessorFn !== "undefined" &&
+                        column.getCanHide()
+                    )
+                    .map((column) => {
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={column.id}
+                          className="capitalize"
+                          checked={column.getIsVisible()}
+                          onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                          }
+                        >
+                          {getColumnDisplayName(column.id)}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <TooltipContent>
+                <p>Ẩn/hiện cột</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Create Button */}
+          <Button onClick={onCreateClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm Nhà cung cấp
+          </Button>
+        </div>
+      }
     >
-      {/* Filter controls */}
-      <div className="flex items-center space-x-2">
-        {statusFilter}
-      </div>
+      {/* Status Filter */}
+      <Select value={selectedStatus} onValueChange={onStatusChange}>
+        <SelectTrigger className="h-8 w-[150px]">
+          <SelectValue placeholder="Trạng thái" />
+        </SelectTrigger>
+        <SelectContent>
+          {statusOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </DataTableToolbar>
   );
 }
+
+// Helper function to get display names for columns
+function getColumnDisplayName(columnId: string): string {
+  const columnNames: Record<string, string> = {
+    supplierCode: "Mã NCC",
+    name: "Tên Nhà Cung Cấp",
+    contactPerson: "Người Liên Hệ",
+    phone: "Điện Thoại",
+    email: "Email",
+    taxId: "Mã Số Thuế",
+    address: "Địa Chỉ",
+    status: "Trạng Thái",
+  };
+
+  return columnNames[columnId] || columnId;
+}
+
+// Export options for use in other components
+export { statusOptions };

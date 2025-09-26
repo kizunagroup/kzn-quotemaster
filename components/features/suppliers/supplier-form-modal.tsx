@@ -26,53 +26,24 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { createSupplier, updateSupplier } from '@/lib/actions/supplier.actions';
-import { createSupplierSchema, type CreateSupplierInput } from '@/lib/schemas/supplier.schemas';
-import type { Supplier } from '@/lib/hooks/use-suppliers';
 
-// Form schema with Vietnamese error messages (client-side version)
-const formSchema = z.object({
-  supplierCode: z
-    .string()
-    .min(1, 'Mã nhà cung cấp là bắt buộc')
-    .max(20, 'Mã nhà cung cấp không được vượt quá 20 ký tự')
-    .regex(/^[A-Z0-9_-]*$/, 'Mã nhà cung cấp chỉ được chứa chữ hoa, số, dấu gạch ngang và gạch dưới')
-    .optional()
-    .or(z.literal('')),
-  name: z
-    .string()
-    .min(1, 'Tên nhà cung cấp là bắt buộc')
-    .max(255, 'Tên nhà cung cấp không được vượt quá 255 ký tự'),
-  taxId: z
-    .string()
-    .max(50, 'Mã số thuế không được vượt quá 50 ký tự')
-    .optional()
-    .or(z.literal('')),
-  address: z.string().optional().or(z.literal('')),
-  contactPerson: z
-    .string()
-    .max(255, 'Tên người liên hệ không được vượt quá 255 ký tự')
-    .optional()
-    .or(z.literal('')),
-  phone: z
-    .string()
-    .max(20, 'Số điện thoại không được vượt quá 20 ký tự')
-    .regex(/^[0-9\s\-\+\(\)]*$/, 'Số điện thoại không hợp lệ')
-    .optional()
-    .or(z.literal('')),
-  email: z
-    .string()
-    .email('Email không hợp lệ')
-    .max(255, 'Email không được vượt quá 255 ký tự')
-    .optional()
-    .or(z.literal('')),
-});
+import {
+  createSupplier,
+  updateSupplier,
+} from '@/lib/actions/supplier.actions';
+import {
+  createSupplierSchema,
+  updateSupplierSchema,
+  type CreateSupplierInput,
+  type UpdateSupplierInput,
+} from '@/lib/schemas/supplier.schemas';
+import type { Supplier } from '@/lib/hooks/use-suppliers';
 
 interface SupplierFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  supplier?: Supplier | null;
+  supplier?: Supplier | null; // null for create, Supplier object for edit
 }
 
 export function SupplierFormModal({
@@ -84,9 +55,10 @@ export function SupplierFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditMode = Boolean(supplier);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    mode: 'onChange',
+  // Form setup with conditional schema based on mode
+  const form = useForm<CreateSupplierInput | UpdateSupplierInput>({
+    resolver: zodResolver(isEditMode ? updateSupplierSchema : createSupplierSchema),
+    mode: 'onChange', // Enable instant validation for all fields
     defaultValues: {
       supplierCode: '',
       name: '',
@@ -95,6 +67,9 @@ export function SupplierFormModal({
       contactPerson: '',
       phone: '',
       email: '',
+      ...(isEditMode && supplier && {
+        id: supplier.id,
+      }),
     },
   });
 
@@ -102,7 +77,9 @@ export function SupplierFormModal({
   useEffect(() => {
     if (isOpen) {
       if (isEditMode && supplier) {
+        // Populate form with supplier data for editing
         form.reset({
+          id: supplier.id,
           supplierCode: supplier.supplierCode || '',
           name: supplier.name || '',
           taxId: supplier.taxId || '',
@@ -112,6 +89,7 @@ export function SupplierFormModal({
           email: supplier.email || '',
         });
       } else {
+        // Reset form for create mode
         form.reset({
           supplierCode: '',
           name: '',
@@ -125,50 +103,60 @@ export function SupplierFormModal({
     }
   }, [isOpen, isEditMode, supplier, form]);
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  // Handle form submission
+  const onSubmit = async (values: CreateSupplierInput | UpdateSupplierInput) => {
     setIsSubmitting(true);
 
     try {
-      // Convert empty strings to undefined for optional fields
-      const sanitizedValues: CreateSupplierInput = {
-        ...values,
-        supplierCode: values.supplierCode || undefined,
-        taxId: values.taxId || undefined,
-        address: values.address || undefined,
-        contactPerson: values.contactPerson || undefined,
-        phone: values.phone || undefined,
-        email: values.email || undefined,
-      };
-
       let result;
 
-      if (isEditMode && supplier) {
-        result = await updateSupplier({
-          id: supplier.id,
-          ...sanitizedValues
-        });
-      } else {
-        result = await createSupplier(sanitizedValues);
-      }
+      if (isEditMode) {
+        // Update existing supplier
+        result = await updateSupplier(values as UpdateSupplierInput);
 
-      if (result.success) {
-        toast.success(result.success);
-        onSuccess();
-        onClose();
-      } else if (result.error) {
-        // Handle specific field errors
-        if (result.error.includes('Mã nhà cung cấp đã tồn tại')) {
-          form.setError('supplierCode', {
-            type: 'server',
-            message: result.error
-          });
-        } else if (result.error.includes('email')) {
-          form.setError('email', {
-            type: 'server',
-            message: result.error
-          });
-        } else {
-          toast.error(result.error);
+        if (result.success) {
+          toast.success(result.success);
+          onSuccess();
+          onClose();
+        } else if (result.error) {
+          // Handle update errors
+          if (result.error.includes('Mã nhà cung cấp đã tồn tại') || result.error.includes('supplier code already exists')) {
+            form.setError('supplierCode', {
+              type: 'server',
+              message: 'Mã nhà cung cấp này đã được sử dụng'
+            });
+          } else if (result.error.includes('Email đã tồn tại') || result.error.includes('email already exists')) {
+            form.setError('email', {
+              type: 'server',
+              message: 'Email này đã được sử dụng'
+            });
+          } else {
+            toast.error(result.error);
+          }
+        }
+      } else {
+        // Create new supplier
+        result = await createSupplier(values as CreateSupplierInput);
+
+        if (result.success) {
+          toast.success(result.success);
+          onSuccess();
+          onClose();
+        } else if (result.error) {
+          // Handle create errors
+          if (result.error.includes('Mã nhà cung cấp đã tồn tại') || result.error.includes('supplier code already exists')) {
+            form.setError('supplierCode', {
+              type: 'server',
+              message: 'Mã nhà cung cấp này đã được sử dụng'
+            });
+          } else if (result.error.includes('Email đã tồn tại') || result.error.includes('email already exists')) {
+            form.setError('email', {
+              type: 'server',
+              message: 'Email này đã được sử dụng'
+            });
+          } else {
+            toast.error(result.error);
+          }
         }
       }
     } catch (error) {
@@ -179,16 +167,21 @@ export function SupplierFormModal({
     }
   };
 
-  // ROBUST MODAL CLOSING LOGIC like Staff pattern
+  // Handle modal close with data loss prevention
   const handleClose = () => {
     if (!isSubmitting) {
+      // Check if form has been modified
       const isDirty = form.formState.isDirty;
+
       if (isDirty) {
         const shouldClose = window.confirm(
           'Bạn có thay đổi chưa được lưu. Bạn có chắc chắn muốn đóng?'
         );
-        if (!shouldClose) return;
+        if (!shouldClose) {
+          return;
+        }
       }
+
       form.reset();
       onClose();
     }
@@ -198,7 +191,12 @@ export function SupplierFormModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
         className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
-        onInteractOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          // Prevent closing when clicking outside if form is dirty
+          if (form.formState.isDirty) {
+            e.preventDefault();
+          }
+        }}
       >
         <DialogHeader>
           <DialogTitle>
@@ -214,12 +212,13 @@ export function SupplierFormModal({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Supplier Code */}
               <FormField
                 control={form.control}
                 name="supplierCode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Mã nhà cung cấp</FormLabel>
+                    <FormLabel>Mã Nhà cung cấp</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="VD: NCC001"
@@ -234,12 +233,13 @@ export function SupplierFormModal({
                 )}
               />
 
+              {/* Name */}
               <FormField
                 control={form.control}
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Tên nhà cung cấp *</FormLabel>
+                    <FormLabel>Tên Nhà cung cấp *</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="VD: Công ty TNHH ABC"
@@ -252,6 +252,7 @@ export function SupplierFormModal({
                 )}
               />
 
+              {/* Tax ID */}
               <FormField
                 control={form.control}
                 name="taxId"
@@ -270,6 +271,7 @@ export function SupplierFormModal({
                 )}
               />
 
+              {/* Contact Person */}
               <FormField
                 control={form.control}
                 name="contactPerson"
@@ -288,6 +290,7 @@ export function SupplierFormModal({
                 )}
               />
 
+              {/* Phone */}
               <FormField
                 control={form.control}
                 name="phone"
@@ -306,6 +309,7 @@ export function SupplierFormModal({
                 )}
               />
 
+              {/* Email */}
               <FormField
                 control={form.control}
                 name="email"
@@ -314,6 +318,7 @@ export function SupplierFormModal({
                     <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input
+                        type="email"
                         placeholder="VD: contact@company.com"
                         {...field}
                         disabled={isSubmitting}
@@ -325,6 +330,7 @@ export function SupplierFormModal({
               />
             </div>
 
+            {/* Address - Full width */}
             <FormField
               control={form.control}
               name="address"

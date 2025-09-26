@@ -9,8 +9,10 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 import { MoreHorizontal, Edit, PowerOff, Power } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { useSuppliers, type Supplier } from '@/lib/hooks/use-suppliers';
+import { toggleSupplierStatus } from '@/lib/actions/supplier.actions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -36,14 +38,16 @@ import { SupplierFormModal } from './supplier-form-modal';
 import { SupplierDeleteDialog } from './supplier-delete-dialog';
 
 // Status badge variant mapping
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'default';
-    case 'inactive':
-      return 'secondary';
+    case "active":
+      return "default";
+    case "inactive":
+      return "secondary";
     default:
-      return 'outline';
+      return "outline";
   }
 };
 
@@ -51,9 +55,9 @@ const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructiv
 const getStatusDisplay = (status: string): string => {
   switch (status.toLowerCase()) {
     case 'active':
-      return 'Hoạt Động'; // Changed from "Đang hoạt động"
+      return 'Hoạt Động';
     case 'inactive':
-      return 'Tạm Dừng'; // Standardized
+      return 'Tạm Dừng';
     default:
       return status;
   }
@@ -65,6 +69,7 @@ export function SuppliersDataTable() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [activatingId, setActivatingId] = useState<number | null>(null);
 
   // Fetch supplier data using our custom hook
   const {
@@ -86,7 +91,9 @@ export function SuppliersDataTable() {
   // Convert our URL sort state to TanStack Table sorting format
   const sorting: SortingState = useMemo(() => {
     if (urlState.sort.column && urlState.sort.order) {
-      return [{ id: urlState.sort.column, desc: urlState.sort.order === 'desc' }];
+      return [
+        { id: urlState.sort.column, desc: urlState.sort.order === "desc" },
+      ];
     }
     return [];
   }, [urlState.sort.column, urlState.sort.order]);
@@ -100,8 +107,8 @@ export function SuppliersDataTable() {
       setSort('');
     } else {
       // Extract the first sort (single column sorting)
-      const { id, desc } = newSorting[0];
-      setSort(id, desc ? 'desc' : 'asc');
+      const { id } = newSorting[0];
+      setSort(id);
     }
   };
 
@@ -137,6 +144,27 @@ export function SuppliersDataTable() {
     setIsDeleteModalOpen(true);
   };
 
+  // Handle activating a supplier directly (like Staff pattern)
+  const handleActivateClick = async (supplier: Supplier) => {
+    setActivatingId(supplier.id);
+
+    try {
+      const result = await toggleSupplierStatus(supplier.id);
+
+      if (result.success) {
+        toast.success(result.success);
+        refresh(); // Refresh data to show updated status
+      } else if (result.error) {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      console.error('Activate supplier error:', error);
+      toast.error('Có lỗi xảy ra khi kích hoạt nhà cung cấp');
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   // Modal close handlers - CENTRALIZED like Staff pattern
   const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false);
@@ -164,10 +192,7 @@ export function SuppliersDataTable() {
       accessorKey: 'supplierCode',
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Mã NCC"
-          column={column}
-        />
+        <DataTableColumnHeader title="Mã NCC" column={column} />
       ),
       cell: ({ row }) => (
         <div className="font-medium">{row.getValue('supplierCode') || '-'}</div>
@@ -177,52 +202,40 @@ export function SuppliersDataTable() {
       accessorKey: 'name',
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Tên Nhà Cung Cấp"
-          column={column}
-        />
+        <DataTableColumnHeader title="Tên Nhà Cung Cấp" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate font-medium">{row.getValue('name')}</div>
+        <div className="max-w-[200px] truncate font-medium">
+          {row.getValue('name')}
+        </div>
       ),
     },
     {
       accessorKey: 'contactPerson',
       enableSorting: false,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Người Liên Hệ"
-          column={column}
-        />
+        <DataTableColumnHeader title="Người Liên Hệ" column={column} />
       ),
-      cell: ({ row }) => (
-        <div>{row.getValue('contactPerson') || '-'}</div>
-      ),
+      cell: ({ row }) => <div>{row.getValue('contactPerson') || '-'}</div>,
     },
     {
       accessorKey: 'phone',
       enableSorting: false,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Điện Thoại"
-          column={column}
-        />
+        <DataTableColumnHeader title="Điện Thoại" column={column} />
       ),
-      cell: ({ row }) => (
-        <div>{row.getValue('phone') || '-'}</div>
-      ),
+      cell: ({ row }) => <div>{row.getValue('phone') || '-'}</div>,
     },
     {
       accessorKey: 'email',
-      enableSorting: false,
+      enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Email"
-          column={column}
-        />
+        <DataTableColumnHeader title="Email" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate text-muted-foreground">{row.getValue('email') || '-'}</div>
+        <div className="max-w-[200px] truncate text-muted-foreground">
+          {row.getValue('email') || '-'}
+        </div>
       ),
     },
     {
@@ -233,14 +246,9 @@ export function SuppliersDataTable() {
         defaultIsVisible: false,
       },
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Mã Số Thuế"
-          column={column}
-        />
+        <DataTableColumnHeader title="Mã Số Thuế" column={column} />
       ),
-      cell: ({ row }) => (
-        <div>{row.getValue('taxId') || '-'}</div>
-      ),
+      cell: ({ row }) => <div>{row.getValue('taxId') || '-'}</div>,
     },
     {
       accessorKey: 'address',
@@ -250,10 +258,7 @@ export function SuppliersDataTable() {
         defaultIsVisible: false,
       },
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Địa Chỉ"
-          column={column}
-        />
+        <DataTableColumnHeader title="Địa Chỉ" column={column} />
       ),
       cell: ({ row }) => (
         <div className="max-w-[200px] truncate">
@@ -265,10 +270,7 @@ export function SuppliersDataTable() {
       accessorKey: 'status',
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Trạng Thái"
-          column={column}
-        />
+        <DataTableColumnHeader title="Trạng Thái" column={column} />
       ),
       cell: ({ row }) => {
         const status = row.getValue('status') as string;
@@ -313,11 +315,12 @@ export function SuppliersDataTable() {
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem
-                    onClick={() => handleToggleStatusClick(supplier)}
+                    onClick={() => handleActivateClick(supplier)}
                     className="text-green-600 focus:text-green-600"
+                    disabled={activatingId === supplier.id}
                   >
                     <Power className="mr-2 h-4 w-4" />
-                    Kích hoạt
+                    {activatingId === supplier.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -350,8 +353,8 @@ export function SuppliersDataTable() {
     // Set initial column visibility based on meta.defaultIsVisible
     initialState: {
       columnVisibility: {
-        taxId: false,      // Hide "Mã Số Thuế" by default
-        address: false,    // Hide "Địa Chỉ" by default
+        taxId: false, // Hide "Mã Số Thuế" by default
+        address: false, // Hide "Địa Chỉ" by default
       },
     },
   });
@@ -419,7 +422,7 @@ export function SuppliersDataTable() {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
+                  data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -437,7 +440,9 @@ export function SuppliersDataTable() {
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {isEmpty ? 'Không có dữ liệu nhà cung cấp.' : 'Không tìm thấy kết quả.'}
+                  {isEmpty
+                    ? 'Không có dữ liệu nhà cung cấp.'
+                    : 'Không tìm thấy kết quả.'}
                 </TableCell>
               </TableRow>
             )}
@@ -456,7 +461,7 @@ export function SuppliersDataTable() {
 
       {/* Modal Components - KEY-BASED RESET PATTERN (CRITICAL) */}
       <SupplierFormModal
-        key="create-modal"
+        key={`create-${isCreateModalOpen}`}
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         onSuccess={handleModalSuccess}
@@ -464,7 +469,7 @@ export function SuppliersDataTable() {
       />
 
       <SupplierFormModal
-        key={selectedSupplier ? `edit-modal-${selectedSupplier.id}` : 'edit-modal-empty'}
+        key={`edit-${isEditModalOpen}-${selectedSupplier?.id}`}
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         onSuccess={handleModalSuccess}
@@ -472,7 +477,7 @@ export function SuppliersDataTable() {
       />
 
       <SupplierDeleteDialog
-        key={selectedSupplier ? `delete-dialog-${selectedSupplier.id}` : 'delete-dialog-empty'}
+        key={`delete-${isDeleteModalOpen}-${selectedSupplier?.id}`}
         isOpen={isDeleteModalOpen}
         onClose={handleCloseDeleteModal}
         onSuccess={handleModalSuccess}

@@ -24,9 +24,13 @@ export interface SuppliersResponse {
     page: number;
     limit: number;
     total: number;
-    pages: number; // FIXED: Changed from totalPages to pages to match DataTablePagination
-    hasNextPage: boolean;
-    hasPreviousPage: boolean;
+    pages: number;
+  };
+  filters: {
+    search?: string;
+    status?: string;
+    sort?: string;
+    order?: string;
   };
 }
 
@@ -105,7 +109,7 @@ export function useSuppliers() {
     updateUrl,
   } = useDataTableUrlState({
     defaultFilters: {},
-    defaultSort: { column: 'name', order: 'asc' }, // Default sort by name
+    defaultSort: { column: 'createdAt', order: 'desc' }, // UPDATED: Default sort by creation date descending
     defaultPagination: { page: 1, limit: 10 },
   });
 
@@ -121,12 +125,12 @@ export function useSuppliers() {
       params.set('status', filters.status);
     }
 
-    // Add sorting (match API parameter names from the route.ts)
+    // Add sorting
     if (sort.column) {
-      params.set('sortBy', sort.column);
+      params.set('sort', sort.column);
     }
     if (sort.order) {
-      params.set('sortOrder', sort.order);
+      params.set('order', sort.order);
     }
 
     // Add pagination
@@ -189,6 +193,8 @@ export function useSuppliers() {
     suppliers: data?.data || [],
     pagination: data?.pagination,
 
+    filters: data?.filters,
+
     // State management from URL hook
     urlState: {
       filters,
@@ -209,11 +215,9 @@ export function useSuppliers() {
     // Loading and error states
     isLoading,
     error,
-    isValidating: isLoading, // Alias for consistency
-
     // Computed properties for convenience
     isEmpty: !isLoading && (!data?.data || data.data.length === 0),
-    hasData: !isLoading && data?.data && data.data.length > 0,
+    isValidating: isLoading, // Alias for consistency
 
     // Helper methods
     refresh: () => mutate(), // Convenient refresh method (alias for mutate)
@@ -222,46 +226,20 @@ export function useSuppliers() {
     // Utility properties
     hasActiveFilters,
 
-    // Pagination helpers - FIXED to match API response structure
-    hasNextPage: data?.pagination?.hasNextPage || false,
-    hasPreviousPage: data?.pagination?.hasPreviousPage || false,
-    totalPages: data?.pagination?.pages || 0, // FIXED: Use pages instead of totalPages
-    totalItems: data?.pagination?.total || 0,
+    // Pagination helpers
+    hasNextPage: data?.pagination
+      ? data.pagination.page < data.pagination.pages
+      : false,
+    hasPrevPage: data?.pagination ? data.pagination.page > 1 : false,
 
-    // Navigation helpers
-    goToPage: (page: number) => {
-      if (page >= 1 && page <= (data?.pagination?.pages || 1)) {
-        setPagination({ page });
-      }
-    },
-    goToNextPage: () => {
-      if (data?.pagination?.hasNextPage) {
-        setPagination({ page: pagination.page + 1 });
-      }
-    },
-    goToPreviousPage: () => {
-      if (data?.pagination?.hasPreviousPage) {
-        setPagination({ page: pagination.page - 1 });
-      }
-    },
-    changePageSize: (limit: number) => {
-      setPagination({ page: 1, limit }); // Reset to first page when changing page size
-    },
+    // Summary data
+    totalSuppliers: data?.pagination?.total || 0,
+    currentPageSize: data?.data?.length || 0,
+    totalPages: data?.pagination?.pages || 0,
 
-    // Search and filter helpers
-    searchSuppliers: (searchTerm: string) => {
-      setSearch(searchTerm);
-      setPagination({ page: 1 }); // Reset to first page when searching
-    },
-    filterByStatus: (status: string) => {
-      setFilter('status', status === 'all' ? null : status);
-      setPagination({ page: 1 }); // Reset to first page when filtering
-    },
-
-    // Sorting helpers - FIXED to match Staff pattern
-    sortBy: (column: string, order?: 'asc' | 'desc') => {
-      setSort(column, order);
-      setPagination({ page: 1 }); // Reset to first page when sorting
-    },
+    // Supplier-specific helpers
+    activeSuppliers: data?.data?.filter((supplier) => supplier.status === 'active') || [],
+    inactiveSuppliers:
+      data?.data?.filter((supplier) => supplier.status === 'inactive') || [],
   };
 }
