@@ -26,15 +26,11 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  createSupplier,
-  updateSupplier,
-  createSupplierSchema,
-  type CreateSupplierInput
-} from '@/lib/actions/supplier.actions';
+import { createSupplier, updateSupplier } from '@/lib/actions/supplier.actions';
+import { createSupplierSchema, type CreateSupplierInput } from '@/lib/schemas/supplier.schemas';
 import type { Supplier } from '@/lib/hooks/use-suppliers';
 
-// Form schema with Vietnamese error messages
+// Form schema with Vietnamese error messages (client-side version)
 const formSchema = z.object({
   supplierCode: z
     .string()
@@ -134,7 +130,7 @@ export function SupplierFormModal({
 
     try {
       // Convert empty strings to undefined for optional fields
-      const sanitizedValues = {
+      const sanitizedValues: CreateSupplierInput = {
         ...values,
         supplierCode: values.supplierCode || undefined,
         taxId: values.taxId || undefined,
