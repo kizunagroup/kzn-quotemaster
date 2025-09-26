@@ -179,8 +179,16 @@ export function SupplierFormModal({
     }
   };
 
+  // ROBUST MODAL CLOSING LOGIC like Staff pattern
   const handleClose = () => {
     if (!isSubmitting) {
+      const isDirty = form.formState.isDirty;
+      if (isDirty) {
+        const shouldClose = window.confirm(
+          'Bạn có thay đổi chưa được lưu. Bạn có chắc chắn muốn đóng?'
+        );
+        if (!shouldClose) return;
+      }
       form.reset();
       onClose();
     }

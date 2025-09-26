@@ -30,21 +30,43 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
 import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
 
 import { SuppliersTableToolbar } from './suppliers-table-toolbar';
 import { SupplierFormModal } from './supplier-form-modal';
 import { SupplierDeleteDialog } from './supplier-delete-dialog';
 
+// Status badge variant mapping
+const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+  switch (status.toLowerCase()) {
+    case 'active':
+      return 'default';
+    case 'inactive':
+      return 'secondary';
+    default:
+      return 'outline';
+  }
+};
+
+// Status display mapping - STANDARDIZED to match Staff
+const getStatusDisplay = (status: string): string => {
+  switch (status.toLowerCase()) {
+    case 'active':
+      return 'Hoạt Động'; // Changed from "Đang hoạt động"
+    case 'inactive':
+      return 'Tạm Dừng'; // Standardized
+    default:
+      return status;
+  }
+};
+
 export function SuppliersDataTable() {
-  // Modal state management
+  // Modal states - CENTRALIZED STATE MANAGEMENT like Staff
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
-  // Hook for data fetching and URL state management
+  // Fetch supplier data using our custom hook
   const {
     suppliers,
     pagination,
@@ -52,198 +74,56 @@ export function SuppliersDataTable() {
     error,
     isEmpty,
     refresh,
-    urlState: { filters, sort },
+    urlState,
     setSearch,
     setFilter,
+    setSort,
     setPagination,
-    hasActiveFilters,
     clearFilters,
+    hasActiveFilters,
   } = useSuppliers();
 
-  // Column definitions with Vietnamese headers
-  const columns: ColumnDef<Supplier>[] = useMemo(
-    () => [
-      {
-        accessorKey: 'supplierCode',
-        id: 'supplierCode',
-        enableSorting: true,
-        header: ({ column }) => (
-          <DataTableColumnHeader title="Mã NCC" column={column} />
-        ),
-        cell: ({ row }) => {
-          const code = row.getValue('supplierCode') as string | null;
-          return (
-            <div className="font-medium">
-              {code || <span className="text-muted-foreground">—</span>}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'name',
-        id: 'name',
-        enableSorting: true,
-        header: ({ column }) => (
-          <DataTableColumnHeader title="Tên Nhà Cung Cấp" column={column} />
-        ),
-        cell: ({ row }) => (
-          <div className="max-w-[200px] font-medium">
-            {row.getValue('name')}
-          </div>
-        ),
-      },
-      {
-        accessorKey: 'contactPerson',
-        id: 'contactPerson',
-        enableSorting: false,
-        header: () => <div>Người liên hệ</div>,
-        cell: ({ row }) => {
-          const contact = row.getValue('contactPerson') as string | null;
-          return (
-            <div className="max-w-[150px]">
-              {contact || <span className="text-muted-foreground">—</span>}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'phone',
-        id: 'phone',
-        enableSorting: false,
-        header: () => <div>Điện thoại</div>,
-        cell: ({ row }) => {
-          const phone = row.getValue('phone') as string | null;
-          return (
-            <div className="font-mono text-sm">
-              {phone || <span className="text-muted-foreground">—</span>}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'email',
-        id: 'email',
-        enableSorting: false,
-        header: () => <div>Email</div>,
-        cell: ({ row }) => {
-          const email = row.getValue('email') as string | null;
-          return (
-            <div className="max-w-[200px] text-sm">
-              {email ? (
-                <a
-                  href={`mailto:${email}`}
-                  className="text-blue-600 hover:text-blue-800 hover:underline"
-                >
-                  {email}
-                </a>
-              ) : (
-                <span className="text-muted-foreground">—</span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        accessorKey: 'status',
-        id: 'status',
-        enableSorting: true,
-        header: ({ column }) => (
-          <DataTableColumnHeader title="Trạng thái" column={column} />
-        ),
-        cell: ({ row }) => {
-          const status = row.getValue('status') as string;
-          return (
-            <Badge variant={status === 'active' ? 'default' : 'secondary'}>
-              {status === 'active' ? 'Đang hoạt động' : 'Tạm dừng'}
-            </Badge>
-          );
-        },
-      },
-      {
-        id: 'actions',
-        enableSorting: false,
-        header: () => <div className="text-right">Thao tác</div>,
-        cell: ({ row }) => {
-          const supplier = row.original;
-          const isActive = supplier.status === 'active';
-
-          return (
-            <div className="flex justify-end">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
-                    <span className="sr-only">Mở menu</span>
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleEditClick(supplier)}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Chỉnh sửa
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => handleToggleStatusClick(supplier)}
-                    className={isActive ? 'text-orange-600' : 'text-green-600'}
-                  >
-                    {isActive ? (
-                      <>
-                        <PowerOff className="mr-2 h-4 w-4" />
-                        Tạm dừng
-                      </>
-                    ) : (
-                      <>
-                        <Power className="mr-2 h-4 w-4" />
-                        Kích hoạt
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          );
-        },
-      },
-    ],
-    []
-  );
-
-  // Convert URL sort state to TanStack Table format
+  // Convert our URL sort state to TanStack Table sorting format
   const sorting: SortingState = useMemo(() => {
-    if (!sort.column || !sort.order) return [];
-    return [{ id: sort.column, desc: sort.order === 'desc' }];
-  }, [sort.column, sort.order]);
+    if (urlState.sort.column && urlState.sort.order) {
+      return [{ id: urlState.sort.column, desc: urlState.sort.order === 'desc' }];
+    }
+    return [];
+  }, [urlState.sort.column, urlState.sort.order]);
 
-  // Table configuration
-  const table = useReactTable({
-    data: suppliers,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
-    enableSorting: true,
-    enableHiding: true,
-    state: { sorting },
-    onSortingChange: () => {}, // Handled by URL state
-    pageCount: pagination?.totalPages || 0,
-    initialState: {
-      columnVisibility: {
-        // Set default column visibility
-        supplierCode: true,
-        name: true,
-        contactPerson: true,
-        phone: true,
-        email: false, // Hide email by default on mobile
-        status: true,
-        actions: true,
-      },
-    },
-  });
+  // Handle TanStack Table sorting changes and sync with URL state
+  const handleSortingChange = (updater: any) => {
+    const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
 
-  // Event handlers
+    if (newSorting.length === 0) {
+      // No sorting - clear sort from URL
+      setSort('');
+    } else {
+      // Extract the first sort (single column sorting)
+      const { id, desc } = newSorting[0];
+      setSort(id, desc ? 'desc' : 'asc');
+    }
+  };
+
+  // Event handlers - CENTRALIZED like Staff pattern
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setFilter('status', value === 'all' ? null : value);
+  };
+
+  const handlePageChange = (page: number) => {
+    setPagination({ page });
+  };
+
+  const handlePageSizeChange = (pageSize: number) => {
+    setPagination({ limit: pageSize, page: 1 });
+  };
+
+  // Modal handlers - CENTRALIZED like Staff pattern
   const handleCreateClick = () => {
-    setSelectedSupplier(null);
     setIsCreateModalOpen(true);
   };
 
@@ -257,33 +137,236 @@ export function SuppliersDataTable() {
     setIsDeleteModalOpen(true);
   };
 
-  const handleSuccess = () => {
+  // Modal close handlers - CENTRALIZED like Staff pattern
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
+    setSelectedSupplier(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setSelectedSupplier(null);
+  };
+
+  const handleCloseDeleteModal = () => {
+    setIsDeleteModalOpen(false);
+    setSelectedSupplier(null);
+  };
+
+  // Success handlers that refresh data and close modals
+  const handleModalSuccess = () => {
     refresh();
   };
 
-  // Handle column sorting from header clicks
-  const handleSortingChange = (updaterOrValue: any) => {
-    // This is handled by the DataTableColumnHeader component
-    // which calls the URL state management functions directly
-  };
+  // Table column definitions
+  const columns: ColumnDef<Supplier>[] = [
+    {
+      accessorKey: 'supplierCode',
+      enableSorting: true,
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Mã NCC"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue('supplierCode') || '-'}</div>
+      ),
+    },
+    {
+      accessorKey: 'name',
+      enableSorting: true,
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Tên Nhà Cung Cấp"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="max-w-[200px] truncate font-medium">{row.getValue('name')}</div>
+      ),
+    },
+    {
+      accessorKey: 'contactPerson',
+      enableSorting: false,
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Người Liên Hệ"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => (
+        <div>{row.getValue('contactPerson') || '-'}</div>
+      ),
+    },
+    {
+      accessorKey: 'phone',
+      enableSorting: false,
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Điện Thoại"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => (
+        <div>{row.getValue('phone') || '-'}</div>
+      ),
+    },
+    {
+      accessorKey: 'email',
+      enableSorting: false,
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Email"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="max-w-[200px] truncate text-muted-foreground">{row.getValue('email') || '-'}</div>
+      ),
+    },
+    {
+      accessorKey: 'taxId',
+      enableSorting: false,
+      enableHiding: true,
+      meta: {
+        defaultIsVisible: false,
+      },
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Mã Số Thuế"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => (
+        <div>{row.getValue('taxId') || '-'}</div>
+      ),
+    },
+    {
+      accessorKey: 'address',
+      enableSorting: false,
+      enableHiding: true,
+      meta: {
+        defaultIsVisible: false,
+      },
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Địa Chỉ"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="max-w-[200px] truncate">
+          {row.getValue('address') || '-'}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      enableSorting: true,
+      header: ({ column }) => (
+        <DataTableColumnHeader
+          title="Trạng Thái"
+          column={column}
+        />
+      ),
+      cell: ({ row }) => {
+        const status = row.getValue('status') as string;
+        return (
+          <Badge variant={getStatusVariant(status)}>
+            {getStatusDisplay(status)}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      enableSorting: false,
+      header: () => <div className="text-right">Thao Tác</div>,
+      cell: ({ row }) => {
+        const supplier = row.original;
 
-  // Error state
+        return (
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Mở menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleEditClick(supplier)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Chỉnh sửa
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
+                {supplier.status === 'active' ? (
+                  <DropdownMenuItem
+                    onClick={() => handleToggleStatusClick(supplier)}
+                    className="text-orange-600 focus:text-orange-600"
+                  >
+                    <PowerOff className="mr-2 h-4 w-4" />
+                    Tạm Dừng
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => handleToggleStatusClick(supplier)}
+                    className="text-green-600 focus:text-green-600"
+                  >
+                    <Power className="mr-2 h-4 w-4" />
+                    Kích hoạt
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ];
+
+  // Initialize table with proper TanStack Table sorting integration
+  const table = useReactTable({
+    data: suppliers,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    manualPagination: true,
+    manualSorting: true,
+    manualFiltering: true,
+    // Enable sorting UI capabilities
+    enableSorting: true,
+    // Single column sorting only
+    enableMultiSort: false,
+    // Enable column hiding
+    enableHiding: true,
+    // Provide current sorting state and change handler
+    state: {
+      sorting,
+    },
+    onSortingChange: handleSortingChange,
+    // Set initial column visibility based on meta.defaultIsVisible
+    initialState: {
+      columnVisibility: {
+        taxId: false,      // Hide "Mã Số Thuế" by default
+        address: false,    // Hide "Địa Chỉ" by default
+      },
+    },
+  });
+
   if (error) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-10">
-          <div className="text-center space-y-4">
-            <AlertCircle className="h-8 w-8 text-destructive mx-auto" />
-            <div>
-              <h3 className="text-lg font-medium">Có lỗi xảy ra</h3>
-              <p className="text-muted-foreground text-sm">{error.message}</p>
-            </div>
-            <Button onClick={refresh} variant="outline">
-              Thử lại
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-center py-10">
+        <div className="text-center">
+          <p className="text-destructive mb-2">Lỗi tải dữ liệu nhà cung cấp</p>
+          <p className="text-sm text-muted-foreground mb-4">{error.message}</p>
+          <Button onClick={refresh} variant="outline">
+            Thử lại
+          </Button>
+        </div>
+      </div>
     );
   }
 
@@ -291,125 +374,108 @@ export function SuppliersDataTable() {
     <div className="space-y-4">
       {/* Toolbar */}
       <SuppliersTableToolbar
-        searchValue={filters.search || ''}
-        onSearchChange={setSearch}
-        selectedStatus={filters.status || 'all'}
-        onStatusChange={(value) => setFilter('status', value === 'all' ? null : value)}
+        searchValue={urlState.filters.search || ''}
+        onSearchChange={handleSearchChange}
+        selectedStatus={urlState.filters.status || 'all'}
+        onStatusChange={handleStatusChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
         table={table}
         onCreateClick={handleCreateClick}
       />
 
-      {/* Main table card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Danh sách nhà cung cấp</CardTitle>
-          <CardDescription>
-            Quản lý thông tin nhà cung cấp trong hệ thống
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  // Loading skeleton
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <TableRow key={`loading-${index}`}>
-                      {columns.map((_, colIndex) => (
-                        <TableCell key={`loading-cell-${colIndex}`}>
-                          <div className="h-6 bg-muted animate-pulse rounded" />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : isEmpty ? (
-                  // Empty state
-                  <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center">
-                      <div className="space-y-2">
-                        <p className="text-muted-foreground">
-                          {hasActiveFilters
-                            ? 'Không tìm thấy nhà cung cấp phù hợp với bộ lọc hiện tại'
-                            : 'Chưa có nhà cung cấp nào được tạo'
-                          }
-                        </p>
-                        {!hasActiveFilters && (
-                          <Button onClick={handleCreateClick} variant="outline" size="sm">
-                            Thêm nhà cung cấp đầu tiên
-                          </Button>
+      {/* Table */}
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
                         )}
-                      </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              // Loading skeleton rows
+              Array.from({ length: 5 }).map((_, index) => (
+                <TableRow key={index}>
+                  {columns.map((_, colIndex) => (
+                    <TableCell key={colIndex}>
+                      <div className="h-4 bg-muted animate-pulse rounded" />
                     </TableCell>
-                  </TableRow>
-                ) : (
-                  // Data rows
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && 'selected'}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableRow>
+              ))
+            ) : table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  {isEmpty ? 'Không có dữ liệu nhà cung cấp.' : 'Không tìm thấy kết quả.'}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-          {/* Pagination */}
-          {pagination && (
-            <div className="mt-4">
-              <DataTablePagination
-                pagination={pagination}
-                onPageChange={(page) => setPagination({ page })}
-                onPageSizeChange={(pageSize) => setPagination({ limit: pageSize, page: 1 })}
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Pagination */}
+      {pagination && (
+        <DataTablePagination
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
 
-      {/* Modals */}
+      {/* Modal Components - KEY-BASED RESET PATTERN (CRITICAL) */}
       <SupplierFormModal
+        key="create-modal"
         isOpen={isCreateModalOpen}
-        onClose={() => setIsCreateModalOpen(false)}
-        onSuccess={handleSuccess}
+        onClose={handleCloseCreateModal}
+        onSuccess={handleModalSuccess}
         supplier={null}
       />
 
       <SupplierFormModal
+        key={selectedSupplier ? `edit-modal-${selectedSupplier.id}` : 'edit-modal-empty'}
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSuccess={handleSuccess}
+        onClose={handleCloseEditModal}
+        onSuccess={handleModalSuccess}
         supplier={selectedSupplier}
       />
 
       <SupplierDeleteDialog
+        key={selectedSupplier ? `delete-dialog-${selectedSupplier.id}` : 'delete-dialog-empty'}
         isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onSuccess={handleSuccess}
+        onClose={handleCloseDeleteModal}
+        onSuccess={handleModalSuccess}
         supplier={selectedSupplier}
       />
     </div>

@@ -24,7 +24,7 @@ export interface SuppliersResponse {
     page: number;
     limit: number;
     total: number;
-    totalPages: number;
+    pages: number; // FIXED: Changed from totalPages to pages to match DataTablePagination
     hasNextPage: boolean;
     hasPreviousPage: boolean;
   };
@@ -222,15 +222,15 @@ export function useSuppliers() {
     // Utility properties
     hasActiveFilters,
 
-    // Pagination helpers
+    // Pagination helpers - FIXED to match API response structure
     hasNextPage: data?.pagination?.hasNextPage || false,
     hasPreviousPage: data?.pagination?.hasPreviousPage || false,
-    totalPages: data?.pagination?.totalPages || 0,
+    totalPages: data?.pagination?.pages || 0, // FIXED: Use pages instead of totalPages
     totalItems: data?.pagination?.total || 0,
 
     // Navigation helpers
     goToPage: (page: number) => {
-      if (page >= 1 && page <= (data?.pagination?.totalPages || 1)) {
+      if (page >= 1 && page <= (data?.pagination?.pages || 1)) {
         setPagination({ page });
       }
     },
@@ -258,9 +258,9 @@ export function useSuppliers() {
       setPagination({ page: 1 }); // Reset to first page when filtering
     },
 
-    // Sorting helpers
-    sortBy: (column: string) => {
-      setSort(column);
+    // Sorting helpers - FIXED to match Staff pattern
+    sortBy: (column: string, order?: 'asc' | 'desc') => {
+      setSort(column, order);
       setPagination({ page: 1 }); // Reset to first page when sorting
     },
   };

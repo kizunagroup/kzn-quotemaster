@@ -29,11 +29,11 @@ import {
 import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
 import type { Supplier } from '@/lib/hooks/use-suppliers';
 
-// Single source of truth for status options
+// Single source of truth for status options - STANDARDIZED to match Staff
 const statusOptions = [
   { value: 'all', label: 'Tất cả trạng thái' },
-  { value: 'active', label: 'Đang hoạt động' },
-  { value: 'inactive', label: 'Tạm dừng' },
+  { value: 'active', label: 'Hoạt Động' },
+  { value: 'inactive', label: 'Tạm Dừng' },
 ] as const;
 
 interface SuppliersTableToolbarProps {
@@ -72,19 +72,16 @@ export function SuppliersTableToolbar({
   // Debounce search input to avoid excessive API calls
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
 
-  // Update parent component when debounced value changes
+  // FIXED: Sync with URL state exactly like Staff pattern
   useEffect(() => {
-    if (onSearchChange && debouncedSearchValue !== searchValue) {
+    setLocalSearchValue(searchValue);
+  }, [searchValue]);
+
+  useEffect(() => {
+    if (debouncedSearchValue !== searchValue) {
       onSearchChange(debouncedSearchValue);
     }
-  }, [debouncedSearchValue, onSearchChange, searchValue]);
-
-  // Sync local state when parent searchValue changes (e.g., from clear filters)
-  useEffect(() => {
-    if (localSearchValue !== searchValue) {
-      setLocalSearchValue(searchValue);
-    }
-  }, [searchValue, localSearchValue]);
+  }, [debouncedSearchValue, searchValue, onSearchChange]);
 
   // Handle local search change
   const handleSearchChange = (value: string) => {

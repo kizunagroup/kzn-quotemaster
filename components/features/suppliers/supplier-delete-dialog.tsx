@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Loader2, PowerOff, Power } from 'lucide-react';
 
 import {
   AlertDialog,
@@ -14,7 +14,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { toggleSupplierStatus } from '@/lib/actions/supplier.actions';
 import type { Supplier } from '@/lib/hooks/use-suppliers';
 
@@ -31,132 +30,173 @@ export function SupplierDeleteDialog({
   onSuccess,
   supplier,
 }: SupplierDeleteDialogProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  if (!supplier) {
-    return null;
-  }
+  // Configuration based on supplier status - ENHANCED like Staff pattern
+  const isActive = supplier?.status === 'active';
+  const actionConfig = {
+    activate: {
+      title: 'Xác nhận kích hoạt nhà cung cấp',
+      description: 'Bạn có chắc chắn muốn kích hoạt nhà cung cấp này? Nhà cung cấp sẽ có thể nhận báo giá mới.',
+      icon: Power,
+      iconBg: 'bg-green-100',
+      iconColor: 'text-green-600',
+      actionButton: {
+        text: 'Kích Hoạt',
+        loadingText: 'Đang kích hoạt...',
+        className: 'bg-green-600 text-white hover:bg-green-700'
+      },
+      warningColor: 'green',
+      notes: [
+        '• Nhà cung cấp sẽ xuất hiện trở lại trong danh sách chọn',
+        '• Có thể nhận báo giá mới từ nhà cung cấp này',
+        '• Tất cả dữ liệu lịch sử vẫn được bảo toàn'
+      ]
+    },
+    deactivate: {
+      title: 'Xác nhận tạm dừng nhà cung cấp',
+      description: 'Bạn có chắc chắn muốn tạm dừng nhà cung cấp này? Nhà cung cấp sẽ được ẩn khỏi danh sách chọn.',
+      icon: PowerOff,
+      iconBg: 'bg-orange-100',
+      iconColor: 'text-orange-600',
+      actionButton: {
+        text: 'Tạm Dừng',
+        loadingText: 'Đang tạm dừng...',
+        className: 'bg-orange-600 text-white hover:bg-orange-700'
+      },
+      warningColor: 'orange',
+      notes: [
+        '• Nhà cung cấp sẽ không xuất hiện trong danh sách chọn khi tạo báo giá',
+        '• Các báo giá hiện tại vẫn được giữ nguyên trong hệ thống',
+        '• Bạn có thể kích hoạt lại nhà cung cấp bất cứ lúc nào'
+      ]
+    }
+  };
 
-  const isActive = supplier.status === 'active';
-  const newStatus = isActive ? 'inactive' : 'active';
-  const actionText = isActive ? 'tạm dừng' : 'kích hoạt';
-  const actionTitle = isActive ? 'Tạm dừng nhà cung cấp' : 'Kích hoạt nhà cung cấp';
+  // Safe config retrieval with fallback to prevent crashes
+  const currentConfig = isActive ? actionConfig.deactivate : actionConfig.activate;
 
+  // Handle action confirmation - ROBUST like Staff pattern
   const handleConfirm = async () => {
-    if (!supplier) return;
+    if (!supplier?.id) {
+      toast.error('Không thể thực hiện thao tác: Thông tin nhà cung cấp không hợp lệ.');
+      return;
+    }
 
-    setIsSubmitting(true);
+    setIsProcessing(true);
 
     try {
       const result = await toggleSupplierStatus(supplier.id);
 
-      if (result.success) {
+      if (result?.success) {
         toast.success(result.success);
-        onSuccess();
-        onClose();
-      } else if (result.error) {
+        if (typeof onSuccess === 'function') {
+          onSuccess();
+        }
+        if (typeof onClose === 'function') {
+          onClose();
+        }
+      } else if (result?.error) {
         toast.error(result.error);
+      } else {
+        toast.error('Thao tác không thành công. Vui lòng thử lại.');
       }
     } catch (error) {
       console.error('Error toggling supplier status:', error);
-      toast.error('Có lỗi xảy ra. Vui lòng thử lại.');
+      toast.error('Có lỗi xảy ra khi thay đổi trạng thái nhà cung cấp. Vui lòng thử lại.');
     } finally {
-      setIsSubmitting(false);
+      setIsProcessing(false);
     }
   };
 
+  // Handle dialog close - ROBUST like Staff pattern
   const handleClose = () => {
-    if (!isSubmitting) {
+    if (!isProcessing && typeof onClose === 'function') {
       onClose();
     }
   };
+
+  if (!supplier) return null;
+
+  const IconComponent = currentConfig.icon;
 
   return (
     <AlertDialog open={isOpen} onOpenChange={handleClose}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-100">
-              <AlertTriangle className="h-5 w-5 text-orange-600" />
+            <div className={`flex h-10 w-10 items-center justify-center rounded-full ${currentConfig.iconBg}`}>
+              <IconComponent className={`h-5 w-5 ${currentConfig.iconColor}`} />
             </div>
             <div>
-              <AlertDialogTitle>{actionTitle}</AlertDialogTitle>
+              <AlertDialogTitle>{currentConfig.title}</AlertDialogTitle>
+              <AlertDialogDescription className="mt-2">
+                {currentConfig.description}
+              </AlertDialogDescription>
             </div>
           </div>
         </AlertDialogHeader>
 
-        <div className="space-y-4">
-          <AlertDialogDescription asChild>
-            <div className="space-y-3">
-              <p>
-                Bạn có chắc chắn muốn <strong>{actionText}</strong> nhà cung cấp này không?
-              </p>
-
-              {/* Supplier Information */}
-              <div className="rounded-lg bg-gray-50 p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Tên nhà cung cấp:</span>
-                  <span className="text-sm">{supplier.name}</span>
-                </div>
-
-                {supplier.supplierCode && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Mã nhà cung cấp:</span>
-                    <span className="text-sm font-mono">{supplier.supplierCode}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Trạng thái hiện tại:</span>
-                  <Badge variant={isActive ? 'default' : 'secondary'}>
-                    {isActive ? 'Đang hoạt động' : 'Tạm dừng'}
-                  </Badge>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Trạng thái sau khi {actionText}:</span>
-                  <Badge variant={newStatus === 'active' ? 'default' : 'secondary'}>
-                    {newStatus === 'active' ? 'Đang hoạt động' : 'Tạm dừng'}
-                  </Badge>
-                </div>
+        {/* Supplier Information */}
+        <div className="rounded-lg border bg-muted/50 p-4">
+          <div className="space-y-2">
+            {supplier.supplierCode && supplier.supplierCode.trim() !== '' && (
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">Mã nhà cung cấp:</span>
+                <span className="font-mono font-semibold">{supplier.supplierCode}</span>
               </div>
-
-              {/* Action Consequences */}
-              <div className="text-sm text-muted-foreground">
-                {isActive ? (
-                  <div className="space-y-1">
-                    <p><strong>Lưu ý khi tạm dừng:</strong></p>
-                    <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>Nhà cung cấp sẽ không xuất hiện trong danh sách chọn khi tạo báo giá mới</li>
-                      <li>Các báo giá hiện tại của nhà cung cấp vẫn được giữ nguyên</li>
-                      <li>Bạn có thể kích hoạt lại bất cứ lúc nào</li>
-                    </ul>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <p><strong>Khi kích hoạt:</strong></p>
-                    <ul className="list-disc list-inside space-y-1 ml-2">
-                      <li>Nhà cung cấp sẽ xuất hiện trở lại trong danh sách chọn</li>
-                      <li>Có thể nhận báo giá mới từ nhà cung cấp này</li>
-                    </ul>
-                  </div>
-                )}
-              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="font-medium text-muted-foreground">Tên nhà cung cấp:</span>
+              <span className="font-semibold">{supplier.name || 'N/A'}</span>
             </div>
-          </AlertDialogDescription>
+            {supplier.contactPerson && supplier.contactPerson.trim() !== '' && (
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">Người liên hệ:</span>
+                <span>{supplier.contactPerson}</span>
+              </div>
+            )}
+            {supplier.phone && supplier.phone.trim() !== '' && (
+              <div className="flex justify-between">
+                <span className="font-medium text-muted-foreground">Điện thoại:</span>
+                <span>{supplier.phone}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Warning Notice */}
+        <div className={`rounded-lg border-l-4 border-l-${currentConfig.warningColor}-500 bg-${currentConfig.warningColor}-50 p-4`}>
+          <div className="flex items-start gap-3">
+            <AlertTriangle className={`h-5 w-5 text-${currentConfig.warningColor}-600 mt-0.5 flex-shrink-0`} />
+            <div className="text-sm">
+              <p className={`font-medium text-${currentConfig.warningColor}-800 mb-1`}>Lưu ý quan trọng:</p>
+              <ul className={`text-${currentConfig.warningColor}-700 space-y-1`}>
+                {currentConfig.notes.map((note, index) => (
+                  <li key={index}>{note}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isSubmitting}>
+          <AlertDialogCancel disabled={isProcessing}>
             Hủy
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            disabled={isSubmitting}
-            className={isActive ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'}
+            disabled={isProcessing}
+            className={currentConfig.actionButton.className}
           >
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isActive ? 'Tạm dừng' : 'Kích hoạt'}
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {currentConfig.actionButton.loadingText}
+              </>
+            ) : (
+              currentConfig.actionButton.text
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
