@@ -125,7 +125,7 @@ export function TeamsDataTable() {
     clearFilters,
     hasActiveFilters,
   } = useDataTableUrlState({
-    defaultSort: { column: 'teamCode', order: 'asc' },
+    // ✅ USE DEFAULT FROM HOOK (createdAt desc) - REMOVED OVERRIDE
     defaultPagination: { page: 1, limit: 10 },
   });
 

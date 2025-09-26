@@ -182,6 +182,7 @@ function getColumnDisplayName(columnId: string): string {
     taxId: "Mã Số Thuế",
     address: "Địa Chỉ",
     status: "Trạng Thái",
+    createdAt: "Ngày Tạo", // ADDED: createdAt column like Teams
   };
 
   return columnNames[columnId] || columnId;

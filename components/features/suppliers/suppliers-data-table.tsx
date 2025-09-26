@@ -63,6 +63,16 @@ const getStatusDisplay = (status: string): string => {
   }
 };
 
+// Date formatting helper - EXACTLY LIKE TEAMS
+const formatDate = (date: Date | string): string => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString('vi-VN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+};
+
 export function SuppliersDataTable() {
   // Modal states - CENTRALIZED STATE MANAGEMENT like Staff
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -282,6 +292,17 @@ export function SuppliersDataTable() {
       },
     },
     {
+      accessorKey: 'createdAt',
+      enableSorting: true,
+      header: ({ column }) => (
+        <DataTableColumnHeader title="Ngày Tạo" column={column} />
+      ),
+      cell: ({ row }) => {
+        const date = row.getValue('createdAt') as Date;
+        return <div className="text-sm">{date ? formatDate(date) : '-'}</div>;
+      },
+    },
+    {
       id: 'actions',
       enableSorting: false,
       header: () => <div className="text-right">Thao Tác</div>,
@@ -355,6 +376,7 @@ export function SuppliersDataTable() {
       columnVisibility: {
         taxId: false, // Hide "Mã Số Thuế" by default
         address: false, // Hide "Địa Chỉ" by default
+        createdAt: false, // Hide "Ngày Tạo" by default - LIKE TEAMS
       },
     },
   });

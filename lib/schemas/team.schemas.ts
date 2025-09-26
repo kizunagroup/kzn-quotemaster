@@ -126,11 +126,11 @@ export const teamQuerySchema = z.object({
   teamType: z.string().nullable().default('all').transform(val =>
     val === null || val === '' ? 'all' : val
   ).pipe(z.enum(['all', 'KITCHEN', 'OFFICE'])),
-  sort: z.string().nullable().default('name').transform(val =>
-    val === null || val === '' ? 'name' : val
+  sort: z.string().nullable().default('createdAt').transform(val =>
+    val === null || val === '' ? 'createdAt' : val
   ).pipe(z.enum(['name', 'teamCode', 'region', 'teamType', 'status', 'createdAt'])),
-  order: z.string().nullable().default('asc').transform(val =>
-    val === null || val === '' ? 'asc' : val
+  order: z.string().nullable().default('desc').transform(val =>
+    val === null || val === '' ? 'desc' : val
   ).pipe(z.enum(['asc', 'desc'])),
   page: z.string().nullable().default('1').transform(val =>
     val === null || val === '' ? '1' : val
