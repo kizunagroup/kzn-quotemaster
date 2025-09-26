@@ -1,27 +1,27 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from "react";
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
   type SortingState,
-} from '@tanstack/react-table';
-import { MoreHorizontal, Edit, PowerOff, Play } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@tanstack/react-table";
+import { MoreHorizontal, Edit, PowerOff, Play } from "lucide-react";
+import { toast } from "sonner";
 
-import { useTeams, type Team } from '@/lib/hooks/use-teams';
-import { useDataTableUrlState } from '@/lib/hooks/use-data-table-url-state';
-import { getRegions, activateTeam } from '@/lib/actions/team.actions';
-import { Button } from '@/components/ui/button';
+import { useTeams, type Team } from "@/lib/hooks/use-teams";
+import { useDataTableUrlState } from "@/lib/hooks/use-data-table-url-state";
+import { getRegions, activateTeam } from "@/lib/actions/team.actions";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -29,64 +29,68 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
-import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { TeamsTableToolbar } from './teams-table-toolbar';
-import { TeamFormModal } from './team-form-modal';
-import { TeamDeleteDialog } from './team-delete-dialog';
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { TeamsTableToolbar } from "./teams-table-toolbar";
+import { TeamFormModal } from "./team-form-modal";
+import { TeamDeleteDialog } from "./team-delete-dialog";
 
 // Status badge variant mapping
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" => {
   switch (status.toLowerCase()) {
-    case 'active':
-    case 'hoạt động':
-      return 'default';
-    case 'inactive':
-    case 'tạm dừng':
-      return 'secondary';
-    case 'suspended':
-    case 'đình chỉ':
-      return 'destructive';
+    case "active":
+    case "hoạt động":
+      return "default";
+    case "inactive":
+    case "tạm dừng":
+      return "secondary";
+    case "suspended":
+    case "đình chỉ":
+      return "destructive";
     default:
-      return 'outline';
+      return "outline";
   }
 };
 
 // Team type display mapping
 const getTeamTypeDisplay = (teamType: string): string => {
   switch (teamType.toUpperCase()) {
-    case 'KITCHEN':
-      return 'Nhóm Bếp';
-    case 'OFFICE':
-      return 'Văn Phòng';
+    case "KITCHEN":
+      return "Nhóm Bếp";
+    case "OFFICE":
+      return "Văn Phòng";
     default:
       return teamType;
   }
 };
 
 // Team type badge variant mapping
-const getTeamTypeVariant = (teamType: string): 'default' | 'secondary' | 'outline' => {
+const getTeamTypeVariant = (
+  teamType: string
+): "default" | "secondary" | "outline" => {
   switch (teamType.toUpperCase()) {
-    case 'KITCHEN':
-      return 'default';
-    case 'OFFICE':
-      return 'secondary';
+    case "KITCHEN":
+      return "default";
+    case "OFFICE":
+      return "secondary";
     default:
-      return 'outline';
+      return "outline";
   }
 };
 
 // Status display mapping
 const getStatusDisplay = (status: string): string => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'Hoạt Động';
-    case 'inactive':
-      return 'Tạm Dừng';
-    case 'suspended':
-      return 'Đình Chỉ';
+    case "active":
+      return "Hoạt Động";
+    case "inactive":
+      return "Tạm Dừng";
+    case "suspended":
+      return "Đình Chỉ";
     default:
       return status;
   }
@@ -94,11 +98,11 @@ const getStatusDisplay = (status: string): string => {
 
 // Date formatting helper
 const formatDate = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("vi-VN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
 };
 
@@ -125,7 +129,7 @@ export function TeamsDataTable() {
     clearFilters,
     hasActiveFilters,
   } = useDataTableUrlState({
-    // ✅ USE DEFAULT FROM HOOK (createdAt desc) - REMOVED OVERRIDE
+    defaultSort: { column: "createdAt", order: "desc" },
     defaultPagination: { page: 1, limit: 10 },
   });
 
@@ -142,18 +146,19 @@ export function TeamsDataTable() {
   // Convert our URL sort state to TanStack Table sorting format
   const sorting: SortingState = useMemo(() => {
     if (sort.column && sort.order) {
-      return [{ id: sort.column, desc: sort.order === 'desc' }];
+      return [{ id: sort.column, desc: sort.order === "desc" }];
     }
     return [];
   }, [sort.column, sort.order]);
 
   // Handle TanStack Table sorting changes and sync with URL state
   const handleSortingChange = (updater: any) => {
-    const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
+    const newSorting =
+      typeof updater === "function" ? updater(sorting) : updater;
 
     if (newSorting.length === 0) {
       // No sorting - clear sort from URL
-      setSort('');
+      setSort("");
     } else {
       // Extract the first sort (single column sorting)
       const { id } = newSorting[0];
@@ -170,11 +175,11 @@ export function TeamsDataTable() {
         if (Array.isArray(result)) {
           setAllRegions(result);
         } else {
-          console.error('Failed to fetch regions:', result.error);
+          console.error("Failed to fetch regions:", result.error);
           setAllRegions([]);
         }
       } catch (error) {
-        console.error('Error fetching regions:', error);
+        console.error("Error fetching regions:", error);
         setAllRegions([]);
       } finally {
         setRegionsLoading(false);
@@ -190,15 +195,15 @@ export function TeamsDataTable() {
   };
 
   const handleRegionChange = (value: string) => {
-    setFilter('region', value === 'all' ? null : value);
+    setFilter("region", value === "all" ? null : value);
   };
 
   const handleStatusChange = (value: string) => {
-    setFilter('status', value === 'all' ? null : value);
+    setFilter("status", value === "all" ? null : value);
   };
 
   const handleTeamTypeChange = (value: string) => {
-    setFilter('teamType', value === 'all' ? null : value);
+    setFilter("teamType", value === "all" ? null : value);
   };
 
   const handlePageChange = (page: number) => {
@@ -238,8 +243,8 @@ export function TeamsDataTable() {
         toast.error(result.error);
       }
     } catch (error) {
-      console.error('Activate team error:', error);
-      toast.error('Có lỗi xảy ra khi kích hoạt nhóm');
+      console.error("Activate team error:", error);
+      toast.error("Có lỗi xảy ra khi kích hoạt nhóm");
     } finally {
       setActivatingId(null);
     }
@@ -248,42 +253,33 @@ export function TeamsDataTable() {
   // Table column definitions
   const columns: ColumnDef<Team>[] = [
     {
-      accessorKey: 'teamCode',
+      accessorKey: "teamCode",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Mã Nhóm"
-          column={column}
-        />
+        <DataTableColumnHeader title="Mã Nhóm" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('teamCode') || '-'}</div>
+        <div className="font-medium">{row.getValue("teamCode") || "-"}</div>
       ),
     },
     {
-      accessorKey: 'name',
+      accessorKey: "name",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Tên Nhóm"
-          column={column}
-        />
+        <DataTableColumnHeader title="Tên Nhóm" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate">{row.getValue('name')}</div>
+        <div className="max-w-[200px] truncate">{row.getValue("name")}</div>
       ),
     },
     {
-      accessorKey: 'teamType',
+      accessorKey: "teamType",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Loại Hình"
-          column={column}
-        />
+        <DataTableColumnHeader title="Loại Hình" column={column} />
       ),
       cell: ({ row }) => {
-        const teamType = row.getValue('teamType') as string;
+        const teamType = row.getValue("teamType") as string;
         return (
           <Badge variant={getTeamTypeVariant(teamType)}>
             {getTeamTypeDisplay(teamType)}
@@ -292,44 +288,33 @@ export function TeamsDataTable() {
       },
     },
     {
-      accessorKey: 'region',
+      accessorKey: "region",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Khu Vực"
-          column={column}
-        />
+        <DataTableColumnHeader title="Khu Vực" column={column} />
       ),
-      cell: ({ row }) => (
-        <div>{row.getValue('region')}</div>
-      ),
+      cell: ({ row }) => <div>{row.getValue("region")}</div>,
     },
     {
-      accessorKey: 'managerName',
+      accessorKey: "managerName",
       enableSorting: false,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Quản Lý"
-          column={column}
-        />
+        <DataTableColumnHeader title="Quản Lý" column={column} />
       ),
       cell: ({ row }) => (
         <div className="max-w-[150px] truncate">
-          {row.getValue('managerName') || '-'}
+          {row.getValue("managerName") || "-"}
         </div>
       ),
     },
     {
-      accessorKey: 'status',
+      accessorKey: "status",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Trạng Thái"
-          column={column}
-        />
+        <DataTableColumnHeader title="Trạng Thái" column={column} />
       ),
       cell: ({ row }) => {
-        const status = row.getValue('status') as string;
+        const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
             {getStatusDisplay(status)}
@@ -338,21 +323,18 @@ export function TeamsDataTable() {
       },
     },
     {
-      accessorKey: 'createdAt',
+      accessorKey: "createdAt",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Ngày Tạo"
-          column={column}
-        />
+        <DataTableColumnHeader title="Ngày Tạo" column={column} />
       ),
       cell: ({ row }) => {
-        const date = row.getValue('createdAt') as Date;
+        const date = row.getValue("createdAt") as Date;
         return <div className="text-sm">{formatDate(date)}</div>;
       },
     },
     {
-      id: 'actions',
+      id: "actions",
       enableSorting: false,
       header: () => <div className="text-right">Thao Tác</div>,
       cell: ({ row }) => {
@@ -373,7 +355,7 @@ export function TeamsDataTable() {
                   Chỉnh sửa
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {team.status === 'active' ? (
+                {team.status === "active" ? (
                   <DropdownMenuItem
                     onClick={() => handleDeleteClick(team)}
                     className="text-orange-600 focus:text-orange-600"
@@ -388,7 +370,9 @@ export function TeamsDataTable() {
                     disabled={activatingId === team.id}
                   >
                     <Play className="mr-2 h-4 w-4" />
-                    {activatingId === team.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                    {activatingId === team.id
+                      ? "Đang kích hoạt..."
+                      : "Kích hoạt"}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -444,15 +428,15 @@ export function TeamsDataTable() {
     <div className="space-y-4">
       {/* Toolbar */}
       <TeamsTableToolbar
-        searchValue={filters.search || ''}
+        searchValue={filters.search || ""}
         onSearchChange={handleSearchChange}
         regions={allRegions}
         regionsLoading={regionsLoading}
-        selectedRegion={filters.region || 'all'}
+        selectedRegion={filters.region || "all"}
         onRegionChange={handleRegionChange}
-        selectedStatus={filters.status || 'all'}
+        selectedStatus={filters.status || "all"}
         onStatusChange={handleStatusChange}
-        selectedTeamType={filters.teamType || 'all'}
+        selectedTeamType={filters.teamType || "all"}
         onTeamTypeChange={handleTeamTypeChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
@@ -495,7 +479,7 @@ export function TeamsDataTable() {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
+                  data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -513,7 +497,9 @@ export function TeamsDataTable() {
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {isEmpty ? 'Không có dữ liệu nhóm.' : 'Không tìm thấy kết quả.'}
+                  {isEmpty
+                    ? "Không có dữ liệu nhóm."
+                    : "Không tìm thấy kết quả."}
                 </TableCell>
               </TableRow>
             )}
