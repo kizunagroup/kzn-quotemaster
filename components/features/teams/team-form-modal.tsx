@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -88,6 +88,9 @@ export function TeamFormModal({
       ...(isEditMode && team && { id: team.id }),
     },
   });
+
+  // STANDARDIZED DATA LOSS PREVENTION: Use useFormState for real-time dirty checking
+  const { isDirty } = useFormState({ control: form.control });
 
   // Watch teamType to conditionally show/hide teamCode field
   const watchedTeamType = form.watch('teamType');
@@ -191,9 +194,19 @@ export function TeamFormModal({
     }
   };
 
-  // Handle modal close
+  // STANDARDIZED DATA LOSS PREVENTION: Handle modal close with real-time dirty checking
   const handleClose = () => {
     if (!isSubmitting) {
+      // Check if form has been modified using real-time isDirty from useFormState
+      if (isDirty) {
+        const shouldClose = window.confirm(
+          'Bạn có thay đổi chưa được lưu. Bạn có chắc chắn muốn đóng?'
+        );
+        if (!shouldClose) {
+          return;
+        }
+      }
+
       form.reset();
       onClose();
     }
@@ -203,7 +216,12 @@ export function TeamFormModal({
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent
         className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
-        onInteractOutside={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          // STANDARDIZED DATA LOSS PREVENTION: Prevent closing when clicking outside if form is dirty
+          if (isDirty) {
+            e.preventDefault();
+          }
+        }}
       >
         <DialogHeader>
           <DialogTitle>

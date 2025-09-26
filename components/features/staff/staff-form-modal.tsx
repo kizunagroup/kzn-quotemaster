@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
@@ -89,6 +89,9 @@ export function StaffFormModal({
       }),
     },
   });
+
+  // STANDARDIZED DATA LOSS PREVENTION: Use useFormState for real-time dirty checking
+  const { isDirty } = useFormState({ control: form.control });
 
   // Reset form when modal opens/closes or staff changes
   useEffect(() => {
@@ -214,12 +217,10 @@ export function StaffFormModal({
     onClose();
   };
 
-  // Handle modal close with data loss prevention
+  // STANDARDIZED DATA LOSS PREVENTION: Handle modal close with real-time dirty checking
   const handleClose = () => {
     if (!isSubmitting) {
-      // Check if form has been modified
-      const isDirty = form.formState.isDirty;
-
+      // Check if form has been modified using real-time isDirty from useFormState
       if (isDirty) {
         const shouldClose = window.confirm(
           'Bạn có thay đổi chưa được lưu. Bạn có chắc chắn muốn đóng?'
@@ -239,8 +240,8 @@ export function StaffFormModal({
       <DialogContent
         className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto"
         onInteractOutside={(e) => {
-          // Prevent closing when clicking outside if form is dirty
-          if (form.formState.isDirty) {
+          // STANDARDIZED DATA LOSS PREVENTION: Prevent closing when clicking outside if form is dirty
+          if (isDirty) {
             e.preventDefault();
           }
         }}

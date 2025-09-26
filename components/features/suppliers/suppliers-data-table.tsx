@@ -459,9 +459,8 @@ export function SuppliersDataTable() {
         />
       )}
 
-      {/* Modal Components - KEY-BASED RESET PATTERN (CRITICAL) */}
+      {/* Modal Components - STANDARDIZED DATA LOSS PREVENTION */}
       <SupplierFormModal
-        key={`create-${isCreateModalOpen}`}
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         onSuccess={handleModalSuccess}
@@ -469,7 +468,6 @@ export function SuppliersDataTable() {
       />
 
       <SupplierFormModal
-        key={`edit-${isEditModalOpen}-${selectedSupplier?.id}`}
         isOpen={isEditModalOpen}
         onClose={handleCloseEditModal}
         onSuccess={handleModalSuccess}
@@ -477,7 +475,6 @@ export function SuppliersDataTable() {
       />
 
       <SupplierDeleteDialog
-        key={`delete-${isDeleteModalOpen}-${selectedSupplier?.id}`}
         isOpen={isDeleteModalOpen}
         onClose={handleCloseDeleteModal}
         onSuccess={handleModalSuccess}
