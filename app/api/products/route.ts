@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user has permission to view products
-    const hasPermission = await checkPermission(user.id, "canViewProducts");
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
       return NextResponse.json(
         { error: "Bạn không có quyền xem danh sách hàng hóa" },
@@ -86,19 +86,28 @@ export async function GET(request: NextRequest) {
     // Safe column mapping for sorting
     const getSortColumn = (sortField: string) => {
       switch (sortField) {
-        case 'productCode': return products.productCode;
-        case 'name': return products.name;
-        case 'unit': return products.unit;
-        case 'category': return products.category;
-        case 'basePrice': return products.basePrice;
-        case 'status': return products.status;
-        case 'createdAt': return products.createdAt;
-        default: return products.createdAt; // DEFAULT TO createdAt
+        case "productCode":
+          return products.productCode;
+        case "name":
+          return products.name;
+        case "unit":
+          return products.unit;
+        case "category":
+          return products.category;
+        case "basePrice":
+          return products.basePrice;
+        case "status":
+          return products.status;
+        case "createdAt":
+          return products.createdAt;
+        default:
+          return products.createdAt; // DEFAULT TO createdAt
       }
     };
 
     const sortColumn = getSortColumn(validatedSort);
-    const orderByClause = validatedOrder === "desc" ? desc(sortColumn) : asc(sortColumn);
+    const orderByClause =
+      validatedOrder === "desc" ? desc(sortColumn) : asc(sortColumn);
 
     // 5. Execute Queries (Data + Count in Parallel)
     const [data, [{ totalCount }]] = await Promise.all([

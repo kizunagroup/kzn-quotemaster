@@ -1,26 +1,26 @@
-"use client";
+'use client';
 
-import useSWR from "swr";
-import { useDataTableUrlState } from "./use-data-table-url-state";
+import useSWR from 'swr';
+import { useDataTableUrlState } from './use-data-table-url-state';
 
-// TypeScript interfaces for type safety (updated for generic team management)
-interface Team {
+// TypeScript interfaces matching the API response structure
+export interface Team {
   id: number;
-  teamCode: string | null; // UPDATED: teamCode instead of kitchenCode
+  teamCode: string | null;
   name: string;
   region: string;
   address?: string;
   managerId?: number;
   managerName?: string;
   managerEmail?: string;
-  teamType: string; // NEW: Team type field
+  teamType: string;
   status: string;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt?: Date;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  deletedAt?: Date | null;
 }
 
-interface TeamsResponse {
+export interface TeamsResponse {
   data: Team[];
   pagination: {
     page: number;
@@ -31,55 +31,67 @@ interface TeamsResponse {
   filters: {
     search?: string;
     region?: string;
-    status: string;
-    teamType: string; // NEW: Team type filter
-    sort: string;
-    order: string;
+    status?: string;
+    teamType?: string;
+    sort?: string;
+    order?: string;
   };
 }
 
 // Robust fetcher function with comprehensive error handling
-const fetcher = async (url: string): Promise<TeamsResponse> => {
-  const response = await fetch(url);
+const fetchTeams = async (url: string): Promise<TeamsResponse> => {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include', // Include cookies for session management
+  });
 
   if (!response.ok) {
     // Handle different HTTP error statuses
     if (response.status === 401) {
-      throw new Error("Unauthorized: Please log in to access team data");
+      throw new Error('Không có quyền truy cập. Vui lòng đăng nhập lại.');
     }
 
     if (response.status === 403) {
-      throw new Error(
-        "Forbidden: You do not have permission to view team data"
-      );
+      throw new Error('Bạn không có quyền xem danh sách nhóm.');
     }
 
     if (response.status >= 500) {
-      throw new Error(
-        "Server error: Unable to fetch team data. Please try again later."
-      );
+      throw new Error('Lỗi máy chủ. Không thể tải danh sách nhóm. Vui lòng thử lại sau.');
     }
 
     if (response.status === 400) {
       // Try to get detailed error message from response
       try {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Invalid request parameters");
+        throw new Error(errorData.error || 'Tham số yêu cầu không hợp lệ');
       } catch {
-        throw new Error("Invalid request parameters");
+        throw new Error('Tham số yêu cầu không hợp lệ');
       }
     }
 
     // Generic error for other status codes
     throw new Error(
-      `Failed to fetch teams: ${response.status} ${response.statusText}`
+      `Không thể tải danh sách nhóm: ${response.status} ${response.statusText}`
     );
   }
 
   try {
-    return await response.json();
-  } catch {
-    throw new Error("Invalid response format from server");
+    const data = await response.json();
+
+    // Validate response structure
+    if (!data || !Array.isArray(data.data)) {
+      throw new Error('Định dạng dữ liệu phản hồi không hợp lệ');
+    }
+
+    return data;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('định dạng')) {
+      throw error;
+    }
+    throw new Error('Định dạng dữ liệu phản hồi không hợp lệ từ máy chủ');
   }
 };
 
@@ -101,7 +113,7 @@ export function useTeams() {
     updateUrl,
   } = useDataTableUrlState({
     defaultFilters: {},
-    defaultSort: { column: "createdAt", order: "desc" }, // UPDATED: Default sort by creation date descending
+    defaultSort: { column: 'createdAt', order: 'desc' }, // Default sort by creation date descending
     defaultPagination: { page: 1, limit: 10 },
   });
 
@@ -111,33 +123,31 @@ export function useTeams() {
 
     // Add filters
     if (filters.search) {
-      params.set("search", filters.search);
+      params.set('search', filters.search);
     }
-    if (filters.region && filters.region !== "all") {
-      params.set("region", filters.region);
+    if (filters.region && filters.region !== 'all') {
+      params.set('region', filters.region);
     }
-    if (filters.status && filters.status !== "all") {
-      params.set("status", filters.status);
+    if (filters.status && filters.status !== 'all') {
+      params.set('status', filters.status);
     }
-
-    // NEW: Team type filter support
-    if (filters.teamType && filters.teamType !== "all") {
-      params.set("teamType", filters.teamType);
+    if (filters.teamType && filters.teamType !== 'all') {
+      params.set('teamType', filters.teamType);
     }
 
     // Add sorting
     if (sort.column) {
-      params.set("sort", sort.column);
+      params.set('sort', sort.column);
     }
     if (sort.order) {
-      params.set("order", sort.order);
+      params.set('order', sort.order);
     }
 
     // Add pagination
-    params.set("page", pagination.page.toString());
-    params.set("limit", pagination.limit.toString());
+    params.set('page', pagination.page.toString());
+    params.set('limit', pagination.limit.toString());
 
-    return `/api/teams?${params.toString()}`; // UPDATED: teams endpoint
+    return `/api/teams?${params.toString()}`;
   };
 
   const apiUrl = buildApiUrl();
@@ -145,7 +155,7 @@ export function useTeams() {
   // Configure SWR with optimized settings for team data
   const { data, error, isLoading, mutate } = useSWR<TeamsResponse>(
     apiUrl,
-    fetcher,
+    fetchTeams,
     {
       // Performance optimizations
       revalidateOnFocus: false, // Don't refetch when window gains focus
@@ -158,8 +168,10 @@ export function useTeams() {
       shouldRetryOnError: (error) => {
         // Don't retry on authentication/authorization errors
         if (
-          error?.message?.includes("Unauthorized") ||
-          error?.message?.includes("Forbidden")
+          error?.message?.includes('quyền truy cập') ||
+          error?.message?.includes('quyền xem') ||
+          error?.message?.includes('Unauthorized') ||
+          error?.message?.includes('Forbidden')
         ) {
           return false;
         }
@@ -169,21 +181,28 @@ export function useTeams() {
 
       // Performance monitoring
       onError: (error) => {
-        console.error("Team data fetch error:", error);
+        console.error('Team data fetch error:', error.message);
       },
 
-      // Success callback for debugging
+      // Success callback for debugging (development only)
       onSuccess: (data) => {
-        console.log(`Team data loaded: ${data.data.length} teams found`);
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Team data loaded: ${data.data.length} teams found`);
+        }
       },
+
+      // Keep data fresh
+      refreshInterval: 0, // No automatic polling - use manual refresh
+      revalidateIfStale: true, // Revalidate if data is stale
     }
   );
 
   // Return structured object with all necessary data and functions
   return {
     // Data
-    teams: data?.data || [], // UPDATED: teams instead of kitchens
+    teams: data?.data || [],
     pagination: data?.pagination,
+
     filters: data?.filters,
 
     // State management from URL hook
@@ -206,7 +225,6 @@ export function useTeams() {
     // Loading and error states
     isLoading,
     error,
-
     // Computed properties for convenience
     isEmpty: !isLoading && (!data?.data || data.data.length === 0),
     isValidating: isLoading, // Alias for consistency
@@ -225,28 +243,23 @@ export function useTeams() {
     hasPrevPage: data?.pagination ? data.pagination.page > 1 : false,
 
     // Summary data
-    totalTeams: data?.pagination?.total || 0, // UPDATED: totalTeams instead of totalKitchens
+    totalTeams: data?.pagination?.total || 0,
     currentPageSize: data?.data?.length || 0,
+    totalPages: data?.pagination?.pages || 0,
 
-    // Team-specific helpers (generalized from kitchen-specific)
-    kitchenTeams: data?.data?.filter((team) => team.teamType === "KITCHEN") || [],
-    officeTeams: data?.data?.filter((team) => team.teamType === "OFFICE") || [],
-    activeTeams: data?.data?.filter((team) => team.status === "active") || [],
-    inactiveTeams: data?.data?.filter((team) => team.status === "inactive") || [],
+    // Team-specific helpers
+    activeTeams: data?.data?.filter((team) => team.status === 'active') || [],
+    inactiveTeams: data?.data?.filter((team) => team.status === 'inactive') || [],
 
     // Team type breakdown
-    teamsByType: data?.data?.reduce((acc, team) => {
-      acc[team.teamType] = (acc[team.teamType] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>) || {},
+    kitchenTeams: data?.data?.filter((team) => team.teamType === 'KITCHEN') || [],
+    officeTeams: data?.data?.filter((team) => team.teamType === 'OFFICE') || [],
 
-    // Region breakdown
-    teamsByRegion: data?.data?.reduce((acc, team) => {
-      if (team.region) {
-        acc[team.region] = (acc[team.region] || 0) + 1;
-      }
-      return acc;
-    }, {} as Record<string, number>) || {},
+    // Team lookup helpers
+    getTeamById: (id: number) => data?.data?.find(team => team.id === id),
+    getTeamByCode: (code: string) => data?.data?.find(team =>
+      team.teamCode?.toLowerCase() === code.toLowerCase()
+    ),
   };
 }
 

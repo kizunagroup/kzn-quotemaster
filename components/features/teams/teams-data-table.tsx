@@ -12,7 +12,6 @@ import { MoreHorizontal, Edit, PowerOff, Play } from "lucide-react";
 import { toast } from "sonner";
 
 import { useTeams, type Team } from "@/lib/hooks/use-teams";
-import { useDataTableUrlState } from "@/lib/hooks/use-data-table-url-state";
 import { getRegions, activateTeam } from "@/lib/actions/team.actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -118,38 +117,30 @@ export function TeamsDataTable() {
   const [allRegions, setAllRegions] = useState<string[]>([]);
   const [regionsLoading, setRegionsLoading] = useState(false);
 
-  // URL state management
+  // Fetch teams data using our custom hook - CENTRALIZED STATE MANAGEMENT like Products
   const {
-    filters,
-    sort,
+    teams,
+    pagination,
+    isLoading,
+    error,
+    isEmpty,
+    refresh,
+    urlState,
     setSearch,
     setFilter,
     setSort,
     setPagination,
     clearFilters,
     hasActiveFilters,
-  } = useDataTableUrlState({
-    defaultSort: { column: "createdAt", order: "desc" },
-    defaultPagination: { page: 1, limit: 10 },
-  });
-
-  // Fetch teams data using our custom hook
-  const {
-    teams,
-    pagination: teamsPagination,
-    isLoading,
-    error,
-    isEmpty,
-    refresh,
   } = useTeams();
 
   // Convert our URL sort state to TanStack Table sorting format
   const sorting: SortingState = useMemo(() => {
-    if (sort.column && sort.order) {
-      return [{ id: sort.column, desc: sort.order === "desc" }];
+    if (urlState.sort.column && urlState.sort.order) {
+      return [{ id: urlState.sort.column, desc: urlState.sort.order === "desc" }];
     }
     return [];
-  }, [sort.column, sort.order]);
+  }, [urlState.sort.column, urlState.sort.order]);
 
   // Handle TanStack Table sorting changes and sync with URL state
   const handleSortingChange = (updater: any) => {
@@ -428,15 +419,15 @@ export function TeamsDataTable() {
     <div className="space-y-4">
       {/* Toolbar */}
       <TeamsTableToolbar
-        searchValue={filters.search || ""}
+        searchValue={urlState.filters.search || ""}
         onSearchChange={handleSearchChange}
         regions={allRegions}
         regionsLoading={regionsLoading}
-        selectedRegion={filters.region || "all"}
+        selectedRegion={urlState.filters.region || "all"}
         onRegionChange={handleRegionChange}
-        selectedStatus={filters.status || "all"}
+        selectedStatus={urlState.filters.status || "all"}
         onStatusChange={handleStatusChange}
-        selectedTeamType={filters.teamType || "all"}
+        selectedTeamType={urlState.filters.teamType || "all"}
         onTeamTypeChange={handleTeamTypeChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
@@ -508,9 +499,9 @@ export function TeamsDataTable() {
       </div>
 
       {/* Pagination */}
-      {teamsPagination && (
+      {pagination && (
         <DataTablePagination
-          pagination={teamsPagination}
+          pagination={pagination}
           onPageChange={handlePageChange}
           onPageSizeChange={handlePageSizeChange}
         />
