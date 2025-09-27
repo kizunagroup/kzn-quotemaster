@@ -569,7 +569,7 @@ async function seedQuotations() {
   const regions = Object.keys(regionGroups);
   console.log(`✅ Found ${regions.length} regions: ${regions.join(', ')}`);
 
-  // 5. Data Generation Loop
+  // 5. Data Generation Loop - FIXED: Using unique combinations to prevent constraint violations
   const quotationData = [];
   const quotationItemsMap = new Map(); // Map quotationId to its items
   const productCategories = ['Grains', 'Vegetables', 'Meat', 'Seafood', 'Spices', 'Beverages'];
@@ -577,94 +577,109 @@ async function seedQuotations() {
   for (const period of periods) {
     console.log(`   Generating quotations for period: ${period}`);
 
+    // CRITICAL FIX: Create all unique combinations for this period first
+    const uniqueCombinations = [];
+
     for (const supplier of allSuppliers) {
-      // Create 3-6 quotations per supplier per period
-      const quotationsPerSupplier = Math.floor(Math.random() * 4) + 3; // 3-6 quotations
-
-      for (let i = 0; i < quotationsPerSupplier; i++) {
-        const randomUser = procurementUsers[Math.floor(Math.random() * procurementUsers.length)];
-        const randomCategory = productCategories[Math.floor(Math.random() * productCategories.length)];
-        const statuses = ['pending', 'approved', 'cancelled', 'negotiation'];
-        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-
-        // Critical: 70% specific kitchen, 30% regional (all kitchens in region)
-        const isRegionalQuote = Math.random() < 0.3; // 30% chance for regional quotes
-        const teamsToQuote = [];
-
-        if (isRegionalQuote) {
-          // Regional quotation - all kitchens in selected region
-          const randomRegion = regions[Math.floor(Math.random() * regions.length)];
-          teamsToQuote.push(...regionGroups[randomRegion]);
-          console.log(`     Creating regional quotation for ${randomRegion} (${regionGroups[randomRegion].length} kitchens)`);
-        } else {
-          // Specific kitchen quotation
-          const randomKitchen = kitchenTeams[Math.floor(Math.random() * kitchenTeams.length)];
-          teamsToQuote.push(randomKitchen);
-        }
-
-        // Generate quotations for each target team
-        for (const targetTeam of teamsToQuote) {
-          const quotationId = `Q${period.replace(/-/g, '')}${supplier.supplierCode}${targetTeam.id.toString().padStart(3, '0')}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
-
-          // Create quotation record
-          const quotationRecord = {
-            quotationId: quotationId,
-            period: period,
-            supplierId: supplier.id,
-            teamId: targetTeam.id,
-            region: targetTeam.region,
-            category: randomCategory,
-            quoteDate: new Date(period),
-            updateDate: new Date(),
-            status: randomStatus,
-            createdBy: randomUser.id,
-            createdAt: new Date(period),
-            updatedAt: new Date(),
-          };
-
-          quotationData.push(quotationRecord);
-
-          // Generate 5-10 quote items for this quotation
-          const itemCount = Math.floor(Math.random() * 6) + 5; // 5-10 items
-          const categoryProducts = allProducts.filter(p => p.category === randomCategory);
-          const productsToUse = categoryProducts.length > 0 ? categoryProducts : allProducts;
-          const quotationItems = [];
-
-          for (let itemIndex = 0; itemIndex < itemCount; itemIndex++) {
-            const randomProduct = productsToUse[Math.floor(Math.random() * productsToUse.length)];
-
-            // Generate realistic pricing based on product base price (if exists) or random values
-            const basePrice = 50000 + Math.random() * 500000; // 50k - 550k VND base
-            const initialPrice = Math.round(basePrice * (0.9 + Math.random() * 0.2)); // ±10% variation
-            const quantity = Math.floor(Math.random() * 100) + 10; // 10-109 units
-            const vatPercentage = Math.random() < 0.7 ? 10 : 5; // 70% chance of 10% VAT, 30% chance of 5%
-
-            const quoteItemRecord = {
-              quotationId: null, // Will be set after quotation is inserted
-              productId: randomProduct.id,
-              quantity: quantity.toString(),
-              initialPrice: initialPrice.toString(),
-              negotiatedPrice: randomStatus === 'negotiation' ? Math.round(initialPrice * 0.95).toString() : null,
-              approvedPrice: randomStatus === 'approved' ? Math.round(initialPrice * 0.98).toString() : null,
-              vatPercentage: vatPercentage.toString(),
-              currency: 'VND',
-              pricePerUnit: Math.round(initialPrice / quantity).toString(),
-              negotiationRounds: randomStatus === 'negotiation' ? Math.floor(Math.random() * 3) + 1 : 0,
-              lastNegotiatedAt: randomStatus === 'negotiation' ? new Date() : null,
-              approvedAt: randomStatus === 'approved' ? new Date() : null,
-              approvedBy: randomStatus === 'approved' ? randomUser.id : null,
-              notes: `${randomProduct.name} cho ${targetTeam.name} - Kỳ ${period}`,
-              createdAt: new Date(period),
-              updatedAt: new Date(),
-            };
-
-            quotationItems.push(quoteItemRecord);
-          }
-
-          // Store items for this quotation
-          quotationItemsMap.set(quotationId, quotationItems);
-        }
+      for (const kitchen of kitchenTeams) {
+        uniqueCombinations.push({
+          supplier: supplier,
+          kitchen: kitchen,
+          combinationKey: `${supplier.id}-${kitchen.id}` // For tracking uniqueness
+        });
       }
+    }
+
+    console.log(`   Total possible combinations: ${uniqueCombinations.length} (${allSuppliers.length} suppliers × ${kitchenTeams.length} kitchens)`);
+
+    // Shuffle the combinations array for randomness
+    for (let i = uniqueCombinations.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [uniqueCombinations[i], uniqueCombinations[j]] = [uniqueCombinations[j], uniqueCombinations[i]];
+    }
+
+    // Take a random subset (30-60% of total combinations) to generate quotations
+    const quotationsToGenerate = Math.floor(uniqueCombinations.length * (0.3 + Math.random() * 0.3)); // 30-60%
+    const selectedCombinations = uniqueCombinations.slice(0, quotationsToGenerate);
+
+    console.log(`   Creating ${selectedCombinations.length} unique quotations (${Math.round((selectedCombinations.length / uniqueCombinations.length) * 100)}% of possible combinations)`);
+
+    // Generate quotations from selected unique combinations
+    for (const combination of selectedCombinations) {
+      const randomUser = procurementUsers[Math.floor(Math.random() * procurementUsers.length)];
+      const randomCategory = productCategories[Math.floor(Math.random() * productCategories.length)];
+      const statuses = ['pending', 'approved', 'cancelled', 'negotiation'];
+      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+      // Generate unique quotation ID
+      const quotationId = `Q${period.replace(/-/g, '')}${combination.supplier.supplierCode}${combination.kitchen.id.toString().padStart(3, '0')}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
+
+      // Create quotation record - GUARANTEED UNIQUE (period, supplier, team) combination
+      const quotationRecord = {
+        quotationId: quotationId,
+        period: period,
+        supplierId: combination.supplier.id,
+        teamId: combination.kitchen.id,
+        region: combination.kitchen.region,
+        category: randomCategory,
+        quoteDate: new Date(period),
+        updateDate: new Date(),
+        status: randomStatus,
+        createdBy: randomUser.id,
+        createdAt: new Date(period),
+        updatedAt: new Date(),
+      };
+
+      quotationData.push(quotationRecord);
+
+      // Generate 5-10 quote items for this quotation with UNIQUE products
+      const categoryProducts = allProducts.filter(p => p.category === randomCategory);
+      const productsToUse = categoryProducts.length > 0 ? categoryProducts : allProducts;
+
+      // Shuffle products and take unique subset to prevent duplicates
+      const shuffledProducts = [...productsToUse];
+      for (let i = shuffledProducts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledProducts[i], shuffledProducts[j]] = [shuffledProducts[j], shuffledProducts[i]];
+      }
+
+      const itemCount = Math.min(Math.floor(Math.random() * 6) + 5, shuffledProducts.length); // 5-10 items or max available products
+      const selectedProducts = shuffledProducts.slice(0, itemCount);
+      const quotationItems = [];
+
+      for (let itemIndex = 0; itemIndex < selectedProducts.length; itemIndex++) {
+        const randomProduct = selectedProducts[itemIndex];
+
+        // Generate realistic pricing based on product base price (if exists) or random values
+        const basePrice = 50000 + Math.random() * 500000; // 50k - 550k VND base
+        const initialPrice = Math.round(basePrice * (0.9 + Math.random() * 0.2)); // ±10% variation
+        const quantity = Math.floor(Math.random() * 100) + 10; // 10-109 units
+        const vatPercentage = Math.random() < 0.7 ? 10 : 5; // 70% chance of 10% VAT, 30% chance of 5%
+
+        const quoteItemRecord = {
+          quotationId: null, // Will be set after quotation is inserted
+          productId: randomProduct.id,
+          quantity: quantity.toString(),
+          initialPrice: initialPrice.toString(),
+          negotiatedPrice: randomStatus === 'negotiation' ? Math.round(initialPrice * 0.95).toString() : null,
+          approvedPrice: randomStatus === 'approved' ? Math.round(initialPrice * 0.98).toString() : null,
+          vatPercentage: vatPercentage.toString(),
+          currency: 'VND',
+          pricePerUnit: Math.round(initialPrice / quantity).toString(),
+          negotiationRounds: randomStatus === 'negotiation' ? Math.floor(Math.random() * 3) + 1 : 0,
+          lastNegotiatedAt: randomStatus === 'negotiation' ? new Date() : null,
+          approvedAt: randomStatus === 'approved' ? new Date() : null,
+          approvedBy: randomStatus === 'approved' ? randomUser.id : null,
+          notes: `${randomProduct.name} cho ${combination.kitchen.name} - Kỳ ${period}`,
+          createdAt: new Date(period),
+          updatedAt: new Date(),
+        };
+
+        quotationItems.push(quoteItemRecord);
+      }
+
+      // Store items for this quotation
+      quotationItemsMap.set(quotationId, quotationItems);
     }
   }
 
