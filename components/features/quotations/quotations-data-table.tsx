@@ -32,6 +32,18 @@ import {
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
+// Temporary permissions hook - TODO: Replace with actual permissions system
+const usePermissions = () => {
+  // For now, we'll assume basic permissions based on the quotations display
+  // This will be replaced with actual user permissions from the auth system
+  return {
+    canViewQuotes: true, // All users who can access this page can view quotes
+    canApproveQuotes: true, // TODO: Replace with actual role-based logic
+    canNegotiateQuotes: true, // TODO: Replace with actual role-based logic
+    canCancelQuotes: true, // TODO: Replace with actual role-based logic
+  };
+};
+
 import { QuotationsTableToolbar } from "./quotations-table-toolbar";
 import { QuotationViewModal } from "./quotation-view-modal";
 import { QuotationStatusDialog } from "./quotation-status-dialog";
@@ -96,6 +108,9 @@ export function QuotationsDataTable() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState<Quotation | null>(null);
+
+  // Get user permissions for conditional UI rendering
+  const permissions = usePermissions();
 
   // Fetch quotation data using our custom hook
   const {
@@ -306,6 +321,11 @@ export function QuotationsDataTable() {
       cell: ({ row }) => {
         const quotation = row.original;
 
+        // Only render actions dropdown if user has view permissions
+        if (!permissions.canViewQuotes) {
+          return <div className="text-center text-muted-foreground">-</div>;
+        }
+
         return (
           <div className="flex justify-center">
             <DropdownMenu>
@@ -316,18 +336,37 @@ export function QuotationsDataTable() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {/* View action - always available if user can view quotes */}
                 <DropdownMenuItem onClick={() => handleViewClick(quotation)}>
                   <Eye className="mr-2 h-4 w-4" />
                   Xem chi tiết
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {quotation.status === "pending" && (
+
+                {/* Conditional separator - only show if there are additional actions */}
+                {(permissions.canApproveQuotes && quotation.status === "pending") ||
+                (permissions.canCancelQuotes && quotation.status !== "cancelled") ? (
+                  <DropdownMenuSeparator />
+                ) : null}
+
+                {/* Approve action - only for pending quotes and users with approval rights */}
+                {permissions.canApproveQuotes && quotation.status === "pending" && (
                   <DropdownMenuItem onClick={() => handleStatusClick(quotation)}>
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Duyệt báo giá
                   </DropdownMenuItem>
                 )}
-                {quotation.status !== "cancelled" && (
+
+                {/* Negotiate action - only for pending/negotiation quotes and users with negotiate rights */}
+                {permissions.canNegotiateQuotes &&
+                 (quotation.status === "pending" || quotation.status === "negotiation") && (
+                  <DropdownMenuItem onClick={() => handleStatusClick(quotation)}>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Thương lượng
+                  </DropdownMenuItem>
+                )}
+
+                {/* Cancel action - only for non-cancelled quotes and users with cancel rights */}
+                {permissions.canCancelQuotes && quotation.status !== "cancelled" && (
                   <DropdownMenuItem
                     onClick={() => handleStatusClick(quotation)}
                     className="text-destructive"
