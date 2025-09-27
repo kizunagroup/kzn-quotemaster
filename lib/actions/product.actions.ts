@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/drizzle';
 import { products } from '@/lib/db/schema';
-import { eq, and, ilike, isNull, sql } from 'drizzle-orm';
+import { eq, and, ilike, isNull, sql, asc } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 import { checkPermission } from '@/lib/auth/permissions';
 import {
@@ -286,5 +286,48 @@ export async function deleteProduct(id: number): Promise<ActionResult> {
   } catch (error) {
     console.error('Error deleting product:', error);
     return { error: 'Có lỗi xảy ra khi xóa hàng hóa. Vui lòng thử lại.' };
+  }
+}
+
+// Server Action: Get Product Categories
+export async function getProductCategories(): Promise<string[] | { error: string }> {
+  try {
+    // 1. Authorization Check (CRITICAL FIRST STEP)
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền truy cập' };
+    }
+
+    // Check if user has permission to view products
+    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    if (!hasPermission) {
+      return { error: 'Bạn không có quyền xem danh sách hàng hóa' };
+    }
+
+    // 2. Database Query - Get distinct categories
+    const result = await db
+      .selectDistinct({
+        category: products.category
+      })
+      .from(products)
+      .where(
+        and(
+          isNull(products.deletedAt), // Exclude soft-deleted records
+          sql`${products.category} IS NOT NULL AND TRIM(${products.category}) != ''` // Exclude null/empty categories
+        )
+      )
+      .orderBy(asc(products.category));
+
+    // 3. Extract and return category strings
+    const categories = result
+      .map(row => row.category)
+      .filter((category): category is string =>
+        category !== null && category.trim() !== ''
+      );
+
+    return categories;
+  } catch (error) {
+    console.error('Error fetching product categories:', error);
+    return { error: 'Có lỗi xảy ra khi tải danh sách nhóm hàng' };
   }
 }

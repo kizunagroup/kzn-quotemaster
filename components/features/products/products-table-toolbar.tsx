@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
+import { getProductCategories } from "@/lib/actions/product.actions";
 import type { Product } from "@/lib/hooks/use-products";
 
 // Single source of truth for status options - STANDARDIZED
@@ -34,16 +35,6 @@ const statusOptions = [
   { value: "all", label: "Tất cả trạng thái" },
   { value: "active", label: "Hoạt Động" },
   { value: "inactive", label: "Tạm Dừng" },
-] as const;
-
-// Category options - placeholder for now, can be dynamic later
-const categoryOptions = [
-  { value: "all", label: "Tất cả nhóm hàng" },
-  { value: "thuc-pham", label: "Thực phẩm" },
-  { value: "gia-vi", label: "Gia vị" },
-  { value: "nuoc-uong", label: "Nước uống" },
-  { value: "dung-cu", label: "Dụng cụ" },
-  { value: "khac", label: "Khác" },
 ] as const;
 
 interface ProductsTableToolbarProps {
@@ -83,6 +74,10 @@ export function ProductsTableToolbar({
   // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
 
+  // Category state - dynamic loading from database
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+
   // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
 
@@ -98,10 +93,42 @@ export function ProductsTableToolbar({
     }
   }, [debouncedSearchValue, searchValue, onSearchChange]);
 
+  // Fetch categories when component mounts
+  useEffect(() => {
+    const fetchCategories = async () => {
+      setCategoriesLoading(true);
+      try {
+        const result = await getProductCategories();
+        if (Array.isArray(result)) {
+          setCategories(result);
+        } else {
+          console.error("Failed to fetch categories:", result.error);
+          setCategories([]);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        setCategories([]);
+      } finally {
+        setCategoriesLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
   // Handle local search input change
   const handleLocalSearchChange = (value: string) => {
     setLocalSearchValue(value);
   };
+
+  // Build category options dynamically
+  const categoryOptions = [
+    { value: "all", label: "Tất cả nhóm hàng" },
+    ...categories.map(category => ({
+      value: category,
+      label: category,
+    })),
+  ];
 
   return (
     <DataTableToolbar
@@ -183,10 +210,14 @@ export function ProductsTableToolbar({
         </div>
       }
     >
-      {/* Category Filter */}
-      <Select value={selectedCategory} onValueChange={onCategoryChange}>
+      {/* Category Filter - Dynamic Loading */}
+      <Select
+        value={selectedCategory}
+        onValueChange={onCategoryChange}
+        disabled={categoriesLoading}
+      >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder="Nhóm hàng" />
+          <SelectValue placeholder={categoriesLoading ? "Đang tải..." : "Nhóm hàng"} />
         </SelectTrigger>
         <SelectContent>
           {categoryOptions.map((option) => (
@@ -232,4 +263,4 @@ function getColumnDisplayName(columnId: string): string {
 }
 
 // Export options for use in other components
-export { statusOptions, categoryOptions };
+export { statusOptions };

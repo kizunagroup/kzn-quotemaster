@@ -11,6 +11,7 @@ export interface DataTableFilters {
   department?: string;
   team?: string;
   teamType?: string;
+  category?: string;
   [key: string]: string | undefined;
 }
 
@@ -34,6 +35,9 @@ export interface DataTableState {
 const DEFAULT_PAGINATION = { page: 1, limit: 10 };
 const DEFAULT_SORT = { column: undefined, order: undefined as 'asc' | 'desc' | undefined };
 const DEFAULT_FILTERS = {};
+
+// Predefined list of filterable keys for generic parsing
+const FILTERABLE_KEYS = ['region', 'status', 'department', 'team', 'teamType', 'category'];
 
 interface UseDataTableUrlStateOptions {
   defaultFilters?: DataTableFilters;
@@ -78,25 +82,23 @@ export function useDataTableUrlState(
   const currentState = useMemo((): DataTableState => {
     const params = new URLSearchParams(searchParams.toString());
 
-    // Parse filters
+    // Parse filters - start with default filters
     const filters: DataTableFilters = { ...defaultFilters };
+
+    // Handle search separately as it doesn't use 'all' logic
     const search = params.get('search');
-    const region = params.get('region');
-    const status = params.get('status');
-    const department = params.get('department');
-    const team = params.get('team');
-    const teamType = params.get('teamType');
-
     if (search) filters.search = search;
-    if (region && region !== 'all') filters.region = region;
-    if (status && status !== 'all') filters.status = status;
-    if (department && department !== 'all') filters.department = department;
-    if (team && team !== 'all') filters.team = team;
-    if (teamType && teamType !== 'all') filters.teamType = teamType;
 
-    // Debug logging for department filter
+    // Generic filter parsing for all filterable keys
+    FILTERABLE_KEYS.forEach(key => {
+      const value = params.get(key);
+      if (value && value !== 'all') {
+        filters[key] = value;
+      }
+    });
+
+    // Debug logging for filters
     if (process.env.NODE_ENV === 'development') {
-      console.log('useDataTableUrlState - URL department param:', department);
       console.log('useDataTableUrlState - Final filters:', filters);
     }
 
@@ -215,16 +217,13 @@ export function useDataTableUrlState(
     router.replace(pathname);
   }, [router, pathname]);
 
-  // Check if there are active filters
+  // Check if there are active filters - generic approach
   const hasActiveFilters = useMemo(() => {
-    return Boolean(
-      currentState.filters.search ||
-      currentState.filters.region ||
-      currentState.filters.status ||
-      currentState.filters.department ||
-      currentState.filters.team ||
-      currentState.filters.teamType
-    );
+    // Check search filter
+    if (currentState.filters.search) return true;
+
+    // Check all filterable keys generically
+    return FILTERABLE_KEYS.some(key => currentState.filters[key]);
   }, [currentState.filters]);
 
   return {
