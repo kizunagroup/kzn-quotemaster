@@ -208,7 +208,7 @@ export function ProductsTableToolbar({
           {/* Create Button */}
           <Button onClick={onCreateClick}>
             <Plus className="mr-2 h-4 w-4" />
-            Thêm
+            Thêm Hàng hóa
           </Button>
         </div>
       }

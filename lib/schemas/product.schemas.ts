@@ -37,9 +37,6 @@ const baseProductSchema = {
       (val) => !val || (!isNaN(Number(val)) && Number(val) > 0),
       "Số lượng cơ sở phải là số dương"
     ),
-  status: z.enum(["active", "inactive"], {
-    errorMap: () => ({ message: "Trạng thái không hợp lệ" }),
-  }),
 };
 
 // Create schema

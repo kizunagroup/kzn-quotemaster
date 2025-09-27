@@ -24,13 +24,6 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -74,7 +67,6 @@ export function ProductFormModal({
       category: '',
       basePrice: '',
       baseQuantity: '',
-      status: 'active',
       ...(isEditMode && product && {
         id: product.id,
       }),
@@ -98,7 +90,6 @@ export function ProductFormModal({
           category: product.category || '',
           basePrice: product.basePrice || '',
           baseQuantity: product.baseQuantity || '',
-          status: product.status as 'active' | 'inactive',
         });
       } else {
         // Reset form for create mode
@@ -110,7 +101,6 @@ export function ProductFormModal({
           category: '',
           basePrice: '',
           baseQuantity: '',
-          status: 'active',
         });
       }
     }
@@ -356,32 +346,6 @@ export function ProductFormModal({
               )}
             />
 
-            {/* Status - Full width */}
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Trạng thái</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    disabled={isSubmitting}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn trạng thái" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Hoạt Động</SelectItem>
-                      <SelectItem value="inactive">Tạm Dừng</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <DialogFooter className="gap-2">
               <Button
