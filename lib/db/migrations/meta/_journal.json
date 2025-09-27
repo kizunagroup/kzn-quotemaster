@@ -43,6 +43,13 @@
       "when": 1758931371442,
       "tag": "0005_awesome_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1758996043382,
+      "tag": "0006_yummy_nemesis",
+      "breakpoints": true
     }
   ]
 }
