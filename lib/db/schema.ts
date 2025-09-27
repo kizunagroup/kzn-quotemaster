@@ -156,19 +156,31 @@ export const suppliers = pgTable(
   })
 );
 
-export const products = pgTable('products', {
-  id: serial('id').primaryKey(),
-  productCode: varchar('product_code', { length: 50 }).notNull().unique(),
-  name: varchar('name', { length: 200 }).notNull(),
-  specification: text('specification'),
-  unit: varchar('unit', { length: 50 }).notNull(),
-  category: varchar('category', { length: 100 }).notNull(),
-  basePrice: decimal('base_price', { precision: 12, scale: 2 }),
-  baseQuantity: decimal('base_quantity', { precision: 10, scale: 2 }),
-  status: varchar('status', { length: 20 }).default('active').notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+export const products = pgTable(
+  'products',
+  {
+    id: serial('id').primaryKey(),
+    productCode: varchar('product_code', { length: 50 }).unique().notNull(),
+    name: varchar('name', { length: 200 }).notNull(),
+    specification: text('specification'), // Quy cách
+    unit: varchar('unit', { length: 50 }).notNull(), // Đvt (Đơn vị tính)
+    category: varchar('category', { length: 100 }).notNull(), // Nhóm hàng
+    basePrice: decimal('base_price', { precision: 12, scale: 2 }), // Giá cơ sở - Reference base price
+    baseQuantity: decimal('base_quantity', { precision: 10, scale: 2 }), // Fallback quantity for price calculations
+    status: varchar('status', { length: 20 }).notNull().default('active'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+    deletedAt: timestamp('deleted_at'),
+  },
+  (table) => ({
+    productCodeIdx: index('idx_products_product_code').on(table.productCode),
+    nameIdx: index('idx_products_name').on(table.name),
+    categoryIdx: index('idx_products_category').on(table.category),
+    statusIdx: index('idx_products_status').on(table.status),
+    categoryStatusIdx: index('idx_products_category_status').on(table.category, table.status),
+    deletedAtIdx: index('idx_products_deleted_at').on(table.deletedAt),
+  })
+);
 
 export const quotations = pgTable('quotations', {
   id: serial('id').primaryKey(),

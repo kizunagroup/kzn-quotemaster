@@ -36,6 +36,13 @@
       "when": 1758822395744,
       "tag": "0004_supreme_maestro",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1758931371442,
+      "tag": "0005_awesome_justice",
+      "breakpoints": true
     }
   ]
 }
