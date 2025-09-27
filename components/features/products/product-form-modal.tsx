@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { CategoryCombobox } from './category-combobox';
 
 import {
   createProduct,
@@ -270,9 +271,10 @@ export function ProductFormModal({
                   <FormItem>
                     <FormLabel>Nhóm hàng *</FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="VD: Thực phẩm, Gia vị"
-                        {...field}
+                      <CategoryCombobox
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Chọn hoặc nhập nhóm hàng..."
                         disabled={isSubmitting}
                       />
                     </FormControl>
