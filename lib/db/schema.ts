@@ -197,6 +197,13 @@ export const quotations = pgTable('quotations', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
+  // Performance indexes for quotations display
+  periodIdx: index('idx_quotations_period').on(table.period),
+  supplierTeamIdx: index('idx_quotations_supplier_team').on(table.supplierId, table.teamId),
+  statusPeriodIdx: index('idx_quotations_status_period').on(table.status, table.period),
+  teamStatusIdx: index('idx_quotations_team_status').on(table.teamId, table.status),
+
+  // Existing constraints
   uniqueQuotePerTeamPerPeriod: unique().on(table.period, table.supplierId, table.teamId),
   periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
   validStatus: check('valid_status', sql`${table.status} IN ('pending', 'approved', 'cancelled', 'negotiation')`),
