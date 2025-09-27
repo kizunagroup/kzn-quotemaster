@@ -48,6 +48,7 @@ interface SuppliersTableToolbarProps {
   // Filter state
   onClearFilters: () => void;
   hasActiveFilters: boolean;
+  hasActiveFiltersOnly?: boolean;
 
   // Table instance for column visibility
   table: Table<Supplier>;
@@ -63,6 +64,7 @@ export function SuppliersTableToolbar({
   onStatusChange,
   onClearFilters,
   hasActiveFilters,
+  hasActiveFiltersOnly = false,
   table,
   onCreateClick,
 }: SuppliersTableToolbarProps) {
@@ -96,6 +98,7 @@ export function SuppliersTableToolbar({
       onSearchChange={handleLocalSearchChange}
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
+      hasActiveFiltersOnly={hasActiveFiltersOnly}
       actions={
         <div className="flex items-center gap-2">
           {/* Column Visibility Toggle */}

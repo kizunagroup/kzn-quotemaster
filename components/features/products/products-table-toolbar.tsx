@@ -51,6 +51,7 @@ interface ProductsTableToolbarProps {
   // Filter state
   onClearFilters: () => void;
   hasActiveFilters: boolean;
+  hasActiveFiltersOnly?: boolean;
 
   // Table instance for column visibility
   table: Table<Product>;
@@ -68,6 +69,7 @@ export function ProductsTableToolbar({
   onStatusChange,
   onClearFilters,
   hasActiveFilters,
+  hasActiveFiltersOnly = false,
   table,
   onCreateClick,
 }: ProductsTableToolbarProps) {
@@ -124,7 +126,7 @@ export function ProductsTableToolbar({
   // Build category options dynamically
   const categoryOptions = [
     { value: "all", label: "Tất cả nhóm hàng" },
-    ...categories.map(category => ({
+    ...categories.map((category) => ({
       value: category,
       label: category,
     })),
@@ -137,6 +139,7 @@ export function ProductsTableToolbar({
       onSearchChange={handleLocalSearchChange}
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
+      hasActiveFiltersOnly={hasActiveFiltersOnly}
       actions={
         <div className="flex items-center gap-2">
           {/* Column Visibility Toggle */}
@@ -217,7 +220,9 @@ export function ProductsTableToolbar({
         disabled={categoriesLoading}
       >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder={categoriesLoading ? "Đang tải..." : "Nhóm hàng"} />
+          <SelectValue
+            placeholder={categoriesLoading ? "Đang tải..." : "Nhóm hàng"}
+          />
         </SelectTrigger>
         <SelectContent>
           {categoryOptions.map((option) => (

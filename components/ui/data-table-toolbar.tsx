@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { Search, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface DataTableToolbarProps {
   // Search functionality
@@ -15,7 +15,8 @@ interface DataTableToolbarProps {
 
   // Clear functionality
   onClearFilters?: () => void;
-  hasActiveFilters?: boolean;
+  hasActiveFilters?: boolean; // Includes search (for backward compatibility)
+  hasActiveFiltersOnly?: boolean; // Excludes search (for clear filters button)
 
   // Action buttons (e.g., Add New)
   actions?: React.ReactNode;
@@ -25,12 +26,13 @@ interface DataTableToolbarProps {
 }
 
 export function DataTableToolbar({
-  searchValue = '',
-  searchPlaceholder = 'Tìm kiếm...',
+  searchValue = "",
+  searchPlaceholder = "Tìm kiếm...",
   onSearchChange,
   children,
   onClearFilters,
   hasActiveFilters = false,
+  hasActiveFiltersOnly = false,
   actions,
   className,
 }: DataTableToolbarProps) {
@@ -44,12 +46,12 @@ export function DataTableToolbar({
   // Handle clear search
   const handleClearSearch = () => {
     if (onSearchChange) {
-      onSearchChange('');
+      onSearchChange("");
     }
   };
 
   return (
-    <div className={`flex items-center justify-between ${className || ''}`}>
+    <div className={`flex items-center justify-between ${className || ""}`}>
       {/* Left side - Search and filters */}
       <div className="flex flex-1 items-center space-x-2">
         {/* Search input */}
@@ -78,13 +80,11 @@ export function DataTableToolbar({
 
         {/* Custom filter slot */}
         {children && (
-          <div className="flex items-center space-x-2">
-            {children}
-          </div>
+          <div className="flex items-center space-x-2">{children}</div>
         )}
 
-        {/* Clear filters button */}
-        {hasActiveFilters && onClearFilters && (
+        {/* Clear filters button - only show when there are active filters (excluding search) */}
+        {hasActiveFiltersOnly && onClearFilters && (
           <Button
             variant="ghost"
             size="sm"
@@ -98,11 +98,7 @@ export function DataTableToolbar({
       </div>
 
       {/* Right side - Action buttons */}
-      {actions && (
-        <div className="flex items-center space-x-2">
-          {actions}
-        </div>
-      )}
+      {actions && <div className="flex items-center space-x-2">{actions}</div>}
     </div>
   );
 }
@@ -142,7 +138,7 @@ interface FilterWrapperProps {
 
 export function FilterWrapper({ children, className }: FilterWrapperProps) {
   return (
-    <div className={`flex items-center space-x-2 ${className || ''}`}>
+    <div className={`flex items-center space-x-2 ${className || ""}`}>
       {children}
     </div>
   );

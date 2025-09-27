@@ -1,26 +1,40 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
   type SortingState,
-} from '@tanstack/react-table';
-import { MoreHorizontal, Edit, UserX, UserCheck, Users, Trash2, RotateCcw, Copy, CheckCircle2 } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@tanstack/react-table";
+import {
+  MoreHorizontal,
+  Edit,
+  UserX,
+  UserCheck,
+  Users,
+  Trash2,
+  RotateCcw,
+  Copy,
+  CheckCircle2,
+} from "lucide-react";
+import { toast } from "sonner";
 
-import { useStaff, type Staff } from '@/lib/hooks/use-staff';
-import { activateStaff, terminateStaff, resetPasswordByAdmin } from '@/lib/actions/staff.actions';
-import { Button } from '@/components/ui/button';
+import { useStaff, type Staff } from "@/lib/hooks/use-staff";
+import {
+  activateStaff,
+  terminateStaff,
+  resetPasswordByAdmin,
+} from "@/lib/actions/staff.actions";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -28,7 +42,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -36,39 +50,41 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
-import { DataTablePagination } from '@/components/ui/data-table-pagination';
-import { StaffTableToolbar } from './staff-table-toolbar';
-import { StaffFormModal } from './staff-form-modal';
-import { StaffDeleteDialog } from './staff-delete-dialog';
-import { TeamAssignmentModal } from './team-assignment-modal';
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { StaffTableToolbar } from "./staff-table-toolbar";
+import { StaffFormModal } from "./staff-form-modal";
+import { StaffDeleteDialog } from "./staff-delete-dialog";
+import { TeamAssignmentModal } from "./team-assignment-modal";
 
 // Status badge variant mapping
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'outline' => {
+const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'default';
-    case 'inactive':
-      return 'secondary';
-    case 'terminated':
-      return 'destructive';
+    case "active":
+      return "default";
+    case "inactive":
+      return "secondary";
+    case "terminated":
+      return "destructive";
     default:
-      return 'outline';
+      return "outline";
   }
 };
 
 // Status display mapping
 const getStatusDisplay = (status: string): string => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'Hoạt Động';
-    case 'inactive':
-      return 'Tạm Dừng';
-    case 'terminated':
-      return 'Đã Nghỉ';
+    case "active":
+      return "Hoạt Động";
+    case "inactive":
+      return "Tạm Dừng";
+    case "terminated":
+      return "Đã Nghỉ";
     default:
       return status;
   }
@@ -76,19 +92,19 @@ const getStatusDisplay = (status: string): string => {
 
 // Department display mapping
 const getDepartmentDisplay = (department: string | null): string => {
-  if (!department) return '-';
+  if (!department) return "-";
 
   switch (department.toUpperCase()) {
-    case 'ADMIN':
-      return 'Quản Trị';
-    case 'PROCUREMENT':
-      return 'Mua Sắm';
-    case 'KITCHEN':
-      return 'Bếp';
-    case 'ACCOUNTING':
-      return 'Kế Toán';
-    case 'OPERATIONS':
-      return 'Vận Hành';
+    case "ADMIN":
+      return "Quản Trị";
+    case "PROCUREMENT":
+      return "Mua Sắm";
+    case "KITCHEN":
+      return "Bếp";
+    case "ACCOUNTING":
+      return "Kế Toán";
+    case "OPERATIONS":
+      return "Vận Hành";
     default:
       return department;
   }
@@ -96,11 +112,11 @@ const getDepartmentDisplay = (department: string | null): string => {
 
 // Format hire date
 const formatHireDate = (date: Date | null): string => {
-  if (!date) return '-';
+  if (!date) return "-";
   try {
-    return new Date(date).toLocaleDateString('vi-VN');
+    return new Date(date).toLocaleDateString("vi-VN");
   } catch {
-    return '-';
+    return "-";
   }
 };
 
@@ -112,10 +128,14 @@ export function StaffDataTable() {
   const [isTeamAssignModalOpen, setIsTeamAssignModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
-  const [deleteActionType, setDeleteActionType] = useState<'deactivate' | 'terminate'>('deactivate');
+  const [deleteActionType, setDeleteActionType] = useState<
+    "deactivate" | "terminate"
+  >("deactivate");
 
   // Reset Password Modal states
-  const [resetPasswordTemp, setResetPasswordTemp] = useState<string | null>(null);
+  const [resetPasswordTemp, setResetPasswordTemp] = useState<string | null>(
+    null
+  );
   const [isCopied, setIsCopied] = useState(false);
   const [isResetting, setIsResetting] = useState<number | null>(null);
 
@@ -134,23 +154,27 @@ export function StaffDataTable() {
     setPagination,
     clearFilters,
     hasActiveFilters,
+    hasActiveFiltersOnly,
   } = useStaff();
 
   // Convert our URL sort state to TanStack Table sorting format
   const sorting: SortingState = useMemo(() => {
     if (urlState.sort.column && urlState.sort.order) {
-      return [{ id: urlState.sort.column, desc: urlState.sort.order === 'desc' }];
+      return [
+        { id: urlState.sort.column, desc: urlState.sort.order === "desc" },
+      ];
     }
     return [];
   }, [urlState.sort.column, urlState.sort.order]);
 
   // Handle TanStack Table sorting changes and sync with URL state
   const handleSortingChange = (updater: any) => {
-    const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
+    const newSorting =
+      typeof updater === "function" ? updater(sorting) : updater;
 
     if (newSorting.length === 0) {
       // No sorting - clear sort from URL
-      setSort('');
+      setSort("");
     } else {
       // Extract the first sort (single column sorting)
       const { id, desc } = newSorting[0];
@@ -164,15 +188,15 @@ export function StaffDataTable() {
   };
 
   const handleDepartmentChange = (value: string) => {
-    setFilter('department', value === 'all' ? null : value);
+    setFilter("department", value === "all" ? null : value);
   };
 
   const handleStatusChange = (value: string) => {
-    setFilter('status', value === 'all' ? null : value);
+    setFilter("status", value === "all" ? null : value);
   };
 
   const handleTeamChange = (value: string) => {
-    setFilter('team', value === 'all' ? null : value);
+    setFilter("team", value === "all" ? null : value);
   };
 
   const handlePageChange = (page: number) => {
@@ -195,13 +219,13 @@ export function StaffDataTable() {
 
   const handleDeleteClick = (staff: Staff) => {
     setSelectedStaff(staff);
-    setDeleteActionType('deactivate');
+    setDeleteActionType("deactivate");
     setIsDeleteModalOpen(true);
   };
 
   const handleTerminateClick = (staff: Staff) => {
     setSelectedStaff(staff);
-    setDeleteActionType('terminate');
+    setDeleteActionType("terminate");
     setIsDeleteModalOpen(true);
   };
 
@@ -224,8 +248,8 @@ export function StaffDataTable() {
         toast.error(result.error);
       }
     } catch (error) {
-      console.error('Activate staff error:', error);
-      toast.error('Có lỗi xảy ra khi kích hoạt nhân viên');
+      console.error("Activate staff error:", error);
+      toast.error("Có lỗi xảy ra khi kích hoạt nhân viên");
     } finally {
       setActivatingId(null);
     }
@@ -246,8 +270,8 @@ export function StaffDataTable() {
         toast.error(result.error);
       }
     } catch (error) {
-      console.error('Reset password error:', error);
-      toast.error('Có lỗi xảy ra khi reset mật khẩu nhân viên');
+      console.error("Reset password error:", error);
+      toast.error("Có lỗi xảy ra khi reset mật khẩu nhân viên");
     } finally {
       setIsResetting(null);
     }
@@ -259,13 +283,13 @@ export function StaffDataTable() {
       try {
         await navigator.clipboard.writeText(resetPasswordTemp);
         setIsCopied(true);
-        toast.success('Mật khẩu đã được sao chép');
+        toast.success("Mật khẩu đã được sao chép");
 
         // Reset copy status after 2 seconds
         setTimeout(() => setIsCopied(false), 2000);
       } catch (error) {
-        console.error('Failed to copy password:', error);
-        toast.error('Không thể sao chép mật khẩu');
+        console.error("Failed to copy password:", error);
+        toast.error("Không thể sao chép mật khẩu");
       }
     }
   };
@@ -305,97 +329,78 @@ export function StaffDataTable() {
   // Table column definitions
   const columns: ColumnDef<Staff>[] = [
     {
-      accessorKey: 'employeeCode',
+      accessorKey: "employeeCode",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Mã NV"
-          column={column}
-        />
+        <DataTableColumnHeader title="Mã NV" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('employeeCode') || '-'}</div>
+        <div className="font-medium">{row.getValue("employeeCode") || "-"}</div>
       ),
     },
     {
-      accessorKey: 'name',
+      accessorKey: "name",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Tên Nhân Viên"
-          column={column}
-        />
+        <DataTableColumnHeader title="Tên Nhân Viên" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate font-medium">{row.getValue('name')}</div>
-      ),
-    },
-    {
-      accessorKey: 'email',
-      enableSorting: true,
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Email"
-          column={column}
-        />
-      ),
-      cell: ({ row }) => (
-        <div className="max-w-[200px] truncate text-muted-foreground">{row.getValue('email')}</div>
-      ),
-    },
-    {
-      accessorKey: 'phone',
-      enableSorting: false,
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Điện Thoại"
-          column={column}
-        />
-      ),
-      cell: ({ row }) => (
-        <div>{row.getValue('phone') || '-'}</div>
-      ),
-    },
-    {
-      accessorKey: 'jobTitle',
-      enableSorting: true,
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Chức Danh"
-          column={column}
-        />
-      ),
-      cell: ({ row }) => (
-        <div className="max-w-[150px] truncate">
-          {row.getValue('jobTitle') || '-'}
+        <div className="max-w-[200px] truncate font-medium">
+          {row.getValue("name")}
         </div>
       ),
     },
     {
-      accessorKey: 'department',
+      accessorKey: "email",
+      enableSorting: true,
+      header: ({ column }) => (
+        <DataTableColumnHeader title="Email" column={column} />
+      ),
+      cell: ({ row }) => (
+        <div className="max-w-[200px] truncate text-muted-foreground">
+          {row.getValue("email")}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "phone",
+      enableSorting: false,
+      header: ({ column }) => (
+        <DataTableColumnHeader title="Điện Thoại" column={column} />
+      ),
+      cell: ({ row }) => <div>{row.getValue("phone") || "-"}</div>,
+    },
+    {
+      accessorKey: "jobTitle",
+      enableSorting: true,
+      header: ({ column }) => (
+        <DataTableColumnHeader title="Chức Danh" column={column} />
+      ),
+      cell: ({ row }) => (
+        <div className="max-w-[150px] truncate">
+          {row.getValue("jobTitle") || "-"}
+        </div>
+      ),
+    },
+    {
+      accessorKey: "department",
       enableSorting: true,
       enableHiding: true,
       meta: {
         defaultIsVisible: false,
       },
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Phòng Ban"
-          column={column}
-        />
+        <DataTableColumnHeader title="Phòng Ban" column={column} />
       ),
       cell: ({ row }) => (
-        <div>{getDepartmentDisplay(row.getValue('department'))}</div>
+        <div>{getDepartmentDisplay(row.getValue("department"))}</div>
       ),
     },
     {
-      id: 'currentTeams',
+      id: "currentTeams",
       enableSorting: false,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Nhóm Làm Việc"
-          column={column}
-        />
+        <DataTableColumnHeader title="Nhóm Làm Việc" column={column} />
       ),
       cell: ({ row }) => {
         const staff = row.original;
@@ -424,33 +429,25 @@ export function StaffDataTable() {
       },
     },
     {
-      accessorKey: 'hireDate',
+      accessorKey: "hireDate",
       enableSorting: true,
       enableHiding: true,
       meta: {
         defaultIsVisible: false,
       },
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Ngày Vào Làm"
-          column={column}
-        />
+        <DataTableColumnHeader title="Ngày Vào Làm" column={column} />
       ),
-      cell: ({ row }) => (
-        <div>{formatHireDate(row.getValue('hireDate'))}</div>
-      ),
+      cell: ({ row }) => <div>{formatHireDate(row.getValue("hireDate"))}</div>,
     },
     {
-      accessorKey: 'status',
+      accessorKey: "status",
       enableSorting: true,
       header: ({ column }) => (
-        <DataTableColumnHeader
-          title="Trạng Thái"
-          column={column}
-        />
+        <DataTableColumnHeader title="Trạng Thái" column={column} />
       ),
       cell: ({ row }) => {
-        const status = row.getValue('status') as string;
+        const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
             {getStatusDisplay(status)}
@@ -459,7 +456,7 @@ export function StaffDataTable() {
       },
     },
     {
-      id: 'actions',
+      id: "actions",
       enableSorting: false,
       header: () => <div className="text-right">Thao Tác</div>,
       cell: ({ row }) => {
@@ -486,20 +483,22 @@ export function StaffDataTable() {
                 </DropdownMenuItem>
 
                 {/* Reset Password - Super Admin Only */}
-                {staff.status !== 'terminated' && (
+                {staff.status !== "terminated" && (
                   <DropdownMenuItem
                     onClick={() => handleResetPasswordClick(staff)}
                     className="text-blue-600 focus:text-blue-600"
                     disabled={isResetting === staff.id}
                   >
                     <RotateCcw className="mr-2 h-4 w-4" />
-                    {isResetting === staff.id ? 'Đang reset...' : 'Reset Mật khẩu'}
+                    {isResetting === staff.id
+                      ? "Đang reset..."
+                      : "Reset Mật khẩu"}
                   </DropdownMenuItem>
                 )}
 
                 <DropdownMenuSeparator />
 
-                {staff.status === 'active' ? (
+                {staff.status === "active" ? (
                   <>
                     <DropdownMenuItem
                       onClick={() => handleDeleteClick(staff)}
@@ -516,7 +515,7 @@ export function StaffDataTable() {
                       Chấm Dứt
                     </DropdownMenuItem>
                   </>
-                ) : staff.status === 'inactive' ? (
+                ) : staff.status === "inactive" ? (
                   <>
                     <DropdownMenuItem
                       onClick={() => handleActivateClick(staff)}
@@ -524,7 +523,9 @@ export function StaffDataTable() {
                       disabled={activatingId === staff.id}
                     >
                       <UserCheck className="mr-2 h-4 w-4" />
-                      {activatingId === staff.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                      {activatingId === staff.id
+                        ? "Đang kích hoạt..."
+                        : "Kích hoạt"}
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => handleTerminateClick(staff)}
@@ -534,7 +535,7 @@ export function StaffDataTable() {
                       Chấm Dứt
                     </DropdownMenuItem>
                   </>
-                ) : staff.status === 'terminated' ? (
+                ) : staff.status === "terminated" ? (
                   <DropdownMenuItem disabled className="text-gray-400">
                     <Trash2 className="mr-2 h-4 w-4" />
                     Đã Chấm Dứt
@@ -571,7 +572,7 @@ export function StaffDataTable() {
     initialState: {
       columnVisibility: {
         department: false, // Hide "Phòng Ban" by default
-        hireDate: false,   // Hide "Ngày Vào Làm" by default
+        hireDate: false, // Hide "Ngày Vào Làm" by default
       },
     },
   });
@@ -594,16 +595,17 @@ export function StaffDataTable() {
     <div className="space-y-4">
       {/* Toolbar */}
       <StaffTableToolbar
-        searchValue={urlState.filters.search || ''}
+        searchValue={urlState.filters.search || ""}
         onSearchChange={handleSearchChange}
-        selectedDepartment={urlState.filters.department || 'all'}
+        selectedDepartment={urlState.filters.department || "all"}
         onDepartmentChange={handleDepartmentChange}
-        selectedStatus={urlState.filters.status || 'all'}
+        selectedStatus={urlState.filters.status || "all"}
         onStatusChange={handleStatusChange}
-        selectedTeam={urlState.filters.team || 'all'}
+        selectedTeam={urlState.filters.team || "all"}
         onTeamChange={handleTeamChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        hasActiveFiltersOnly={hasActiveFiltersOnly}
         table={table}
         onCreateClick={handleCreateClick}
       />
@@ -643,7 +645,7 @@ export function StaffDataTable() {
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
-                  data-state={row.getIsSelected() && 'selected'}
+                  data-state={row.getIsSelected() && "selected"}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -661,7 +663,9 @@ export function StaffDataTable() {
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {isEmpty ? 'Không có dữ liệu nhân viên.' : 'Không tìm thấy kết quả.'}
+                  {isEmpty
+                    ? "Không có dữ liệu nhân viên."
+                    : "Không tìm thấy kết quả."}
                 </TableCell>
               </TableRow>
             )}
@@ -747,9 +751,7 @@ export function StaffDataTable() {
           </AlertDialogHeader>
 
           <AlertDialogFooter>
-            <Button onClick={handleResetPasswordModalClose}>
-              Đóng
-            </Button>
+            <Button onClick={handleResetPasswordModalClose}>Đóng</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { useCallback, useMemo } from 'react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { useCallback, useMemo } from "react";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 
 // Types for data table state
 export interface DataTableFilters {
@@ -17,7 +17,7 @@ export interface DataTableFilters {
 
 export interface DataTableSort {
   column?: string;
-  order?: 'asc' | 'desc';
+  order?: "asc" | "desc";
 }
 
 export interface DataTablePagination {
@@ -33,11 +33,21 @@ export interface DataTableState {
 
 // Default values
 const DEFAULT_PAGINATION = { page: 1, limit: 10 };
-const DEFAULT_SORT = { column: undefined, order: undefined as 'asc' | 'desc' | undefined };
+const DEFAULT_SORT = {
+  column: undefined,
+  order: undefined as "asc" | "desc" | undefined,
+};
 const DEFAULT_FILTERS = {};
 
 // Predefined list of filterable keys for generic parsing
-const FILTERABLE_KEYS = ['region', 'status', 'department', 'team', 'teamType', 'category'];
+const FILTERABLE_KEYS = [
+  "region",
+  "status",
+  "department",
+  "team",
+  "teamType",
+  "category",
+];
 
 interface UseDataTableUrlStateOptions {
   defaultFilters?: DataTableFilters;
@@ -61,7 +71,8 @@ interface UseDataTableUrlStateReturn {
   clearFilters: () => void;
 
   // Utility functions
-  hasActiveFilters: boolean;
+  hasActiveFilters: boolean; // Includes search
+  hasActiveFiltersOnly: boolean; // Excludes search (only category, status, etc.)
   updateUrl: (updates: Record<string, string | null>) => void;
 }
 
@@ -86,33 +97,36 @@ export function useDataTableUrlState(
     const filters: DataTableFilters = { ...defaultFilters };
 
     // Handle search separately as it doesn't use 'all' logic
-    const search = params.get('search');
+    const search = params.get("search");
     if (search) filters.search = search;
 
     // Generic filter parsing for all filterable keys
-    FILTERABLE_KEYS.forEach(key => {
+    FILTERABLE_KEYS.forEach((key) => {
       const value = params.get(key);
-      if (value && value !== 'all') {
+      if (value && value !== "all") {
         filters[key] = value;
       }
     });
 
     // Debug logging for filters
-    if (process.env.NODE_ENV === 'development') {
-      console.log('useDataTableUrlState - Final filters:', filters);
+    if (process.env.NODE_ENV === "development") {
+      console.log("useDataTableUrlState - Final filters:", filters);
     }
 
     // Parse sort
-    const sortColumn = params.get('sort');
-    const sortOrder = params.get('order') as 'asc' | 'desc' | null;
+    const sortColumn = params.get("sort");
+    const sortOrder = params.get("order") as "asc" | "desc" | null;
     const sort: DataTableSort = {
       column: sortColumn || defaultSort.column,
       order: sortOrder || defaultSort.order,
     };
 
     // Parse pagination
-    const page = parseInt(params.get('page') || '1', 10);
-    const limit = parseInt(params.get('limit') || defaultPagination.limit.toString(), 10);
+    const page = parseInt(params.get("page") || "1", 10);
+    const limit = parseInt(
+      params.get("limit") || defaultPagination.limit.toString(),
+      10
+    );
     const pagination: DataTablePagination = {
       page: isNaN(page) ? defaultPagination.page : page,
       limit: isNaN(limit) ? defaultPagination.limit : limit,
@@ -122,71 +136,86 @@ export function useDataTableUrlState(
   }, [searchParams, defaultFilters, defaultSort, defaultPagination]);
 
   // Update URL with new parameters
-  const updateUrl = useCallback((updates: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams.toString());
+  const updateUrl = useCallback(
+    (updates: Record<string, string | null>) => {
+      const params = new URLSearchParams(searchParams.toString());
 
-    Object.entries(updates).forEach(([key, value]) => {
-      if (value === null || value === '' || value === 'all') {
-        params.delete(key);
-      } else {
-        params.set(key, value);
-      }
-    });
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value === null || value === "" || value === "all") {
+          params.delete(key);
+        } else {
+          params.set(key, value);
+        }
+      });
 
-    // Build new URL
-    const newUrl = `${pathname}?${params.toString()}`;
-    router.replace(newUrl);
-  }, [router, pathname, searchParams]);
+      // Build new URL
+      const newUrl = `${pathname}?${params.toString()}`;
+      router.replace(newUrl);
+    },
+    [router, pathname, searchParams]
+  );
 
   // Set filters (partial update)
-  const setFilters = useCallback((newFilters: Partial<DataTableFilters>) => {
-    const updates: Record<string, string | null> = {};
+  const setFilters = useCallback(
+    (newFilters: Partial<DataTableFilters>) => {
+      const updates: Record<string, string | null> = {};
 
-    Object.entries(newFilters).forEach(([key, value]) => {
-      updates[key] = value || null;
-    });
+      Object.entries(newFilters).forEach(([key, value]) => {
+        updates[key] = value || null;
+      });
 
-    // Reset to page 1 when filters change
-    updates.page = '1';
+      // Reset to page 1 when filters change
+      updates.page = "1";
 
-    updateUrl(updates);
-  }, [updateUrl]);
+      updateUrl(updates);
+    },
+    [updateUrl]
+  );
 
   // Set individual filter
-  const setFilter = useCallback((key: string, value: string | null) => {
-    setFilters({ [key]: value || undefined });
-  }, [setFilters]);
+  const setFilter = useCallback(
+    (key: string, value: string | null) => {
+      setFilters({ [key]: value || undefined });
+    },
+    [setFilters]
+  );
 
   // Set search
-  const setSearch = useCallback((search: string) => {
-    setFilter('search', search);
-  }, [setFilter]);
+  const setSearch = useCallback(
+    (search: string) => {
+      setFilter("search", search);
+    },
+    [setFilter]
+  );
 
   // Set sort with cycling logic
-  const setSort = useCallback((column: string) => {
-    const currentSort = currentState.sort;
-    let newOrder: 'asc' | 'desc' | null = 'asc';
+  const setSort = useCallback(
+    (column: string) => {
+      const currentSort = currentState.sort;
+      let newOrder: "asc" | "desc" | null = "asc";
 
-    // Cycle through: no sort -> asc -> desc -> no sort
-    if (currentSort.column === column) {
-      if (currentSort.order === 'asc') {
-        newOrder = 'desc';
-      } else if (currentSort.order === 'desc') {
-        newOrder = null; // Clear sort
+      // Cycle through: no sort -> asc -> desc -> no sort
+      if (currentSort.column === column) {
+        if (currentSort.order === "asc") {
+          newOrder = "desc";
+        } else if (currentSort.order === "desc") {
+          newOrder = null; // Clear sort
+        }
       }
-    }
 
-    const updates: Record<string, string | null> = {};
-    if (newOrder === null) {
-      updates.sort = null;
-      updates.order = null;
-    } else {
-      updates.sort = column;
-      updates.order = newOrder;
-    }
+      const updates: Record<string, string | null> = {};
+      if (newOrder === null) {
+        updates.sort = null;
+        updates.order = null;
+      } else {
+        updates.sort = column;
+        updates.order = newOrder;
+      }
 
-    updateUrl(updates);
-  }, [currentState.sort, updateUrl]);
+      updateUrl(updates);
+    },
+    [currentState.sort, updateUrl]
+  );
 
   // Clear sort
   const clearSort = useCallback(() => {
@@ -194,22 +223,25 @@ export function useDataTableUrlState(
   }, [updateUrl]);
 
   // Set pagination
-  const setPagination = useCallback((newPagination: Partial<DataTablePagination>) => {
-    const updates: Record<string, string | null> = {};
+  const setPagination = useCallback(
+    (newPagination: Partial<DataTablePagination>) => {
+      const updates: Record<string, string | null> = {};
 
-    if (newPagination.page !== undefined) {
-      updates.page = newPagination.page.toString();
-    }
-    if (newPagination.limit !== undefined) {
-      updates.limit = newPagination.limit.toString();
-      // Reset to page 1 when limit changes
-      if (!newPagination.page) {
-        updates.page = '1';
+      if (newPagination.page !== undefined) {
+        updates.page = newPagination.page.toString();
       }
-    }
+      if (newPagination.limit !== undefined) {
+        updates.limit = newPagination.limit.toString();
+        // Reset to page 1 when limit changes
+        if (!newPagination.page) {
+          updates.page = "1";
+        }
+      }
 
-    updateUrl(updates);
-  }, [updateUrl]);
+      updateUrl(updates);
+    },
+    [updateUrl]
+  );
 
   // Clear all filters
   const clearFilters = useCallback(() => {
@@ -217,13 +249,19 @@ export function useDataTableUrlState(
     router.replace(pathname);
   }, [router, pathname]);
 
-  // Check if there are active filters - generic approach
+  // Check if there are active filters - includes search
   const hasActiveFilters = useMemo(() => {
     // Check search filter
     if (currentState.filters.search) return true;
 
     // Check all filterable keys generically
-    return FILTERABLE_KEYS.some(key => currentState.filters[key]);
+    return FILTERABLE_KEYS.some((key) => currentState.filters[key]);
+  }, [currentState.filters]);
+
+  // Check if there are active filters - excludes search (only category, status, etc.)
+  const hasActiveFiltersOnly = useMemo(() => {
+    // Only check filterable keys, exclude search
+    return FILTERABLE_KEYS.some((key) => currentState.filters[key]);
   }, [currentState.filters]);
 
   return {
@@ -243,6 +281,7 @@ export function useDataTableUrlState(
 
     // Utility functions
     hasActiveFilters,
+    hasActiveFiltersOnly,
     updateUrl,
   };
 }

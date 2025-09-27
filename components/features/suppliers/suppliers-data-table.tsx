@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
   type SortingState,
-} from '@tanstack/react-table';
-import { MoreHorizontal, Edit, PowerOff, Power } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@tanstack/react-table";
+import { MoreHorizontal, Edit, PowerOff, Power } from "lucide-react";
+import { toast } from "sonner";
 
-import { useSuppliers, type Supplier } from '@/lib/hooks/use-suppliers';
-import { toggleSupplierStatus } from '@/lib/actions/supplier.actions';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useSuppliers, type Supplier } from "@/lib/hooks/use-suppliers";
+import { toggleSupplierStatus } from "@/lib/actions/supplier.actions";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -22,20 +22,20 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
-import { DataTablePagination } from '@/components/ui/data-table-pagination';
+} from "@/components/ui/dropdown-menu";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
-import { SuppliersTableToolbar } from './suppliers-table-toolbar';
-import { SupplierFormModal } from './supplier-form-modal';
-import { SupplierDeleteDialog } from './supplier-delete-dialog';
+import { SuppliersTableToolbar } from "./suppliers-table-toolbar";
+import { SupplierFormModal } from "./supplier-form-modal";
+import { SupplierDeleteDialog } from "./supplier-delete-dialog";
 
 // Status badge variant mapping
 const getStatusVariant = (
@@ -54,10 +54,10 @@ const getStatusVariant = (
 // Status display mapping - STANDARDIZED to match Staff
 const getStatusDisplay = (status: string): string => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'Hoạt Động';
-    case 'inactive':
-      return 'Tạm Dừng';
+    case "active":
+      return "Hoạt Động";
+    case "inactive":
+      return "Tạm Dừng";
     default:
       return status;
   }
@@ -65,11 +65,11 @@ const getStatusDisplay = (status: string): string => {
 
 // Date formatting helper - EXACTLY LIKE TEAMS
 const formatDate = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("vi-VN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
 };
 
@@ -78,7 +78,9 @@ export function SuppliersDataTable() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
+    null
+  );
   const [activatingId, setActivatingId] = useState<number | null>(null);
 
   // Fetch supplier data using our custom hook
@@ -96,6 +98,7 @@ export function SuppliersDataTable() {
     setPagination,
     clearFilters,
     hasActiveFilters,
+    hasActiveFiltersOnly,
   } = useSuppliers();
 
   // Convert our URL sort state to TanStack Table sorting format
@@ -110,11 +113,12 @@ export function SuppliersDataTable() {
 
   // Handle TanStack Table sorting changes and sync with URL state
   const handleSortingChange = (updater: any) => {
-    const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
+    const newSorting =
+      typeof updater === "function" ? updater(sorting) : updater;
 
     if (newSorting.length === 0) {
       // No sorting - clear sort from URL
-      setSort('');
+      setSort("");
     } else {
       // Extract the first sort (single column sorting)
       const { id } = newSorting[0];
@@ -128,7 +132,7 @@ export function SuppliersDataTable() {
   };
 
   const handleStatusChange = (value: string) => {
-    setFilter('status', value === 'all' ? null : value);
+    setFilter("status", value === "all" ? null : value);
   };
 
   const handlePageChange = (page: number) => {
@@ -168,8 +172,8 @@ export function SuppliersDataTable() {
         toast.error(result.error);
       }
     } catch (error) {
-      console.error('Activate supplier error:', error);
-      toast.error('Có lỗi xảy ra khi kích hoạt nhà cung cấp');
+      console.error("Activate supplier error:", error);
+      toast.error("Có lỗi xảy ra khi kích hoạt nhà cung cấp");
     } finally {
       setActivatingId(null);
     }
@@ -199,57 +203,57 @@ export function SuppliersDataTable() {
   // Table column definitions
   const columns: ColumnDef<Supplier>[] = [
     {
-      accessorKey: 'supplierCode',
+      accessorKey: "supplierCode",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Mã NCC" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue('supplierCode') || '-'}</div>
+        <div className="font-medium">{row.getValue("supplierCode") || "-"}</div>
       ),
     },
     {
-      accessorKey: 'name',
+      accessorKey: "name",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Tên Nhà Cung Cấp" column={column} />
       ),
       cell: ({ row }) => (
         <div className="max-w-[200px] truncate font-medium">
-          {row.getValue('name')}
+          {row.getValue("name")}
         </div>
       ),
     },
     {
-      accessorKey: 'contactPerson',
+      accessorKey: "contactPerson",
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader title="Người Liên Hệ" column={column} />
       ),
-      cell: ({ row }) => <div>{row.getValue('contactPerson') || '-'}</div>,
+      cell: ({ row }) => <div>{row.getValue("contactPerson") || "-"}</div>,
     },
     {
-      accessorKey: 'phone',
+      accessorKey: "phone",
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader title="Điện Thoại" column={column} />
       ),
-      cell: ({ row }) => <div>{row.getValue('phone') || '-'}</div>,
+      cell: ({ row }) => <div>{row.getValue("phone") || "-"}</div>,
     },
     {
-      accessorKey: 'email',
+      accessorKey: "email",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Email" column={column} />
       ),
       cell: ({ row }) => (
         <div className="max-w-[200px] truncate text-muted-foreground">
-          {row.getValue('email') || '-'}
+          {row.getValue("email") || "-"}
         </div>
       ),
     },
     {
-      accessorKey: 'taxId',
+      accessorKey: "taxId",
       enableSorting: false,
       enableHiding: true,
       meta: {
@@ -258,10 +262,10 @@ export function SuppliersDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader title="Mã Số Thuế" column={column} />
       ),
-      cell: ({ row }) => <div>{row.getValue('taxId') || '-'}</div>,
+      cell: ({ row }) => <div>{row.getValue("taxId") || "-"}</div>,
     },
     {
-      accessorKey: 'address',
+      accessorKey: "address",
       enableSorting: false,
       enableHiding: true,
       meta: {
@@ -272,18 +276,18 @@ export function SuppliersDataTable() {
       ),
       cell: ({ row }) => (
         <div className="max-w-[200px] truncate">
-          {row.getValue('address') || '-'}
+          {row.getValue("address") || "-"}
         </div>
       ),
     },
     {
-      accessorKey: 'status',
+      accessorKey: "status",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Trạng Thái" column={column} />
       ),
       cell: ({ row }) => {
-        const status = row.getValue('status') as string;
+        const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
             {getStatusDisplay(status)}
@@ -292,18 +296,18 @@ export function SuppliersDataTable() {
       },
     },
     {
-      accessorKey: 'createdAt',
+      accessorKey: "createdAt",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Ngày Tạo" column={column} />
       ),
       cell: ({ row }) => {
-        const date = row.getValue('createdAt') as Date;
-        return <div className="text-sm">{date ? formatDate(date) : '-'}</div>;
+        const date = row.getValue("createdAt") as Date;
+        return <div className="text-sm">{date ? formatDate(date) : "-"}</div>;
       },
     },
     {
-      id: 'actions',
+      id: "actions",
       enableSorting: false,
       header: () => <div className="text-right">Thao Tác</div>,
       cell: ({ row }) => {
@@ -326,7 +330,7 @@ export function SuppliersDataTable() {
 
                 <DropdownMenuSeparator />
 
-                {supplier.status === 'active' ? (
+                {supplier.status === "active" ? (
                   <DropdownMenuItem
                     onClick={() => handleToggleStatusClick(supplier)}
                     className="text-orange-600 focus:text-orange-600"
@@ -341,7 +345,9 @@ export function SuppliersDataTable() {
                     disabled={activatingId === supplier.id}
                   >
                     <Power className="mr-2 h-4 w-4" />
-                    {activatingId === supplier.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                    {activatingId === supplier.id
+                      ? "Đang kích hoạt..."
+                      : "Kích hoạt"}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -399,12 +405,13 @@ export function SuppliersDataTable() {
     <div className="space-y-4">
       {/* Toolbar */}
       <SuppliersTableToolbar
-        searchValue={urlState.filters.search || ''}
+        searchValue={urlState.filters.search || ""}
         onSearchChange={handleSearchChange}
-        selectedStatus={urlState.filters.status || 'all'}
+        selectedStatus={urlState.filters.status || "all"}
         onStatusChange={handleStatusChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        hasActiveFiltersOnly={hasActiveFiltersOnly}
         table={table}
         onCreateClick={handleCreateClick}
       />
@@ -463,8 +470,8 @@ export function SuppliersDataTable() {
                   className="h-24 text-center"
                 >
                   {isEmpty
-                    ? 'Không có dữ liệu nhà cung cấp.'
-                    : 'Không tìm thấy kết quả.'}
+                    ? "Không có dữ liệu nhà cung cấp."
+                    : "Không tìm thấy kết quả."}
                 </TableCell>
               </TableRow>
             )}

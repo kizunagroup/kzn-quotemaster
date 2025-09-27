@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import {
   flexRender,
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
   type SortingState,
-} from '@tanstack/react-table';
-import { MoreHorizontal, Edit, PowerOff, Power } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@tanstack/react-table";
+import { MoreHorizontal, Edit, PowerOff, Power } from "lucide-react";
+import { toast } from "sonner";
 
-import { useProducts, type Product } from '@/lib/hooks/use-products';
-import { toggleProductStatus } from '@/lib/actions/product.actions';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useProducts, type Product } from "@/lib/hooks/use-products";
+import { toggleProductStatus } from "@/lib/actions/product.actions";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -22,20 +22,20 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
+} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { DataTableColumnHeader } from '@/components/ui/data-table-column-header';
-import { DataTablePagination } from '@/components/ui/data-table-pagination';
+} from "@/components/ui/dropdown-menu";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 
-import { ProductsTableToolbar } from './products-table-toolbar';
-import { ProductFormModal } from './product-form-modal';
-import { ProductDeleteDialog } from './product-delete-dialog';
+import { ProductsTableToolbar } from "./products-table-toolbar";
+import { ProductFormModal } from "./product-form-modal";
+import { ProductDeleteDialog } from "./product-delete-dialog";
 
 // Status badge variant mapping
 const getStatusVariant = (
@@ -54,10 +54,10 @@ const getStatusVariant = (
 // Status display mapping - STANDARDIZED to match Staff
 const getStatusDisplay = (status: string): string => {
   switch (status.toLowerCase()) {
-    case 'active':
-      return 'Hoạt Động';
-    case 'inactive':
-      return 'Tạm Dừng';
+    case "active":
+      return "Hoạt Động";
+    case "inactive":
+      return "Tạm Dừng";
     default:
       return status;
   }
@@ -65,20 +65,20 @@ const getStatusDisplay = (status: string): string => {
 
 // Date formatting helper - EXACTLY LIKE TEAMS
 const formatDate = (date: Date | string): string => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('vi-VN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+  const d = typeof date === "string" ? new Date(date) : date;
+  return d.toLocaleDateString("vi-VN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   });
 };
 
 // Currency formatting helper
 const formatCurrency = (amount: string | null): string => {
-  if (!amount || amount.trim() === '') return '-';
+  if (!amount || amount.trim() === "") return "-";
   const numAmount = Number(amount);
-  if (isNaN(numAmount)) return '-';
-  return numAmount.toLocaleString('vi-VN') + ' VND';
+  if (isNaN(numAmount)) return "-";
+  return numAmount.toLocaleString("vi-VN") + " VND";
 };
 
 export function ProductsDataTable() {
@@ -109,6 +109,7 @@ export function ProductsDataTable() {
     setPagination,
     clearFilters,
     hasActiveFilters,
+    hasActiveFiltersOnly,
   } = useProducts();
 
   // Convert our URL sort state to TanStack Table sorting format
@@ -123,11 +124,12 @@ export function ProductsDataTable() {
 
   // Handle TanStack Table sorting changes and sync with URL state
   const handleSortingChange = (updater: any) => {
-    const newSorting = typeof updater === 'function' ? updater(sorting) : updater;
+    const newSorting =
+      typeof updater === "function" ? updater(sorting) : updater;
 
     if (newSorting.length === 0) {
       // No sorting - clear sort from URL
-      setSort('');
+      setSort("");
     } else {
       // Extract the first sort (single column sorting)
       const { id } = newSorting[0];
@@ -141,11 +143,11 @@ export function ProductsDataTable() {
   };
 
   const handleCategoryChange = (value: string) => {
-    setFilter('category', value === 'all' ? null : value);
+    setFilter("category", value === "all" ? null : value);
   };
 
   const handleStatusChange = (value: string) => {
-    setFilter('status', value === 'all' ? null : value);
+    setFilter("status", value === "all" ? null : value);
   };
 
   const handlePageChange = (page: number) => {
@@ -158,19 +160,19 @@ export function ProductsDataTable() {
 
   // Modal handlers - CENTRALIZED like Staff pattern with Key-based Reset Pattern
   const handleCreateClick = () => {
-    setCreateModalKey(prev => prev + 1); // Reset modal key
+    setCreateModalKey((prev) => prev + 1); // Reset modal key
     setIsCreateModalOpen(true);
   };
 
   const handleEditClick = (product: Product) => {
     setSelectedProduct(product);
-    setEditModalKey(prev => prev + 1); // Reset modal key
+    setEditModalKey((prev) => prev + 1); // Reset modal key
     setIsEditModalOpen(true);
   };
 
   const handleToggleStatusClick = (product: Product) => {
     setSelectedProduct(product);
-    setDeleteModalKey(prev => prev + 1); // Reset modal key
+    setDeleteModalKey((prev) => prev + 1); // Reset modal key
     setIsDeleteModalOpen(true);
   };
 
@@ -188,8 +190,8 @@ export function ProductsDataTable() {
         toast.error(result.error);
       }
     } catch (error) {
-      console.error('Activate product error:', error);
-      toast.error('Có lỗi xảy ra khi kích hoạt hàng hóa');
+      console.error("Activate product error:", error);
+      toast.error("Có lỗi xảy ra khi kích hoạt hàng hóa");
     } finally {
       setActivatingId(null);
     }
@@ -219,29 +221,31 @@ export function ProductsDataTable() {
   // Table column definitions
   const columns: ColumnDef<Product>[] = [
     {
-      accessorKey: 'productCode',
+      accessorKey: "productCode",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Mã hàng" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-mono font-medium">{row.getValue('productCode')}</div>
+        <div className="font-mono font-medium">
+          {row.getValue("productCode")}
+        </div>
       ),
     },
     {
-      accessorKey: 'name',
+      accessorKey: "name",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Tên hàng" column={column} />
       ),
       cell: ({ row }) => (
         <div className="max-w-[200px] truncate font-medium">
-          {row.getValue('name')}
+          {row.getValue("name")}
         </div>
       ),
     },
     {
-      accessorKey: 'specification',
+      accessorKey: "specification",
       enableSorting: false,
       enableHiding: true,
       meta: {
@@ -251,51 +255,47 @@ export function ProductsDataTable() {
         <DataTableColumnHeader title="Quy cách" column={column} />
       ),
       cell: ({ row }) => {
-        const spec = row.getValue('specification') as string;
+        const spec = row.getValue("specification") as string;
         return (
           <div className="max-w-[150px] truncate text-sm text-muted-foreground">
-            {spec || '-'}
+            {spec || "-"}
           </div>
         );
       },
     },
     {
-      accessorKey: 'unit',
+      accessorKey: "unit",
       enableSorting: false,
       header: ({ column }) => (
         <DataTableColumnHeader title="Đvt" column={column} />
       ),
-      cell: ({ row }) => <div>{row.getValue('unit')}</div>,
+      cell: ({ row }) => <div>{row.getValue("unit")}</div>,
     },
     {
-      accessorKey: 'category',
+      accessorKey: "category",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Nhóm hàng" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[120px] truncate">
-          {row.getValue('category')}
-        </div>
+        <div className="max-w-[120px] truncate">{row.getValue("category")}</div>
       ),
     },
     {
-      accessorKey: 'basePrice',
+      accessorKey: "basePrice",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Giá cơ sở" column={column} />
       ),
       cell: ({ row }) => {
-        const price = row.getValue('basePrice') as string;
+        const price = row.getValue("basePrice") as string;
         return (
-          <div className="text-right font-medium">
-            {formatCurrency(price)}
-          </div>
+          <div className="text-right font-medium">{formatCurrency(price)}</div>
         );
       },
     },
     {
-      accessorKey: 'baseQuantity',
+      accessorKey: "baseQuantity",
       enableSorting: false,
       enableHiding: true,
       meta: {
@@ -305,22 +305,22 @@ export function ProductsDataTable() {
         <DataTableColumnHeader title="SL cơ sở" column={column} />
       ),
       cell: ({ row }) => {
-        const quantity = row.getValue('baseQuantity') as string;
+        const quantity = row.getValue("baseQuantity") as string;
         return (
           <div className="text-right">
-            {quantity ? Number(quantity).toLocaleString('vi-VN') : '-'}
+            {quantity ? Number(quantity).toLocaleString("vi-VN") : "-"}
           </div>
         );
       },
     },
     {
-      accessorKey: 'status',
+      accessorKey: "status",
       enableSorting: true,
       header: ({ column }) => (
         <DataTableColumnHeader title="Trạng thái" column={column} />
       ),
       cell: ({ row }) => {
-        const status = row.getValue('status') as string;
+        const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
             {getStatusDisplay(status)}
@@ -329,7 +329,7 @@ export function ProductsDataTable() {
       },
     },
     {
-      accessorKey: 'createdAt',
+      accessorKey: "createdAt",
       enableSorting: true,
       enableHiding: true,
       meta: {
@@ -339,12 +339,12 @@ export function ProductsDataTable() {
         <DataTableColumnHeader title="Ngày tạo" column={column} />
       ),
       cell: ({ row }) => {
-        const date = row.getValue('createdAt') as Date;
-        return <div className="text-sm">{date ? formatDate(date) : '-'}</div>;
+        const date = row.getValue("createdAt") as Date;
+        return <div className="text-sm">{date ? formatDate(date) : "-"}</div>;
       },
     },
     {
-      id: 'actions',
+      id: "actions",
       enableSorting: false,
       header: () => <div className="text-right">Thao tác</div>,
       cell: ({ row }) => {
@@ -367,7 +367,7 @@ export function ProductsDataTable() {
 
                 <DropdownMenuSeparator />
 
-                {product.status === 'active' ? (
+                {product.status === "active" ? (
                   <DropdownMenuItem
                     onClick={() => handleToggleStatusClick(product)}
                     className="text-orange-600 focus:text-orange-600"
@@ -382,7 +382,9 @@ export function ProductsDataTable() {
                     disabled={activatingId === product.id}
                   >
                     <Power className="mr-2 h-4 w-4" />
-                    {activatingId === product.id ? 'Đang kích hoạt...' : 'Kích hoạt'}
+                    {activatingId === product.id
+                      ? "Đang kích hoạt..."
+                      : "Kích hoạt"}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -440,14 +442,15 @@ export function ProductsDataTable() {
     <div className="space-y-4">
       {/* Toolbar */}
       <ProductsTableToolbar
-        searchValue={urlState.filters.search || ''}
+        searchValue={urlState.filters.search || ""}
         onSearchChange={handleSearchChange}
-        selectedCategory={urlState.filters.category || 'all'}
+        selectedCategory={urlState.filters.category || "all"}
         onCategoryChange={handleCategoryChange}
-        selectedStatus={urlState.filters.status || 'all'}
+        selectedStatus={urlState.filters.status || "all"}
         onStatusChange={handleStatusChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        hasActiveFiltersOnly={hasActiveFiltersOnly}
         table={table}
         onCreateClick={handleCreateClick}
       />
@@ -506,8 +509,8 @@ export function ProductsDataTable() {
                   className="h-24 text-center"
                 >
                   {isEmpty
-                    ? 'Không có dữ liệu hàng hóa.'
-                    : 'Không tìm thấy kết quả.'}
+                    ? "Không có dữ liệu hàng hóa."
+                    : "Không tìm thấy kết quả."}
                 </TableCell>
               </TableRow>
             )}

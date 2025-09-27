@@ -31,7 +31,6 @@ import { TeamCombobox } from "@/components/features/staff/team-combobox";
 import { getStaffDepartments } from "@/lib/actions/staff.actions";
 import type { Staff } from "@/lib/hooks/use-staff";
 
-
 // Single source of truth for status options
 const statusOptions = [
   { value: "all", label: "Tất cả trạng thái" },
@@ -43,22 +42,22 @@ const statusOptions = [
 // Department display mapping for Vietnamese labels
 const getDepartmentDisplay = (department: string): string => {
   switch (department.toUpperCase()) {
-    case 'ADMIN':
-      return 'Quản Trị';
-    case 'BEP':
-      return 'Bếp';
-    case 'KE_TOAN':
-      return 'Kế Toán';
-    case 'KINH_DOANH':
-      return 'Kinh Doanh';
-    case 'NHAN_SU':
-      return 'Nhân Sự';
-    case 'PHAT_TRIEN_KINH_DOANH':
-      return 'Phát Triển Kinh Doanh';
-    case 'SAN_XUAT':
-      return 'Sản Xuất';
-    case 'TONG_VU':
-      return 'Tổng Vụ';
+    case "ADMIN":
+      return "Quản Trị";
+    case "BEP":
+      return "Bếp";
+    case "KE_TOAN":
+      return "Kế Toán";
+    case "KINH_DOANH":
+      return "Kinh Doanh";
+    case "NHAN_SU":
+      return "Nhân Sự";
+    case "PHAT_TRIEN_KINH_DOANH":
+      return "Phát Triển Kinh Doanh";
+    case "SAN_XUAT":
+      return "Sản Xuất";
+    case "TONG_VU":
+      return "Tổng Vụ";
     default:
       return department;
   }
@@ -86,6 +85,7 @@ interface StaffTableToolbarProps {
   // Filter state
   onClearFilters: () => void;
   hasActiveFilters: boolean;
+  hasActiveFiltersOnly?: boolean;
 
   // Table instance for column visibility
   table: Table<Staff>;
@@ -105,6 +105,7 @@ export function StaffTableToolbar({
   onTeamChange,
   onClearFilters,
   hasActiveFilters,
+  hasActiveFiltersOnly = false,
   table,
   onCreateClick,
 }: StaffTableToolbarProps) {
@@ -160,8 +161,8 @@ export function StaffTableToolbar({
 
   // Build department options dynamically
   const departmentOptions = [
-    { value: 'all', label: 'Tất cả phòng ban' },
-    ...departments.map(department => ({
+    { value: "all", label: "Tất cả phòng ban" },
+    ...departments.map((department) => ({
       value: department,
       label: getDepartmentDisplay(department),
     })),
@@ -174,6 +175,7 @@ export function StaffTableToolbar({
       onSearchChange={handleLocalSearchChange}
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
+      hasActiveFiltersOnly={hasActiveFiltersOnly}
       actions={
         <div className="flex items-center gap-2">
           {/* Column Visibility Toggle */}
@@ -239,7 +241,9 @@ export function StaffTableToolbar({
         disabled={departmentsLoading}
       >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder={departmentsLoading ? "Đang tải..." : "Phòng ban"} />
+          <SelectValue
+            placeholder={departmentsLoading ? "Đang tải..." : "Phòng ban"}
+          />
         </SelectTrigger>
         <SelectContent>
           {departmentOptions.map((option) => (

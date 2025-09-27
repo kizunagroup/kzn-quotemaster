@@ -132,12 +132,15 @@ export function TeamsDataTable() {
     setPagination,
     clearFilters,
     hasActiveFilters,
+    hasActiveFiltersOnly,
   } = useTeams();
 
   // Convert our URL sort state to TanStack Table sorting format
   const sorting: SortingState = useMemo(() => {
     if (urlState.sort.column && urlState.sort.order) {
-      return [{ id: urlState.sort.column, desc: urlState.sort.order === "desc" }];
+      return [
+        { id: urlState.sort.column, desc: urlState.sort.order === "desc" },
+      ];
     }
     return [];
   }, [urlState.sort.column, urlState.sort.order]);
@@ -431,6 +434,7 @@ export function TeamsDataTable() {
         onTeamTypeChange={handleTeamTypeChange}
         onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        hasActiveFiltersOnly={hasActiveFiltersOnly}
         table={table}
         onCreateClick={handleCreateClick}
       />

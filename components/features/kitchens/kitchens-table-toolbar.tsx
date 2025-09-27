@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useDebounce } from 'use-debounce';
-import { Plus, Settings2 } from 'lucide-react';
-import { Table } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { useDebounce } from "use-debounce";
+import { Plus, Settings2 } from "lucide-react";
+import { Table } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -19,21 +19,21 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
-import type { Kitchen } from '@/lib/hooks/use-kitchens';
+} from "@/components/ui/tooltip";
+import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
+import type { Kitchen } from "@/lib/hooks/use-kitchens";
 
 // Single source of truth for status options
 const statusOptions = [
-  { value: 'all', label: 'Tất cả trạng thái' },
-  { value: 'active', label: 'Hoạt Động' },
-  { value: 'inactive', label: 'Tạm Dừng' },
+  { value: "all", label: "Tất cả trạng thái" },
+  { value: "active", label: "Hoạt Động" },
+  { value: "inactive", label: "Tạm Dừng" },
 ] as const;
 
 interface KitchensTableToolbarProps {
@@ -52,6 +52,7 @@ interface KitchensTableToolbarProps {
   // Filter state
   onClearFilters: () => void;
   hasActiveFilters: boolean;
+  hasActiveFiltersOnly?: boolean;
 
   // Table instance for column visibility
   table: Table<Kitchen>;
@@ -61,16 +62,17 @@ interface KitchensTableToolbarProps {
 }
 
 export function KitchensTableToolbar({
-  searchValue = '',
+  searchValue = "",
   onSearchChange,
   regions,
   regionsLoading = false,
-  selectedRegion = 'all',
+  selectedRegion = "all",
   onRegionChange,
-  selectedStatus = 'all',
+  selectedStatus = "all",
   onStatusChange,
   onClearFilters,
   hasActiveFilters,
+  hasActiveFiltersOnly = false,
   table,
   onCreateClick,
 }: KitchensTableToolbarProps) {
@@ -104,6 +106,7 @@ export function KitchensTableToolbar({
       onSearchChange={handleLocalSearchChange}
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
+      hasActiveFiltersOnly={hasActiveFiltersOnly}
       actions={
         <div className="flex items-center gap-2">
           {/* Column Visibility Toggle */}
@@ -129,7 +132,8 @@ export function KitchensTableToolbar({
                     .getAllColumns()
                     .filter(
                       (column) =>
-                        typeof column.accessorFn !== "undefined" && column.getCanHide()
+                        typeof column.accessorFn !== "undefined" &&
+                        column.getCanHide()
                     )
                     .map((column) => {
                       return (
@@ -137,11 +141,13 @@ export function KitchensTableToolbar({
                           key={column.id}
                           className="capitalize"
                           checked={column.getIsVisible()}
-                          onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                          onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                          }
                         >
                           {getColumnDisplayName(column.id)}
                         </DropdownMenuCheckboxItem>
-                      )
+                      );
                     })}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -160,9 +166,15 @@ export function KitchensTableToolbar({
       }
     >
       {/* Region Filter */}
-      <Select value={selectedRegion} onValueChange={onRegionChange} disabled={regionsLoading}>
+      <Select
+        value={selectedRegion}
+        onValueChange={onRegionChange}
+        disabled={regionsLoading}
+      >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder={regionsLoading ? "Đang tải..." : "Khu vực"} />
+          <SelectValue
+            placeholder={regionsLoading ? "Đang tải..." : "Khu vực"}
+          />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tất cả khu vực</SelectItem>
@@ -194,12 +206,12 @@ export function KitchensTableToolbar({
 // Helper function to get display names for columns
 function getColumnDisplayName(columnId: string): string {
   const columnNames: Record<string, string> = {
-    kitchenCode: 'Mã Bếp',
-    name: 'Tên Bếp',
-    region: 'Khu Vực',
-    teamType: 'Loại Hình',
-    managerName: 'Quản Lý',
-    status: 'Trạng Thái',
+    kitchenCode: "Mã Bếp",
+    name: "Tên Bếp",
+    region: "Khu Vực",
+    teamType: "Loại Hình",
+    managerName: "Quản Lý",
+    status: "Trạng Thái",
   };
 
   return columnNames[columnId] || columnId;

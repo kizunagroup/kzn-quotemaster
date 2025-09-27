@@ -1,17 +1,17 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useDebounce } from 'use-debounce';
-import { Plus, Settings2 } from 'lucide-react';
-import { Table } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect } from "react";
+import { useDebounce } from "use-debounce";
+import { Plus, Settings2 } from "lucide-react";
+import { Table } from "@tanstack/react-table";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -19,31 +19,31 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
-import { getTeamTypes } from '@/lib/actions/team.actions';
-import type { Team } from '@/lib/hooks/use-teams';
+} from "@/components/ui/tooltip";
+import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
+import { getTeamTypes } from "@/lib/actions/team.actions";
+import type { Team } from "@/lib/hooks/use-teams";
 
 // Single source of truth for status options
 const statusOptions = [
-  { value: 'all', label: 'Tất cả trạng thái' },
-  { value: 'active', label: 'Hoạt Động' },
-  { value: 'inactive', label: 'Tạm Dừng' },
+  { value: "all", label: "Tất cả trạng thái" },
+  { value: "active", label: "Hoạt Động" },
+  { value: "inactive", label: "Tạm Dừng" },
 ] as const;
 
 // Team type display mapping for Vietnamese labels
 const getTeamTypeDisplay = (teamType: string): string => {
   switch (teamType.toUpperCase()) {
-    case 'KITCHEN':
-      return 'Nhóm Bếp';
-    case 'OFFICE':
-      return 'Văn Phòng';
+    case "KITCHEN":
+      return "Nhóm Bếp";
+    case "OFFICE":
+      return "Văn Phòng";
     default:
       return teamType;
   }
@@ -67,6 +67,7 @@ interface TeamsTableToolbarProps {
   // Filter state
   onClearFilters: () => void;
   hasActiveFilters: boolean;
+  hasActiveFiltersOnly?: boolean;
 
   // Table instance for column visibility
   table: Table<Team>;
@@ -76,18 +77,19 @@ interface TeamsTableToolbarProps {
 }
 
 export function TeamsTableToolbar({
-  searchValue = '',
+  searchValue = "",
   onSearchChange,
   regions,
   regionsLoading = false,
-  selectedRegion = 'all',
+  selectedRegion = "all",
   onRegionChange,
-  selectedStatus = 'all',
+  selectedStatus = "all",
   onStatusChange,
-  selectedTeamType = 'all',
+  selectedTeamType = "all",
   onTeamTypeChange,
   onClearFilters,
   hasActiveFilters,
+  hasActiveFiltersOnly = false,
   table,
   onCreateClick,
 }: TeamsTableToolbarProps) {
@@ -143,8 +145,8 @@ export function TeamsTableToolbar({
 
   // Build team type options dynamically
   const teamTypeOptions = [
-    { value: 'all', label: 'Tất cả loại hình' },
-    ...teamTypes.map(teamType => ({
+    { value: "all", label: "Tất cả loại hình" },
+    ...teamTypes.map((teamType) => ({
       value: teamType,
       label: getTeamTypeDisplay(teamType),
     })),
@@ -157,6 +159,7 @@ export function TeamsTableToolbar({
       onSearchChange={handleLocalSearchChange}
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
+      hasActiveFiltersOnly={hasActiveFiltersOnly}
       actions={
         <div className="flex items-center gap-2">
           {/* Column Visibility Toggle */}
@@ -182,7 +185,8 @@ export function TeamsTableToolbar({
                     .getAllColumns()
                     .filter(
                       (column) =>
-                        typeof column.accessorFn !== "undefined" && column.getCanHide()
+                        typeof column.accessorFn !== "undefined" &&
+                        column.getCanHide()
                     )
                     .map((column) => {
                       return (
@@ -190,11 +194,13 @@ export function TeamsTableToolbar({
                           key={column.id}
                           className="capitalize"
                           checked={column.getIsVisible()}
-                          onCheckedChange={(value) => column.toggleVisibility(!!value)}
+                          onCheckedChange={(value) =>
+                            column.toggleVisibility(!!value)
+                          }
                         >
                           {getColumnDisplayName(column.id)}
                         </DropdownMenuCheckboxItem>
-                      )
+                      );
                     })}
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -213,9 +219,15 @@ export function TeamsTableToolbar({
       }
     >
       {/* Region Filter */}
-      <Select value={selectedRegion} onValueChange={onRegionChange} disabled={regionsLoading}>
+      <Select
+        value={selectedRegion}
+        onValueChange={onRegionChange}
+        disabled={regionsLoading}
+      >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder={regionsLoading ? "Đang tải..." : "Khu vực"} />
+          <SelectValue
+            placeholder={regionsLoading ? "Đang tải..." : "Khu vực"}
+          />
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Tất cả khu vực</SelectItem>
@@ -234,7 +246,9 @@ export function TeamsTableToolbar({
         disabled={teamTypesLoading}
       >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder={teamTypesLoading ? "Đang tải..." : "Loại hình"} />
+          <SelectValue
+            placeholder={teamTypesLoading ? "Đang tải..." : "Loại hình"}
+          />
         </SelectTrigger>
         <SelectContent>
           {teamTypeOptions.map((option) => (
@@ -265,13 +279,13 @@ export function TeamsTableToolbar({
 // Helper function to get display names for columns
 function getColumnDisplayName(columnId: string): string {
   const columnNames: Record<string, string> = {
-    teamCode: 'Mã Nhóm',
-    name: 'Tên Nhóm',
-    teamType: 'Loại Hình',
-    region: 'Khu Vực',
-    managerName: 'Quản Lý',
-    status: 'Trạng Thái',
-    createdAt: 'Ngày Tạo',
+    teamCode: "Mã Nhóm",
+    name: "Tên Nhóm",
+    teamType: "Loại Hình",
+    region: "Khu Vực",
+    managerName: "Quản Lý",
+    status: "Trạng Thái",
+    createdAt: "Ngày Tạo",
   };
 
   return columnNames[columnId] || columnId;

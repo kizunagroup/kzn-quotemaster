@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import useSWR from 'swr';
-import { useDataTableUrlState } from './use-data-table-url-state';
+import useSWR from "swr";
+import { useDataTableUrlState } from "./use-data-table-url-state";
 
 // Task 3A.2: TypeScript interfaces matching the API response structure
 export interface Product {
@@ -38,34 +38,36 @@ export interface ProductsResponse {
 // Task 3A.2: Robust fetcher function with comprehensive error handling
 const fetchProducts = async (url: string): Promise<ProductsResponse> => {
   const response = await fetch(url, {
-    method: 'GET',
+    method: "GET",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    credentials: 'include', // Include cookies for session management
+    credentials: "include", // Include cookies for session management
   });
 
   if (!response.ok) {
     // Handle different HTTP error statuses
     if (response.status === 401) {
-      throw new Error('Không có quyền truy cập. Vui lòng đăng nhập lại.');
+      throw new Error("Không có quyền truy cập. Vui lòng đăng nhập lại.");
     }
 
     if (response.status === 403) {
-      throw new Error('Bạn không có quyền xem danh sách hàng hóa.');
+      throw new Error("Bạn không có quyền xem danh sách hàng hóa.");
     }
 
     if (response.status >= 500) {
-      throw new Error('Lỗi máy chủ. Không thể tải danh sách hàng hóa. Vui lòng thử lại sau.');
+      throw new Error(
+        "Lỗi máy chủ. Không thể tải danh sách hàng hóa. Vui lòng thử lại sau."
+      );
     }
 
     if (response.status === 400) {
       // Try to get detailed error message from response
       try {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Tham số yêu cầu không hợp lệ');
+        throw new Error(errorData.error || "Tham số yêu cầu không hợp lệ");
       } catch {
-        throw new Error('Tham số yêu cầu không hợp lệ');
+        throw new Error("Tham số yêu cầu không hợp lệ");
       }
     }
 
@@ -80,15 +82,15 @@ const fetchProducts = async (url: string): Promise<ProductsResponse> => {
 
     // Validate response structure
     if (!data || !Array.isArray(data.data)) {
-      throw new Error('Định dạng dữ liệu phản hồi không hợp lệ');
+      throw new Error("Định dạng dữ liệu phản hồi không hợp lệ");
     }
 
     return data;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('định dạng')) {
+    if (error instanceof Error && error.message.includes("định dạng")) {
       throw error;
     }
-    throw new Error('Định dạng dữ liệu phản hồi không hợp lệ từ máy chủ');
+    throw new Error("Định dạng dữ liệu phản hồi không hợp lệ từ máy chủ");
   }
 };
 
@@ -107,10 +109,11 @@ export function useProducts() {
     setFilter,
     clearFilters,
     hasActiveFilters,
+    hasActiveFiltersOnly,
     updateUrl,
   } = useDataTableUrlState({
     defaultFilters: {},
-    defaultSort: { column: 'createdAt', order: 'desc' }, // Default sort by creation date descending
+    defaultSort: { column: "createdAt", order: "desc" }, // Default sort by creation date descending
     defaultPagination: { page: 1, limit: 10 },
   });
 
@@ -120,26 +123,26 @@ export function useProducts() {
 
     // Add filters
     if (filters.search) {
-      params.set('search', filters.search);
+      params.set("search", filters.search);
     }
-    if (filters.category && filters.category !== 'all') {
-      params.set('category', filters.category);
+    if (filters.category && filters.category !== "all") {
+      params.set("category", filters.category);
     }
-    if (filters.status && filters.status !== 'all') {
-      params.set('status', filters.status);
+    if (filters.status && filters.status !== "all") {
+      params.set("status", filters.status);
     }
 
     // Add sorting
     if (sort.column) {
-      params.set('sort', sort.column);
+      params.set("sort", sort.column);
     }
     if (sort.order) {
-      params.set('order', sort.order);
+      params.set("order", sort.order);
     }
 
     // Add pagination
-    params.set('page', pagination.page.toString());
-    params.set('limit', pagination.limit.toString());
+    params.set("page", pagination.page.toString());
+    params.set("limit", pagination.limit.toString());
 
     return `/api/products?${params.toString()}`;
   };
@@ -162,10 +165,10 @@ export function useProducts() {
       shouldRetryOnError: (error) => {
         // Don't retry on authentication/authorization errors
         if (
-          error?.message?.includes('quyền truy cập') ||
-          error?.message?.includes('quyền xem') ||
-          error?.message?.includes('Unauthorized') ||
-          error?.message?.includes('Forbidden')
+          error?.message?.includes("quyền truy cập") ||
+          error?.message?.includes("quyền xem") ||
+          error?.message?.includes("Unauthorized") ||
+          error?.message?.includes("Forbidden")
         ) {
           return false;
         }
@@ -175,13 +178,15 @@ export function useProducts() {
 
       // Performance monitoring
       onError: (error) => {
-        console.error('Product data fetch error:', error.message);
+        console.error("Product data fetch error:", error.message);
       },
 
       // Success callback for debugging (development only)
       onSuccess: (data) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`Product data loaded: ${data.data.length} products found`);
+        if (process.env.NODE_ENV === "development") {
+          console.log(
+            `Product data loaded: ${data.data.length} products found`
+          );
         }
       },
 
@@ -215,6 +220,10 @@ export function useProducts() {
     clearFilters,
     updateUrl,
 
+    // Filter state indicators
+    hasActiveFilters,
+    hasActiveFiltersOnly,
+
     // Loading and error states
     isLoading,
     error,
@@ -241,27 +250,33 @@ export function useProducts() {
     totalPages: data?.pagination?.pages || 0,
 
     // Product-specific helpers
-    activeProducts: data?.data?.filter((product) => product.status === 'active') || [],
-    inactiveProducts: data?.data?.filter((product) => product.status === 'inactive') || [],
+    activeProducts:
+      data?.data?.filter((product) => product.status === "active") || [],
+    inactiveProducts:
+      data?.data?.filter((product) => product.status === "inactive") || [],
 
     // Product-specific convenience methods
     searchProducts: (searchTerm: string) => {
       setSearch(searchTerm);
     },
     filterByCategory: (category: string) => {
-      setFilter('category', category === 'all' ? null : category);
+      setFilter("category", category === "all" ? null : category);
     },
     filterByStatus: (status: string) => {
-      setFilter('status', status === 'all' ? null : status);
+      setFilter("status", status === "all" ? null : status);
     },
 
     // Category management helpers (from current data)
-    categories: Array.from(new Set(data?.data?.map(product => product.category) || [])).sort(),
+    categories: Array.from(
+      new Set(data?.data?.map((product) => product.category) || [])
+    ).sort(),
 
     // Product lookup helpers
-    getProductById: (id: number) => data?.data?.find(product => product.id === id),
-    getProductByCode: (code: string) => data?.data?.find(product =>
-      product.productCode.toLowerCase() === code.toLowerCase()
-    ),
+    getProductById: (id: number) =>
+      data?.data?.find((product) => product.id === id),
+    getProductByCode: (code: string) =>
+      data?.data?.find(
+        (product) => product.productCode.toLowerCase() === code.toLowerCase()
+      ),
   };
 }

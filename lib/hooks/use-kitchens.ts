@@ -97,6 +97,7 @@ export function useKitchens() {
     setFilter,
     clearFilters,
     hasActiveFilters,
+    hasActiveFiltersOnly,
     updateUrl,
   } = useDataTableUrlState({
     defaultFilters: {},
@@ -196,6 +197,10 @@ export function useKitchens() {
     setFilter,
     clearFilters,
     updateUrl,
+
+    // Filter state indicators
+    hasActiveFilters,
+    hasActiveFiltersOnly,
 
     // Loading and error states
     isLoading,
