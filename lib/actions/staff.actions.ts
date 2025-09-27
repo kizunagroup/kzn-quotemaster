@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { db } from '@/lib/db/drizzle';
 import { users, teamMembers, teams } from '@/lib/db/schema';
-import { eq, and, or, ilike, sql, isNull } from 'drizzle-orm';
+import { eq, and, or, ilike, sql, isNull, asc } from 'drizzle-orm';
 import { getUser, getUserTeams } from '@/lib/db/queries';
 import { checkPermission } from '@/lib/auth/permissions';
 import { hashPassword } from '@/lib/auth/session';
@@ -1129,6 +1129,49 @@ export async function getStaffManagers(searchQuery?: string): Promise<{ id: numb
   } catch (error) {
     console.error('Get staff managers error:', error);
     return { error: 'Có lỗi xảy ra khi tải danh sách quản lý' };
+  }
+}
+
+// Server Action: Get Staff Departments
+export async function getStaffDepartments(): Promise<string[] | { error: string }> {
+  try {
+    // 1. Authorization Check (CRITICAL FIRST STEP)
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền truy cập' };
+    }
+
+    // Check if user has permission to view staff
+    const hasPermission = await checkPermission(user.id, 'canManageStaff');
+    if (!hasPermission) {
+      return { error: 'Bạn không có quyền xem danh sách nhân viên' };
+    }
+
+    // 2. Database Query - Get distinct departments
+    const result = await db
+      .selectDistinct({
+        department: users.department
+      })
+      .from(users)
+      .where(
+        and(
+          sql`${users.status} IN ('active', 'inactive')`, // Exclude terminated staff
+          sql`${users.department} IS NOT NULL AND TRIM(${users.department}) != ''` // Exclude null/empty departments
+        )
+      )
+      .orderBy(asc(users.department));
+
+    // 3. Extract and return department strings
+    const departments = result
+      .map(row => row.department)
+      .filter((department): department is string =>
+        department !== null && department.trim() !== ''
+      );
+
+    return departments;
+  } catch (error) {
+    console.error('Error fetching staff departments:', error);
+    return { error: 'Có lỗi xảy ra khi tải danh sách phòng ban' };
   }
 }
 

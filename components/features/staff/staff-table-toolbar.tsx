@@ -28,17 +28,9 @@ import {
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
 import { TeamCombobox } from "@/components/features/staff/team-combobox";
+import { getStaffDepartments } from "@/lib/actions/staff.actions";
 import type { Staff } from "@/lib/hooks/use-staff";
 
-// Single source of truth for department options
-const departmentOptions = [
-  { value: "all", label: "Tất cả phòng ban" },
-  { value: "ADMIN", label: "Quản Trị" },
-  { value: "PROCUREMENT", label: "Mua Sắm" },
-  { value: "KITCHEN", label: "Bếp" },
-  { value: "ACCOUNTING", label: "Kế Toán" },
-  { value: "OPERATIONS", label: "Vận Hành" },
-] as const;
 
 // Single source of truth for status options
 const statusOptions = [
@@ -47,6 +39,24 @@ const statusOptions = [
   { value: "inactive", label: "Tạm Dừng" },
   { value: "terminated", label: "Đã Nghỉ" },
 ] as const;
+
+// Department display mapping for Vietnamese labels
+const getDepartmentDisplay = (department: string): string => {
+  switch (department.toUpperCase()) {
+    case 'ADMIN':
+      return 'Quản Trị';
+    case 'PROCUREMENT':
+      return 'Mua Sắm';
+    case 'KITCHEN':
+      return 'Bếp';
+    case 'ACCOUNTING':
+      return 'Kế Toán';
+    case 'OPERATIONS':
+      return 'Vận Hành';
+    default:
+      return department;
+  }
+};
 
 // Team options - this could be dynamically loaded in the future
 const teamOptions = [
@@ -95,6 +105,10 @@ export function StaffTableToolbar({
   // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
 
+  // Department state - dynamic loading from database
+  const [departments, setDepartments] = useState<string[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+
   // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
 
@@ -110,10 +124,42 @@ export function StaffTableToolbar({
     }
   }, [debouncedSearchValue, searchValue, onSearchChange]);
 
+  // Fetch departments when component mounts
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      setDepartmentsLoading(true);
+      try {
+        const result = await getStaffDepartments();
+        if (Array.isArray(result)) {
+          setDepartments(result);
+        } else {
+          console.error("Failed to fetch departments:", result.error);
+          setDepartments([]);
+        }
+      } catch (error) {
+        console.error("Error fetching departments:", error);
+        setDepartments([]);
+      } finally {
+        setDepartmentsLoading(false);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
+
   // Handle local search input change
   const handleLocalSearchChange = (value: string) => {
     setLocalSearchValue(value);
   };
+
+  // Build department options dynamically
+  const departmentOptions = [
+    { value: 'all', label: 'Tất cả phòng ban' },
+    ...departments.map(department => ({
+      value: department,
+      label: getDepartmentDisplay(department),
+    })),
+  ];
 
   return (
     <DataTableToolbar
@@ -180,10 +226,14 @@ export function StaffTableToolbar({
         </div>
       }
     >
-      {/* Department Filter */}
-      <Select value={selectedDepartment} onValueChange={onDepartmentChange}>
+      {/* Department Filter - Dynamic Loading */}
+      <Select
+        value={selectedDepartment}
+        onValueChange={onDepartmentChange}
+        disabled={departmentsLoading}
+      >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder="Phòng ban" />
+          <SelectValue placeholder={departmentsLoading ? "Đang tải..." : "Phòng ban"} />
         </SelectTrigger>
         <SelectContent>
           {departmentOptions.map((option) => (
@@ -239,4 +289,4 @@ function getColumnDisplayName(columnId: string): string {
 }
 
 // Export options for use in other components
-export { departmentOptions, statusOptions, teamOptions };
+export { statusOptions, teamOptions };
