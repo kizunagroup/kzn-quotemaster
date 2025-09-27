@@ -28,7 +28,7 @@ export async function updateQuotationStatus(data: QuotationStatusUpdateInput): P
     // - Send notifications if required
 
     // Placeholder successful response
-    revalidatePath("/cap-nhat");
+    revalidatePath("/bao-gia");
     return { success: "Trạng thái báo giá sẽ được cập nhật trong Phase 2" };
   } catch (error) {
     console.error("Update quotation status error:", error);
@@ -54,7 +54,7 @@ export async function cancelQuotation(quotationId: number, reason: string): Prom
     // - Send notifications to relevant parties
 
     // Placeholder successful response
-    revalidatePath("/cap-nhat");
+    revalidatePath("/bao-gia");
     return { success: "Báo giá sẽ được hủy trong Phase 2" };
   } catch (error) {
     console.error("Cancel quotation error:", error);
