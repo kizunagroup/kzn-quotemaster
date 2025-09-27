@@ -27,6 +27,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { DataTableToolbar } from '@/components/ui/data-table-toolbar';
+import { getTeamTypes } from '@/lib/actions/team.actions';
 import type { Team } from '@/lib/hooks/use-teams';
 
 // Single source of truth for status options
@@ -36,12 +37,17 @@ const statusOptions = [
   { value: 'inactive', label: 'Tạm Dừng' },
 ] as const;
 
-// Team type filter options
-const teamTypeOptions = [
-  { value: 'all', label: 'Tất cả loại hình' },
-  { value: 'KITCHEN', label: 'Nhóm Bếp' },
-  { value: 'OFFICE', label: 'Văn Phòng' },
-] as const;
+// Team type display mapping for Vietnamese labels
+const getTeamTypeDisplay = (teamType: string): string => {
+  switch (teamType.toUpperCase()) {
+    case 'KITCHEN':
+      return 'Nhóm Bếp';
+    case 'OFFICE':
+      return 'Văn Phòng';
+    default:
+      return teamType;
+  }
+};
 
 interface TeamsTableToolbarProps {
   // Search props
@@ -88,6 +94,10 @@ export function TeamsTableToolbar({
   // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
 
+  // Team type state - dynamic loading from database
+  const [teamTypes, setTeamTypes] = useState<string[]>([]);
+  const [teamTypesLoading, setTeamTypesLoading] = useState(false);
+
   // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
 
@@ -103,10 +113,42 @@ export function TeamsTableToolbar({
     }
   }, [debouncedSearchValue, searchValue, onSearchChange]);
 
+  // Fetch team types when component mounts
+  useEffect(() => {
+    const fetchTeamTypes = async () => {
+      setTeamTypesLoading(true);
+      try {
+        const result = await getTeamTypes();
+        if (Array.isArray(result)) {
+          setTeamTypes(result);
+        } else {
+          console.error("Failed to fetch team types:", result.error);
+          setTeamTypes([]);
+        }
+      } catch (error) {
+        console.error("Error fetching team types:", error);
+        setTeamTypes([]);
+      } finally {
+        setTeamTypesLoading(false);
+      }
+    };
+
+    fetchTeamTypes();
+  }, []);
+
   // Handle local search input change
   const handleLocalSearchChange = (value: string) => {
     setLocalSearchValue(value);
   };
+
+  // Build team type options dynamically
+  const teamTypeOptions = [
+    { value: 'all', label: 'Tất cả loại hình' },
+    ...teamTypes.map(teamType => ({
+      value: teamType,
+      label: getTeamTypeDisplay(teamType),
+    })),
+  ];
 
   return (
     <DataTableToolbar
@@ -185,10 +227,14 @@ export function TeamsTableToolbar({
         </SelectContent>
       </Select>
 
-      {/* Team Type Filter */}
-      <Select value={selectedTeamType} onValueChange={onTeamTypeChange}>
+      {/* Team Type Filter - Dynamic Loading */}
+      <Select
+        value={selectedTeamType}
+        onValueChange={onTeamTypeChange}
+        disabled={teamTypesLoading}
+      >
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder="Loại hình" />
+          <SelectValue placeholder={teamTypesLoading ? "Đang tải..." : "Loại hình"} />
         </SelectTrigger>
         <SelectContent>
           {teamTypeOptions.map((option) => (
@@ -232,4 +278,4 @@ function getColumnDisplayName(columnId: string): string {
 }
 
 // Export options for use in other components
-export { statusOptions, teamTypeOptions };
+export { statusOptions };

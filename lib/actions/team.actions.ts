@@ -4,7 +4,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db/drizzle";
 import { teams, users, teamMembers } from "@/lib/db/schema";
-import { eq, and, ilike, isNull, sql, inArray } from "drizzle-orm";
+import { eq, and, ilike, isNull, sql, inArray, asc } from "drizzle-orm";
 import { getUser, getUserWithTeams } from "@/lib/db/queries";
 import { checkPermission } from "@/lib/auth/permissions";
 import {
@@ -257,6 +257,49 @@ export async function getRegions(): Promise<string[] | { error: string }> {
   } catch (error) {
     console.error("Get regions error:", error);
     return { error: "Có lỗi xảy ra khi tải danh sách khu vực" };
+  }
+}
+
+// Server Action: Get Team Types
+export async function getTeamTypes(): Promise<string[] | { error: string }> {
+  try {
+    // 1. Authorization Check (CRITICAL FIRST STEP)
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền truy cập' };
+    }
+
+    // Check if user has permission to view teams
+    const hasPermission = await checkPermission(user.id, 'canManageKitchens');
+    if (!hasPermission) {
+      return { error: 'Bạn không có quyền xem danh sách nhóm' };
+    }
+
+    // 2. Database Query - Get distinct team types
+    const result = await db
+      .selectDistinct({
+        teamType: teams.teamType
+      })
+      .from(teams)
+      .where(
+        and(
+          isNull(teams.deletedAt), // Exclude soft-deleted records
+          sql`${teams.teamType} IS NOT NULL AND TRIM(${teams.teamType}) != ''` // Exclude null/empty team types
+        )
+      )
+      .orderBy(asc(teams.teamType));
+
+    // 3. Extract and return team type strings
+    const teamTypes = result
+      .map(row => row.teamType)
+      .filter((teamType): teamType is string =>
+        teamType !== null && teamType.trim() !== ''
+      );
+
+    return teamTypes;
+  } catch (error) {
+    console.error('Error fetching team types:', error);
+    return { error: 'Có lỗi xảy ra khi tải danh sách loại hình nhóm' };
   }
 }
 
