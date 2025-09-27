@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from 'zod';
 import { db } from "@/lib/db/drizzle";
 import { suppliers } from "@/lib/db/schema";
 import { getUser } from "@/lib/db/queries";
 import { checkPermission } from "@/lib/auth/permissions";
+import { supplierQuerySchema } from '@/lib/schemas/supplier.schemas';
 import { and, ilike, eq, desc, asc, count, isNull, or, sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
@@ -25,31 +27,16 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Task 3.3: Parse Query Parameters with Defaults - FIXED TO MATCH TEAMS
+    // Parse and validate query parameters using the schema - EXACTLY LIKE TEAMS
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") || "";
-    const status = searchParams.get("status") || "all";
-    const sort = searchParams.get("sort") || "createdAt"; // ✅ DEFAULT TO createdAt
-    const order = searchParams.get("order") || "desc"; // ✅ DEFAULT TO desc
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-
-    // Validate pagination parameters
-    const validatedPage = Math.max(1, page);
-    const validatedLimit = Math.min(Math.max(1, limit), 100); // Cap at 100 for performance
-
-    // Validate sort parameters - FIXED TO MATCH TEAMS
-    const validSortColumns = [
-      "name",
-      "supplierCode",
-      "contactPerson",
-      "phone",
-      "email",
-      "status",
-      "createdAt",
-    ];
-    const validatedSort = validSortColumns.includes(sort) ? sort : "createdAt"; // ✅ DEFAULT TO createdAt
-    const validatedOrder = ["asc", "desc"].includes(order) ? order : "desc"; // ✅ DEFAULT TO desc
+    const params = supplierQuerySchema.parse({
+      search: searchParams.get('search'),
+      status: searchParams.get('status'),
+      sort: searchParams.get('sort'),
+      order: searchParams.get('order'),
+      page: searchParams.get('page'),
+      limit: searchParams.get('limit'),
+    });
 
     // Task 3.4: Build Where Conditions
     const conditions = [
@@ -58,20 +45,16 @@ export async function GET(request: NextRequest) {
     ];
 
     // Search filtering across name and supplierCode - EXACTLY LIKE TEAMS
-    if (search.trim()) {
-      const searchTerm = `%${search.trim()}%`;
+    if (params.search && params.search.trim()) {
+      const searchTerm = `%${params.search.trim()}%`;
       conditions.push(
         sql`(LOWER(${suppliers.name}) LIKE LOWER(${searchTerm}) OR LOWER(${suppliers.supplierCode}) LIKE LOWER(${searchTerm}))`
       );
     }
 
     // Status filtering
-    if (status && status !== "all") {
-      // Validate status parameter
-      const validStatuses = ["active", "inactive"];
-      if (validStatuses.includes(status)) {
-        conditions.push(eq(suppliers.status, status));
-      }
+    if (params.status && params.status !== "all") {
+      conditions.push(eq(suppliers.status, params.status));
     }
 
     // Task 3.5: Build Final Where Clause
@@ -87,12 +70,12 @@ export async function GET(request: NextRequest) {
         case 'email': return suppliers.email;
         case 'status': return suppliers.status;
         case 'createdAt': return suppliers.createdAt;
-        default: return suppliers.createdAt; // ✅ DEFAULT TO createdAt instead of name
+        default: return suppliers.createdAt;
       }
     };
 
-    const sortColumn = getSortColumn(validatedSort);
-    const orderByClause = validatedOrder === "desc" ? desc(sortColumn) : asc(sortColumn);
+    const sortColumn = getSortColumn(params.sort);
+    const orderByClause = params.order === "desc" ? desc(sortColumn) : asc(sortColumn);
 
     // Task 3.5: Execute Queries (Data + Count in Parallel)
     const [data, [{ totalCount }]] = await Promise.all([
@@ -114,43 +97,62 @@ export async function GET(request: NextRequest) {
         .from(suppliers)
         .where(whereClause)
         .orderBy(orderByClause)
-        .limit(validatedLimit)
-        .offset((validatedPage - 1) * validatedLimit),
+        .limit(params.limit)
+        .offset((params.page - 1) * params.limit),
 
       // Count query for pagination
       db.select({ totalCount: count() }).from(suppliers).where(whereClause),
     ]);
 
-    // Calculate pagination metadata
-    const totalPages = Math.ceil(totalCount / validatedLimit);
-
     // Task 3.6: Return Standardized Response - EXACTLY LIKE TEAMS
     return NextResponse.json({
       data,
       pagination: {
-        page: validatedPage,
-        limit: validatedLimit,
+        page: params.page,
+        limit: params.limit,
         total: totalCount,
-        pages: totalPages, // FIXED: pages instead of totalPages to match teams
+        pages: Math.ceil(totalCount / params.limit),
       },
       filters: {
-        search,
-        status,
-        sort: validatedSort, // ADDED: Missing filters object like teams
-        order: validatedOrder,
+        search: params.search,
+        status: params.status,
+        sort: params.sort,
+        order: params.order,
       },
     });
   } catch (error) {
     console.error("Error fetching suppliers:", error);
 
-    // Handle specific database errors
-    if (error instanceof Error) {
-      // Log the actual error for debugging but return generic message to user
-      console.error("Database error details:", error.message);
+    // Handle Zod validation errors - EXACTLY LIKE TEAMS
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        {
+          error: 'Invalid query parameters',
+          details: error.errors
+        },
+        { status: 400 }
+      );
     }
 
+    // Handle database errors
+    if (error instanceof Error && error.message.includes('database')) {
+      return NextResponse.json(
+        {
+          error: 'Database error',
+          code: 'DATABASE_ERROR',
+          timestamp: new Date().toISOString()
+        },
+        { status: 500 }
+      );
+    }
+
+    // Generic server error
     return NextResponse.json(
-      { error: "Có lỗi xảy ra khi tải danh sách nhà cung cấp" },
+      {
+        error: 'Internal server error',
+        code: 'SUPPLIERS_FETCH_FAILED',
+        timestamp: new Date().toISOString()
+      },
       { status: 500 }
     );
   }

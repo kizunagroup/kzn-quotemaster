@@ -38,6 +38,27 @@ export const updateSupplierSchema = createSupplierSchema.extend({
   id: z.number().min(1, 'ID nhà cung cấp không hợp lệ'),
 });
 
+// Query schema for supplier filtering (used in API routes) - MISSING CRITICAL SCHEMA
+export const supplierQuerySchema = z.object({
+  search: z.string().nullable().optional(),
+  status: z.string().nullable().default('all').transform(val =>
+    val === null || val === '' ? 'all' : val
+  ).pipe(z.enum(['all', 'active', 'inactive'])),
+  sort: z.string().nullable().default('createdAt').transform(val =>
+    val === null || val === '' ? 'createdAt' : val
+  ).pipe(z.enum(['name', 'supplierCode', 'contactPerson', 'phone', 'email', 'status', 'createdAt'])),
+  order: z.string().nullable().default('desc').transform(val =>
+    val === null || val === '' ? 'desc' : val
+  ).pipe(z.enum(['asc', 'desc'])),
+  page: z.string().nullable().default('1').transform(val =>
+    val === null || val === '' ? '1' : val
+  ).pipe(z.coerce.number().min(1)),
+  limit: z.string().nullable().default('10').transform(val =>
+    val === null || val === '' ? '10' : val
+  ).pipe(z.coerce.number().min(1).max(100)),
+});
+
 // Type exports for use in components
 export type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
 export type UpdateSupplierInput = z.infer<typeof updateSupplierSchema>;
+export type SupplierQueryInput = z.infer<typeof supplierQuerySchema>;
