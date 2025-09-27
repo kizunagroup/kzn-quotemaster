@@ -12,6 +12,8 @@ import {
   suppliers,
   products,
   kitchenPeriodDemands,
+  quotations,
+  quoteItems,
 } from "./schema";
 import { hashPassword } from "@/lib/auth/session";
 import { sql } from "drizzle-orm";
@@ -512,6 +514,210 @@ async function checkExistingData() {
     console.warn("⚠️  Error checking existing data:", error);
     return { hasConflicts: false, userCount: 0, teamCount: 0 };
   }
+}
+
+// NEW: Seed quotations with realistic sample data for UI testing
+async function seedQuotations() {
+  console.log("🌱 Starting quotations seeding...");
+
+  // 1. Fetch Prerequisites - Find users suitable for creating quotes
+  const procurementUsers = await db
+    .select({ id: users.id, name: users.name, department: users.department })
+    .from(users)
+    .where(sql`${users.department} IN ('ADMIN', 'SAN_XUAT', 'KINH_DOANH')`)
+    .limit(10);
+
+  if (procurementUsers.length === 0) {
+    console.warn("⚠️  No suitable users found for creating quotations. Skipping quotations seed.");
+    return;
+  }
+
+  console.log(`✅ Found ${procurementUsers.length} users suitable for creating quotations`);
+
+  // 2. Fetch all existing suppliers, products, and kitchen teams
+  const allSuppliers = await db.select().from(suppliers);
+  const allProducts = await db.select().from(products);
+  const kitchenTeams = await db
+    .select({ id: teams.id, name: teams.name, region: teams.region })
+    .from(teams)
+    .where(sql`${teams.teamType} = 'KITCHEN'`);
+
+  if (allSuppliers.length === 0 || allProducts.length === 0 || kitchenTeams.length === 0) {
+    console.warn("⚠️  Missing required data (suppliers, products, or kitchen teams). Skipping quotations seed.");
+    return;
+  }
+
+  console.log(`✅ Found ${allSuppliers.length} suppliers, ${allProducts.length} products, ${kitchenTeams.length} kitchen teams`);
+
+  // 3. Define Time Periods - Recent periods for quotation cycles
+  const currentDate = new Date();
+  const periods = [
+    `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`, // Current month
+    `${currentDate.getFullYear()}-${String(currentDate.getMonth()).padStart(2, '0')}-01`, // Last month
+    `${currentDate.getFullYear()}-${String(currentDate.getMonth() - 1).padStart(2, '0')}-01`, // Two months ago
+  ].filter(period => !period.includes('-00-')); // Remove invalid months
+
+  console.log(`✅ Using quotation periods: ${periods.join(', ')}`);
+
+  // 4. Group kitchen teams by region for regional quotations
+  const regionGroups = kitchenTeams.reduce((groups, team) => {
+    if (!groups[team.region]) groups[team.region] = [];
+    groups[team.region].push(team);
+    return groups;
+  }, {} as Record<string, typeof kitchenTeams>);
+
+  const regions = Object.keys(regionGroups);
+  console.log(`✅ Found ${regions.length} regions: ${regions.join(', ')}`);
+
+  // 5. Data Generation Loop
+  const quotationData = [];
+  const quotationItemsMap = new Map(); // Map quotationId to its items
+  const productCategories = ['Grains', 'Vegetables', 'Meat', 'Seafood', 'Spices', 'Beverages'];
+
+  for (const period of periods) {
+    console.log(`   Generating quotations for period: ${period}`);
+
+    for (const supplier of allSuppliers) {
+      // Create 3-6 quotations per supplier per period
+      const quotationsPerSupplier = Math.floor(Math.random() * 4) + 3; // 3-6 quotations
+
+      for (let i = 0; i < quotationsPerSupplier; i++) {
+        const randomUser = procurementUsers[Math.floor(Math.random() * procurementUsers.length)];
+        const randomCategory = productCategories[Math.floor(Math.random() * productCategories.length)];
+        const statuses = ['pending', 'approved', 'cancelled', 'negotiation'];
+        const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+
+        // Critical: 70% specific kitchen, 30% regional (all kitchens in region)
+        const isRegionalQuote = Math.random() < 0.3; // 30% chance for regional quotes
+        const teamsToQuote = [];
+
+        if (isRegionalQuote) {
+          // Regional quotation - all kitchens in selected region
+          const randomRegion = regions[Math.floor(Math.random() * regions.length)];
+          teamsToQuote.push(...regionGroups[randomRegion]);
+          console.log(`     Creating regional quotation for ${randomRegion} (${regionGroups[randomRegion].length} kitchens)`);
+        } else {
+          // Specific kitchen quotation
+          const randomKitchen = kitchenTeams[Math.floor(Math.random() * kitchenTeams.length)];
+          teamsToQuote.push(randomKitchen);
+        }
+
+        // Generate quotations for each target team
+        for (const targetTeam of teamsToQuote) {
+          const quotationId = `Q${period.replace(/-/g, '')}${supplier.supplierCode}${targetTeam.id.toString().padStart(3, '0')}${Math.floor(Math.random() * 100).toString().padStart(2, '0')}`;
+
+          // Create quotation record
+          const quotationRecord = {
+            quotationId: quotationId,
+            period: period,
+            supplierId: supplier.id,
+            teamId: targetTeam.id,
+            region: targetTeam.region,
+            category: randomCategory,
+            quoteDate: new Date(period),
+            updateDate: new Date(),
+            status: randomStatus,
+            createdBy: randomUser.id,
+            createdAt: new Date(period),
+            updatedAt: new Date(),
+          };
+
+          quotationData.push(quotationRecord);
+
+          // Generate 5-10 quote items for this quotation
+          const itemCount = Math.floor(Math.random() * 6) + 5; // 5-10 items
+          const categoryProducts = allProducts.filter(p => p.category === randomCategory);
+          const productsToUse = categoryProducts.length > 0 ? categoryProducts : allProducts;
+          const quotationItems = [];
+
+          for (let itemIndex = 0; itemIndex < itemCount; itemIndex++) {
+            const randomProduct = productsToUse[Math.floor(Math.random() * productsToUse.length)];
+
+            // Generate realistic pricing based on product base price (if exists) or random values
+            const basePrice = 50000 + Math.random() * 500000; // 50k - 550k VND base
+            const initialPrice = Math.round(basePrice * (0.9 + Math.random() * 0.2)); // ±10% variation
+            const quantity = Math.floor(Math.random() * 100) + 10; // 10-109 units
+            const vatPercentage = Math.random() < 0.7 ? 10 : 5; // 70% chance of 10% VAT, 30% chance of 5%
+
+            const quoteItemRecord = {
+              quotationId: null, // Will be set after quotation is inserted
+              productId: randomProduct.id,
+              quantity: quantity.toString(),
+              initialPrice: initialPrice.toString(),
+              negotiatedPrice: randomStatus === 'negotiation' ? Math.round(initialPrice * 0.95).toString() : null,
+              approvedPrice: randomStatus === 'approved' ? Math.round(initialPrice * 0.98).toString() : null,
+              vatPercentage: vatPercentage.toString(),
+              currency: 'VND',
+              pricePerUnit: Math.round(initialPrice / quantity).toString(),
+              negotiationRounds: randomStatus === 'negotiation' ? Math.floor(Math.random() * 3) + 1 : 0,
+              lastNegotiatedAt: randomStatus === 'negotiation' ? new Date() : null,
+              approvedAt: randomStatus === 'approved' ? new Date() : null,
+              approvedBy: randomStatus === 'approved' ? randomUser.id : null,
+              notes: `${randomProduct.name} cho ${targetTeam.name} - Kỳ ${period}`,
+              createdAt: new Date(period),
+              updatedAt: new Date(),
+            };
+
+            quotationItems.push(quoteItemRecord);
+          }
+
+          // Store items for this quotation
+          quotationItemsMap.set(quotationId, quotationItems);
+        }
+      }
+    }
+  }
+
+  const totalQuoteItems = Array.from(quotationItemsMap.values()).reduce((sum, items) => sum + items.length, 0);
+  console.log(`✅ Generated ${quotationData.length} quotations with ${totalQuoteItems} quote items`);
+
+  // 6. Insert quotations and quote items with proper relationships
+  if (quotationData.length > 0) {
+    // Insert quotations first
+    const insertedQuotations = await db.insert(quotations).values(quotationData).returning();
+    console.log(`✅ Inserted ${insertedQuotations.length} quotations into database`);
+
+    // Prepare all quote items with correct quotation IDs
+    const allQuoteItems = [];
+    insertedQuotations.forEach((insertedQuotation, index) => {
+      const originalQuotationId = quotationData[index].quotationId;
+      const items = quotationItemsMap.get(originalQuotationId) || [];
+
+      items.forEach(item => {
+        allQuoteItems.push({
+          ...item,
+          quotationId: insertedQuotation.id
+        });
+      });
+    });
+
+    if (allQuoteItems.length > 0) {
+      await db.insert(quoteItems).values(allQuoteItems);
+      console.log(`✅ Inserted ${allQuoteItems.length} quote items into database`);
+    }
+  }
+
+  // 7. Summary reporting
+  console.log("\n📊 Quotations Seeding Summary:");
+  console.log(`   📋 Total Quotations: ${quotationData.length}`);
+  console.log(`   📦 Total Quote Items: ${totalQuoteItems}`);
+  console.log(`   📅 Periods Covered: ${periods.length} (${periods.join(', ')})`);
+  console.log(`   🏭 Suppliers Involved: ${allSuppliers.length}`);
+  console.log(`   🍳 Kitchen Teams: ${kitchenTeams.length}`);
+  console.log(`   📍 Regions: ${regions.length} (${regions.join(', ')})`);
+
+  // Status breakdown
+  const statusCounts = quotationData.reduce((counts, q) => {
+    counts[q.status] = (counts[q.status] || 0) + 1;
+    return counts;
+  }, {} as Record<string, number>);
+
+  console.log("   📊 Status Distribution:");
+  Object.entries(statusCounts).forEach(([status, count]) => {
+    console.log(`     ${status}: ${count} quotations`);
+  });
+
+  console.log("✅ Quotations seeding completed successfully!");
 }
 
 export async function seedDatabase() {
@@ -1314,6 +1520,9 @@ export async function seedDatabase() {
   console.log("   ✅ Clean separation between OFFICE and KITCHEN structures");
   console.log("   ✅ Realistic Vietnamese organizational structure");
   console.log("   ✅ Production-ready data relationships and constraints");
+
+  // 11. Seed quotations with realistic test data
+  await seedQuotations();
 
   // Verify data integrity - CRITICAL for proper linkage
   console.log("\n🔍 Data Integrity Verification:");
