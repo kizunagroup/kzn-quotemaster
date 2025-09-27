@@ -35,15 +35,6 @@ const VALID_SORT_COLUMNS = [
   "createdAt",
 ] as const;
 
-// Valid departments for filtering
-const VALID_DEPARTMENTS = [
-  "all",
-  "ADMIN",
-  "PROCUREMENT",
-  "KITCHEN",
-  "ACCOUNTING",
-  "OPERATIONS",
-] as const;
 
 // Input validation schema for query parameters
 const staffQuerySchema = z.object({
@@ -52,8 +43,7 @@ const staffQuerySchema = z.object({
     .string()
     .nullable()
     .default("all")
-    .transform((val) => (val === null || val === "" ? "all" : val))
-    .pipe(z.enum(VALID_DEPARTMENTS)),
+    .transform((val) => (val === null || val === "" ? "all" : val)),
   status: z
     .string()
     .nullable()

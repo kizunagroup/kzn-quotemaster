@@ -45,14 +45,20 @@ const getDepartmentDisplay = (department: string): string => {
   switch (department.toUpperCase()) {
     case 'ADMIN':
       return 'Quản Trị';
-    case 'PROCUREMENT':
-      return 'Mua Sắm';
-    case 'KITCHEN':
+    case 'BEP':
       return 'Bếp';
-    case 'ACCOUNTING':
+    case 'KE_TOAN':
       return 'Kế Toán';
-    case 'OPERATIONS':
-      return 'Vận Hành';
+    case 'KINH_DOANH':
+      return 'Kinh Doanh';
+    case 'NHAN_SU':
+      return 'Nhân Sự';
+    case 'PHAT_TRIEN_KINH_DOANH':
+      return 'Phát Triển Kinh Doanh';
+    case 'SAN_XUAT':
+      return 'Sản Xuất';
+    case 'TONG_VU':
+      return 'Tổng Vụ';
     default:
       return department;
   }
