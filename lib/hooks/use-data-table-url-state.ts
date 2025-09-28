@@ -263,13 +263,21 @@ export function useDataTableUrlState(
     if (currentState.filters.search) return true;
 
     // Check all filterable keys generically
-    return FILTERABLE_KEYS.some((key) => currentState.filters[key]);
+    // A filter is considered "active" if it has a value that's not "all" or undefined
+    return FILTERABLE_KEYS.some((key) => {
+      const value = currentState.filters[key];
+      return value && value !== "all";
+    });
   }, [currentState.filters]);
 
   // Check if there are active filters - excludes search (only category, status, etc.)
   const hasActiveFiltersOnly = useMemo(() => {
     // Only check filterable keys, exclude search
-    return FILTERABLE_KEYS.some((key) => currentState.filters[key]);
+    // A filter is considered "active" if it has a value that's not "all" or undefined
+    return FILTERABLE_KEYS.some((key) => {
+      const value = currentState.filters[key];
+      return value && value !== "all";
+    });
   }, [currentState.filters]);
 
   return {
