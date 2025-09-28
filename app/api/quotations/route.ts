@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
     const queryResult = quotationQuerySchema.safeParse({
       search: searchParams.get("search") || undefined,
       period: searchParams.get("period") || undefined,
-      supplier: searchParams.get("supplier") || undefined,
+      supplier: searchParams.get("supplier") || searchParams.get("supplierId") || undefined,
       region: searchParams.get("region") || undefined,
       teamId: searchParams.get("teamId") || undefined,
       status: searchParams.get("status") || "all",

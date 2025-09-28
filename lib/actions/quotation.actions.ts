@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { getUser } from "@/lib/db/queries";
 import { QuotationStatusUpdateInput } from "@/lib/schemas/quotation.schemas";
+import { db } from "@/lib/db/drizzle";
+import { quotations, suppliers, teams } from "@/lib/db/schema";
+import { sql, eq, distinct, asc } from "drizzle-orm";
 
 // Return type for server actions
 type ActionResult = {
@@ -59,5 +62,82 @@ export async function cancelQuotation(quotationId: number, reason: string): Prom
   } catch (error) {
     console.error("Cancel quotation error:", error);
     return { error: "Có lỗi xảy ra khi hủy báo giá" };
+  }
+}
+
+// Server Action: Get Quotation Periods for Dynamic Filtering
+export async function getQuotationPeriods(): Promise<string[]> {
+  try {
+    // 1. Authorization Check
+    const user = await getUser();
+    if (!user) {
+      return [];
+    }
+
+    // 2. Fetch distinct periods from quotations table
+    const periods = await db
+      .selectDistinct({
+        period: quotations.period,
+      })
+      .from(quotations)
+      .orderBy(asc(quotations.period));
+
+    return periods.map(p => p.period);
+  } catch (error) {
+    console.error("Get quotation periods error:", error);
+    return [];
+  }
+}
+
+// Server Action: Get Quotation Suppliers for Dynamic Filtering
+export async function getQuotationSuppliers(): Promise<Array<{ id: number; name: string }>> {
+  try {
+    // 1. Authorization Check
+    const user = await getUser();
+    if (!user) {
+      return [];
+    }
+
+    // 2. Fetch suppliers that have quotations
+    const suppliersData = await db
+      .selectDistinct({
+        id: suppliers.id,
+        name: suppliers.name,
+      })
+      .from(suppliers)
+      .innerJoin(quotations, eq(quotations.supplierId, suppliers.id))
+      .orderBy(asc(suppliers.name));
+
+    return suppliersData;
+  } catch (error) {
+    console.error("Get quotation suppliers error:", error);
+    return [];
+  }
+}
+
+// Server Action: Get Quotation Teams for Dynamic Filtering
+export async function getQuotationTeams(): Promise<Array<{ id: number; name: string }>> {
+  try {
+    // 1. Authorization Check
+    const user = await getUser();
+    if (!user) {
+      return [];
+    }
+
+    // 2. Fetch kitchen teams that have quotations
+    const teamsData = await db
+      .selectDistinct({
+        id: teams.id,
+        name: teams.name,
+      })
+      .from(teams)
+      .innerJoin(quotations, eq(quotations.teamId, teams.id))
+      .where(eq(teams.teamType, 'KITCHEN'))
+      .orderBy(asc(teams.name));
+
+    return teamsData;
+  } catch (error) {
+    console.error("Get quotation teams error:", error);
+    return [];
   }
 }

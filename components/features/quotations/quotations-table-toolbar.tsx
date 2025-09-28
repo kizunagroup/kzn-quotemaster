@@ -28,8 +28,13 @@ import {
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
 import type { Quotation } from "@/lib/hooks/use-quotations";
+import {
+  getQuotationPeriods,
+  getQuotationSuppliers,
+  getQuotationTeams
+} from "@/lib/actions/quotation.actions";
 
-// Filter options for quotations
+// Static status options (these don't change)
 const statusOptions = [
   { value: "all", label: "Tất cả trạng thái" },
   { value: "pending", label: "Chờ Duyệt" },
@@ -38,41 +43,19 @@ const statusOptions = [
   { value: "cancelled", label: "Đã Hủy" },
 ] as const;
 
-// Period options (recent periods)
-const periodOptions = [
-  { value: "all", label: "Tất cả kỳ báo giá" },
-  { value: "2024-12-01", label: "Tháng 12/2024" },
-  { value: "2024-11-01", label: "Tháng 11/2024" },
-  { value: "2024-10-01", label: "Tháng 10/2024" },
-  { value: "2024-09-01", label: "Tháng 9/2024" },
-] as const;
+// Dynamic option types
+type OptionType = { value: string; label: string };
 
-// Region options (common Vietnamese regions)
-const regionOptions = [
-  { value: "all", label: "Tất cả khu vực" },
-  { value: "Miền Bắc", label: "Miền Bắc" },
-  { value: "Miền Trung", label: "Miền Trung" },
-  { value: "Miền Nam", label: "Miền Nam" },
-  { value: "Hà Nội", label: "Hà Nội" },
-  { value: "TP.HCM", label: "TP.HCM" },
-  { value: "Đà Nẵng", label: "Đà Nẵng" },
-] as const;
-
-// Supplier options (placeholder - should be fetched from API)
-const supplierOptions = [
-  { value: "all", label: "Tất cả nhà cung cấp" },
-  { value: "supplier-1", label: "Nhà cung cấp A" },
-  { value: "supplier-2", label: "Nhà cung cấp B" },
-  { value: "supplier-3", label: "Nhà cung cấp C" },
-] as const;
-
-// Team options (placeholder - should be permission-based)
-const teamOptions = [
-  { value: "all", label: "Tất cả bếp" },
-  { value: "team-1", label: "Bếp Trung Tâm" },
-  { value: "team-2", label: "Bếp Chi Nhánh 1" },
-  { value: "team-3", label: "Bếp Chi Nhánh 2" },
-] as const;
+// Helper function to format period display
+function formatPeriodLabel(period: string): string {
+  const [year, month] = period.split('-');
+  const monthNames = [
+    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
+  ];
+  const monthIndex = parseInt(month) - 1;
+  return `${monthNames[monthIndex]}/${year}`;
+}
 
 interface QuotationsTableToolbarProps {
   // Search props
@@ -121,8 +104,95 @@ export function QuotationsTableToolbar({
   // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
 
+  // Dynamic filter options state
+  const [periodOptions, setPeriodOptions] = useState<OptionType[]>([
+    { value: "all", label: "Tất cả kỳ báo giá" }
+  ]);
+  const [supplierOptions, setSupplierOptions] = useState<OptionType[]>([
+    { value: "all", label: "Tất cả nhà cung cấp" }
+  ]);
+  const [teamOptions, setTeamOptions] = useState<OptionType[]>([
+    { value: "all", label: "Tất cả bếp" }
+  ]);
+  const [regionOptions, setRegionOptions] = useState<OptionType[]>([
+    { value: "all", label: "Tất cả khu vực" }
+  ]);
+
+  // Loading states
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true);
+
   // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
+
+  // Load dynamic filter options on component mount
+  useEffect(() => {
+    const loadFilterOptions = async () => {
+      try {
+        setIsLoadingOptions(true);
+
+        // Fetch all filter options in parallel
+        const [periods, suppliers, teams] = await Promise.all([
+          getQuotationPeriods(),
+          getQuotationSuppliers(),
+          getQuotationTeams()
+        ]);
+
+        // Format period options
+        const formattedPeriods: OptionType[] = [
+          { value: "all", label: "Tất cả kỳ báo giá" },
+          ...periods.map(period => ({
+            value: period,
+            label: formatPeriodLabel(period)
+          }))
+        ];
+
+        // Format supplier options
+        const formattedSuppliers: OptionType[] = [
+          { value: "all", label: "Tất cả nhà cung cấp" },
+          ...suppliers.map(supplier => ({
+            value: supplier.id.toString(),
+            label: supplier.name
+          }))
+        ];
+
+        // Format team options
+        const formattedTeams: OptionType[] = [
+          { value: "all", label: "Tất cả bếp" },
+          ...teams.map(team => ({
+            value: team.id.toString(),
+            label: team.name
+          }))
+        ];
+
+        // Get unique regions from current data (could be enhanced with separate API)
+        const uniqueRegions = Array.from(new Set([
+          'Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng',
+          'Vũng Tàu', 'Nha Trang', 'Huế', 'Quận 1', 'Quận 5', 'Quận 7',
+          'Bình Thạnh', 'Thủ Đức', 'Gò Vấp', 'Phú Nhuận'
+        ]));
+
+        const formattedRegions: OptionType[] = [
+          { value: "all", label: "Tất cả khu vực" },
+          ...uniqueRegions.map(region => ({
+            value: region,
+            label: region
+          }))
+        ];
+
+        // Update state
+        setPeriodOptions(formattedPeriods);
+        setSupplierOptions(formattedSuppliers);
+        setTeamOptions(formattedTeams);
+        setRegionOptions(formattedRegions);
+      } catch (error) {
+        console.error('Failed to load filter options:', error);
+      } finally {
+        setIsLoadingOptions(false);
+      }
+    };
+
+    loadFilterOptions();
+  }, []);
 
   // Sync local search value with external prop when it changes
   useEffect(() => {
@@ -216,9 +286,9 @@ export function QuotationsTableToolbar({
       {/* Filter Controls */}
       <div className="flex items-center gap-2 flex-wrap">
         {/* Period Filter */}
-        <Select value={selectedPeriod} onValueChange={onPeriodChange}>
+        <Select value={selectedPeriod} onValueChange={onPeriodChange} disabled={isLoadingOptions}>
           <SelectTrigger className="h-8 w-[160px]">
-            <SelectValue placeholder="Kỳ báo giá" />
+            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Kỳ báo giá"} />
           </SelectTrigger>
           <SelectContent>
             {periodOptions.map((option) => (
@@ -230,9 +300,9 @@ export function QuotationsTableToolbar({
         </Select>
 
         {/* Supplier Filter */}
-        <Select value={selectedSupplier} onValueChange={onSupplierChange}>
+        <Select value={selectedSupplier} onValueChange={onSupplierChange} disabled={isLoadingOptions}>
           <SelectTrigger className="h-8 w-[160px]">
-            <SelectValue placeholder="Nhà cung cấp" />
+            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Nhà cung cấp"} />
           </SelectTrigger>
           <SelectContent>
             {supplierOptions.map((option) => (
@@ -244,9 +314,9 @@ export function QuotationsTableToolbar({
         </Select>
 
         {/* Region Filter */}
-        <Select value={selectedRegion} onValueChange={onRegionChange}>
+        <Select value={selectedRegion} onValueChange={onRegionChange} disabled={isLoadingOptions}>
           <SelectTrigger className="h-8 w-[140px]">
-            <SelectValue placeholder="Khu vực" />
+            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Khu vực"} />
           </SelectTrigger>
           <SelectContent>
             {regionOptions.map((option) => (
@@ -257,10 +327,10 @@ export function QuotationsTableToolbar({
           </SelectContent>
         </Select>
 
-        {/* Team Filter (Permission-based - for now showing all) */}
-        <Select value={selectedTeam} onValueChange={onTeamChange}>
+        {/* Team Filter */}
+        <Select value={selectedTeam} onValueChange={onTeamChange} disabled={isLoadingOptions}>
           <SelectTrigger className="h-8 w-[140px]">
-            <SelectValue placeholder="Bếp" />
+            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Bếp"} />
           </SelectTrigger>
           <SelectContent>
             {teamOptions.map((option) => (
@@ -306,5 +376,5 @@ function getColumnDisplayName(columnId: string): string {
   return columnNames[columnId] || columnId;
 }
 
-// Export options for use in other components
-export { statusOptions, periodOptions, regionOptions, supplierOptions, teamOptions };
+// Export static options for use in other components
+export { statusOptions };

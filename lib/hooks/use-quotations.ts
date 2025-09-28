@@ -139,9 +139,12 @@ export function useQuotations() {
       params.set("period", filters.period);
     }
 
-    // Add supplier filter
+    // Add supplier filter (supports both supplier name and supplierId)
     if (filters.supplier) {
       params.set("supplier", filters.supplier);
+    }
+    if (filters.supplierId) {
+      params.set("supplierId", filters.supplierId);
     }
 
     // Add region filter
