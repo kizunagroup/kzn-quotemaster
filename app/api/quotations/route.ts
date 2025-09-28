@@ -52,7 +52,6 @@ export async function GET(request: NextRequest) {
       period: searchParams.get("period") || undefined,
       supplier: searchParams.get("supplier") || searchParams.get("supplierId") || undefined,
       region: searchParams.get("region") || undefined,
-      teamId: searchParams.get("teamId") || undefined,
       status: searchParams.get("status") || "all",
       sort: searchParams.get("sort") || "createdAt",
       order: searchParams.get("order") || "desc",
@@ -117,10 +116,6 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(quotations.region, params.region));
     }
 
-    // Team filter (specific team selection)
-    if (params.teamId) {
-      conditions.push(eq(quotations.teamId, params.teamId));
-    }
 
     // Status filter
     if (params.status && params.status !== "all") {

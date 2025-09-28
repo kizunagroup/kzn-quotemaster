@@ -152,10 +152,6 @@ export function useQuotations() {
       params.set("region", filters.region);
     }
 
-    // Add team filter
-    if (filters.teamId) {
-      params.set("teamId", filters.teamId);
-    }
 
     // Add status filter
     if (filters.status && filters.status !== "all") {

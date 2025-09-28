@@ -115,8 +115,8 @@ export async function getQuotationSuppliers(): Promise<Array<{ id: number; name:
   }
 }
 
-// Server Action: Get Quotation Teams for Dynamic Filtering
-export async function getQuotationTeams(): Promise<Array<{ id: number; name: string }>> {
+// Server Action: Get Quotation Regions for Dynamic Filtering
+export async function getQuotationRegions(): Promise<string[]> {
   try {
     // 1. Authorization Check
     const user = await getUser();
@@ -124,20 +124,18 @@ export async function getQuotationTeams(): Promise<Array<{ id: number; name: str
       return [];
     }
 
-    // 2. Fetch kitchen teams that have quotations
-    const teamsData = await db
+    // 2. Fetch distinct regions from quotations table
+    const regionsData = await db
       .selectDistinct({
-        id: teams.id,
-        name: teams.name,
+        region: quotations.region,
       })
-      .from(teams)
-      .innerJoin(quotations, eq(quotations.teamId, teams.id))
-      .where(eq(teams.teamType, 'KITCHEN'))
-      .orderBy(asc(teams.name));
+      .from(quotations)
+      .orderBy(asc(quotations.region));
 
-    return teamsData;
+    return regionsData.map(r => r.region);
   } catch (error) {
-    console.error("Get quotation teams error:", error);
+    console.error("Get quotation regions error:", error);
     return [];
   }
 }
+

@@ -31,7 +31,7 @@ import type { Quotation } from "@/lib/hooks/use-quotations";
 import {
   getQuotationPeriods,
   getQuotationSuppliers,
-  getQuotationTeams
+  getQuotationRegions
 } from "@/lib/actions/quotation.actions";
 
 // Static status options (these don't change)
@@ -69,8 +69,6 @@ interface QuotationsTableToolbarProps {
   onSupplierChange: (value: string) => void;
   selectedRegion?: string;
   onRegionChange: (value: string) => void;
-  selectedTeam?: string;
-  onTeamChange: (value: string) => void;
   selectedStatus?: string;
   onStatusChange: (value: string) => void;
 
@@ -92,8 +90,6 @@ export function QuotationsTableToolbar({
   onSupplierChange,
   selectedRegion = "all",
   onRegionChange,
-  selectedTeam = "all",
-  onTeamChange,
   selectedStatus = "all",
   onStatusChange,
   onClearFilters,
@@ -110,9 +106,6 @@ export function QuotationsTableToolbar({
   ]);
   const [supplierOptions, setSupplierOptions] = useState<OptionType[]>([
     { value: "all", label: "Tất cả nhà cung cấp" }
-  ]);
-  const [teamOptions, setTeamOptions] = useState<OptionType[]>([
-    { value: "all", label: "Tất cả bếp" }
   ]);
   const [regionOptions, setRegionOptions] = useState<OptionType[]>([
     { value: "all", label: "Tất cả khu vực" }
@@ -131,10 +124,10 @@ export function QuotationsTableToolbar({
         setIsLoadingOptions(true);
 
         // Fetch all filter options in parallel
-        const [periods, suppliers, teams] = await Promise.all([
+        const [periods, suppliers, regions] = await Promise.all([
           getQuotationPeriods(),
           getQuotationSuppliers(),
-          getQuotationTeams()
+          getQuotationRegions()
         ]);
 
         // Format period options
@@ -155,25 +148,11 @@ export function QuotationsTableToolbar({
           }))
         ];
 
-        // Format team options
-        const formattedTeams: OptionType[] = [
-          { value: "all", label: "Tất cả bếp" },
-          ...teams.map(team => ({
-            value: team.id.toString(),
-            label: team.name
-          }))
-        ];
 
-        // Get unique regions from current data (could be enhanced with separate API)
-        const uniqueRegions = Array.from(new Set([
-          'Hà Nội', 'TP.HCM', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng',
-          'Vũng Tàu', 'Nha Trang', 'Huế', 'Quận 1', 'Quận 5', 'Quận 7',
-          'Bình Thạnh', 'Thủ Đức', 'Gò Vấp', 'Phú Nhuận'
-        ]));
-
+        // Format region options from database
         const formattedRegions: OptionType[] = [
           { value: "all", label: "Tất cả khu vực" },
-          ...uniqueRegions.map(region => ({
+          ...regions.map(region => ({
             value: region,
             label: region
           }))
@@ -182,7 +161,6 @@ export function QuotationsTableToolbar({
         // Update state
         setPeriodOptions(formattedPeriods);
         setSupplierOptions(formattedSuppliers);
-        setTeamOptions(formattedTeams);
         setRegionOptions(formattedRegions);
       } catch (error) {
         console.error('Failed to load filter options:', error);
@@ -327,19 +305,6 @@ export function QuotationsTableToolbar({
           </SelectContent>
         </Select>
 
-        {/* Team Filter */}
-        <Select value={selectedTeam} onValueChange={onTeamChange} disabled={isLoadingOptions}>
-          <SelectTrigger className="h-8 w-[140px]">
-            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Bếp"} />
-          </SelectTrigger>
-          <SelectContent>
-            {teamOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         {/* Status Filter */}
         <Select value={selectedStatus} onValueChange={onStatusChange}>

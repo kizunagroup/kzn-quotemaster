@@ -172,9 +172,6 @@ export function QuotationsDataTable() {
     setFilter("region", value === "all" ? null : value);
   };
 
-  const handleTeamChange = (value: string) => {
-    setFilter("teamId", value === "all" ? null : value);
-  };
 
   const handleStatusChange = (value: string) => {
     setFilter("status", value === "all" ? null : value);
@@ -438,8 +435,6 @@ export function QuotationsDataTable() {
         onSupplierChange={handleSupplierChange}
         selectedRegion={urlState.filters.region || "all"}
         onRegionChange={handleRegionChange}
-        selectedTeam={urlState.filters.teamId || "all"}
-        onTeamChange={handleTeamChange}
         selectedStatus={urlState.filters.status || "all"}
         onStatusChange={handleStatusChange}
         onClearFilters={clearFilters}

@@ -15,7 +15,6 @@ export interface DataTableFilters {
   // Quotations-specific filters
   period?: string;
   supplier?: string;
-  teamId?: string;
   [key: string]: string | undefined;
 }
 
@@ -54,7 +53,6 @@ const FILTERABLE_KEYS = [
   // Quotations-specific filters
   "period",
   "supplier",
-  "teamId",
 ];
 
 interface UseDataTableUrlStateOptions {
