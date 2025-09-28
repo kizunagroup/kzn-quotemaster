@@ -134,20 +134,20 @@ export async function GET(request: NextRequest) {
           return quotations.quotationId;
         case "period":
           return quotations.period;
+        case "supplierCode":
+          return suppliers.supplierCode;
         case "supplierName":
           return suppliers.name;
-        case "teamName":
-          return teams.name;
         case "region":
           return quotations.region;
         case "category":
           return quotations.category;
-        case "status":
-          return quotations.status;
         case "quoteDate":
           return quotations.quoteDate;
         case "updateDate":
           return quotations.updateDate;
+        case "status":
+          return quotations.status;
         case "createdAt":
         default:
           return quotations.createdAt;

@@ -7,7 +7,7 @@ export const quotationQuerySchema = z.object({
   supplier: z.string().optional(),
   region: z.string().optional(),
   status: z.enum(['pending', 'approved', 'cancelled', 'negotiation', 'all']).default('all'),
-  sort: z.string().default('createdAt'),
+  sort: z.enum(['quotationId', 'period', 'supplierCode', 'supplierName', 'region', 'category', 'quoteDate', 'updateDate', 'status', 'createdAt']).default('createdAt'),
   order: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(10),
