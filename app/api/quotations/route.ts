@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, ilike, or, inArray, desc, asc, count, sql, isNull } from "drizzle-orm";
+import {
+  and,
+  eq,
+  ilike,
+  or,
+  inArray,
+  desc,
+  asc,
+  count,
+  sql,
+  isNull,
+} from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
 import { quotations, suppliers, teams, quoteItems } from "@/lib/db/schema";
 import { getUser, getUserWithTeams } from "@/lib/db/queries";
@@ -61,7 +72,7 @@ export async function GET(request: NextRequest) {
     // 4. Determine user's accessible team IDs for permission-based filtering
     let accessibleTeamIds: number[] = [];
     if (permissions.teamRestricted) {
-      accessibleTeamIds = userWithTeams.map(team => team.teamId);
+      accessibleTeamIds = userWithTeams.map((team) => team.teamId);
       if (accessibleTeamIds.length === 0) {
         return NextResponse.json({
           data: [],
@@ -72,7 +83,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 5. Build where conditions
-    const conditions = [isNull(quotations.createdAt) === false]; // Exclude soft-deleted if needed
+    const conditions = [sql`${isNull(quotations.createdAt)} = false`]; // Exclude soft-deleted if needed
 
     // Search filter - across quotation ID, supplier name, and region
     if (params.search?.trim()) {
@@ -149,7 +160,8 @@ export async function GET(request: NextRequest) {
     };
 
     const sortColumn = getSortColumn(params.sort);
-    const orderByClause = params.order === "desc" ? desc(sortColumn) : asc(sortColumn);
+    const orderByClause =
+      params.order === "desc" ? desc(sortColumn) : asc(sortColumn);
 
     // 7. Execute main query with complex JOINs
     const baseQuery = db
