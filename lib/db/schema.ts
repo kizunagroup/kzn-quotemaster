@@ -9,6 +9,7 @@ import {
   unique,
   check,
   index,
+  boolean,
 } from 'drizzle-orm/pg-core';
 import { relations, sql } from 'drizzle-orm';
 
@@ -187,7 +188,6 @@ export const quotations = pgTable('quotations', {
   quotationId: varchar('quotation_id', { length: 100 }).notNull().unique(),
   period: varchar('period', { length: 10 }).notNull(),
   supplierId: integer('supplier_id').references(() => suppliers.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
-  teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
   region: varchar('region', { length: 50 }).notNull(),
   category: varchar('category', { length: 100 }).notNull(),
   quoteDate: timestamp('quote_date'),
@@ -199,12 +199,12 @@ export const quotations = pgTable('quotations', {
 }, (table) => ({
   // Performance indexes for quotations display
   periodIdx: index('idx_quotations_period').on(table.period),
-  supplierTeamIdx: index('idx_quotations_supplier_team').on(table.supplierId, table.teamId),
+  supplierRegionIdx: index('idx_quotations_supplier_region').on(table.supplierId, table.region),
   statusPeriodIdx: index('idx_quotations_status_period').on(table.status, table.period),
-  teamStatusIdx: index('idx_quotations_team_status').on(table.teamId, table.status),
+  regionStatusIdx: index('idx_quotations_region_status').on(table.region, table.status),
 
-  // Existing constraints
-  uniqueQuotePerTeamPerPeriod: unique().on(table.period, table.supplierId, table.teamId),
+  // V3.2 constraint: unique per supplier, period, region (centralized purchasing model)
+  uniqueQuotePerSupplierPeriodRegion: unique().on(table.supplierId, table.period, table.region),
   periodFormatCheck: check('period_format', sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`),
   validStatus: check('valid_status', sql`${table.status} IN ('pending', 'approved', 'cancelled', 'negotiation')`),
 }));
@@ -254,6 +254,28 @@ export const priceHistory = pgTable('price_history', {
   validPriceType: check('valid_price_type', sql`${table.priceType} IN ('initial', 'negotiated', 'approved')`),
 }));
 
+export const supplierServiceScopes = pgTable(
+  'supplier_service_scopes',
+  {
+    id: serial('id').primaryKey(),
+    supplierId: integer('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    teamId: integer('team_id')
+      .notNull()
+      .references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  (table) => ({
+    uniqueSupplierTeam: unique().on(table.supplierId, table.teamId),
+    supplierIdx: index('idx_supplier_service_scopes_supplier').on(table.supplierId),
+    teamIdx: index('idx_supplier_service_scopes_team').on(table.teamId),
+    activeIdx: index('idx_supplier_service_scopes_active').on(table.isActive),
+  })
+);
+
 export const kitchenPeriodDemands = pgTable('kitchen_period_demands', {
   id: serial('id').primaryKey(),
   teamId: integer('team_id').references(() => teams.id, { onUpdate: 'cascade', onDelete: 'cascade' }).notNull(),
@@ -288,6 +310,7 @@ export const teamsRelations = relations(teams, ({ one, many }) => ({
   // QuoteMaster extensions
   quotations: many(quotations),
   demands: many(kitchenPeriodDemands),
+  supplierServiceScopes: many(supplierServiceScopes),
 }));
 
 export const usersRelations = relations(users, ({ many }) => ({
@@ -341,6 +364,7 @@ export const activityLogsRelations = relations(activityLogs, ({ one }) => ({
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
   quotations: many(quotations),
   priceHistory: many(priceHistory),
+  supplierServiceScopes: many(supplierServiceScopes),
 }));
 
 export const productsRelations = relations(products, ({ many }) => ({
@@ -353,10 +377,6 @@ export const quotationsRelations = relations(quotations, ({ one, many }) => ({
   supplier: one(suppliers, {
     fields: [quotations.supplierId],
     references: [suppliers.id],
-  }),
-  team: one(teams, {
-    fields: [quotations.teamId],
-    references: [teams.id],
   }),
   createdBy: one(users, {
     fields: [quotations.createdBy],
@@ -391,6 +411,17 @@ export const priceHistoryRelations = relations(priceHistory, ({ one }) => ({
   }),
   team: one(teams, {
     fields: [priceHistory.teamId],
+    references: [teams.id],
+  }),
+}));
+
+export const supplierServiceScopesRelations = relations(supplierServiceScopes, ({ one }) => ({
+  supplier: one(suppliers, {
+    fields: [supplierServiceScopes.supplierId],
+    references: [suppliers.id],
+  }),
+  team: one(teams, {
+    fields: [supplierServiceScopes.teamId],
     references: [teams.id],
   }),
 }));
@@ -437,6 +468,8 @@ export type QuoteItem = typeof quoteItems.$inferSelect;
 export type NewQuoteItem = typeof quoteItems.$inferInsert;
 export type PriceHistory = typeof priceHistory.$inferSelect;
 export type NewPriceHistory = typeof priceHistory.$inferInsert;
+export type SupplierServiceScope = typeof supplierServiceScopes.$inferSelect;
+export type NewSupplierServiceScope = typeof supplierServiceScopes.$inferInsert;
 export type KitchenPeriodDemand = typeof kitchenPeriodDemands.$inferSelect;
 export type NewKitchenPeriodDemand = typeof kitchenPeriodDemands.$inferInsert;
 
