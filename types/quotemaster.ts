@@ -39,7 +39,6 @@ export interface Quotation {
   quotationId: string;
   period: string; // YYYY-MM-XX format
   supplierId: number;
-  teamId: number;
   region: string;
   category: string;
   quoteDate?: Date;
@@ -50,7 +49,6 @@ export interface Quotation {
   updatedAt: Date;
   // Relations
   supplier?: Supplier;
-  team?: ExtendedTeam;
   items?: QuoteItem[];
 }
 
@@ -81,7 +79,6 @@ export interface PriceHistory {
   id: number;
   productId: number;
   supplierId: number;
-  teamId?: number;
   period: string;
   price: number;
   priceType: 'initial' | 'negotiated' | 'approved';
@@ -90,7 +87,6 @@ export interface PriceHistory {
   // Relations
   product?: Product;
   supplier?: Supplier;
-  team?: ExtendedTeam;
 }
 
 export interface KitchenPeriodDemand {
@@ -209,7 +205,6 @@ export const updateKitchenSchema = createKitchenSchema.extend({
 export const quotationFormSchema = z.object({
   period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Định dạng kỳ báo giá không hợp lệ (YYYY-MM-XX)"),
   supplierId: z.number().min(1, "Vui lòng chọn nhà cung cấp"),
-  teamId: z.number().min(1, "Vui lòng chọn bếp/phòng ban"),
   region: z.string().min(1, "Khu vực là bắt buộc"),
   category: z.string().min(1, "Nhóm hàng là bắt buộc"),
   quoteDate: z.date().optional(),
@@ -401,7 +396,6 @@ export interface QuoteFilters {
   period?: string;
   supplier?: string;
   region?: string;
-  teamId?: number;
   status?: 'pending' | 'approved' | 'cancelled' | 'negotiation';
   category?: string;
   dateFrom?: Date;
@@ -441,8 +435,8 @@ export interface ExportOptions {
 }
 
 export interface PriceListExportOptions extends ExportOptions {
-  teamId: number;
   period: string;
+  region: string;
   groupByCategory: boolean;
   highlightBestPrices: boolean;
 }
@@ -457,7 +451,6 @@ export interface ComparisonExportOptions extends ExportOptions {
 // Audit and activity types
 export interface QuoteMasterActivity {
   id: string;
-  teamId: number;
   userId: number;
   action: string;
   timestamp: Date;
@@ -465,7 +458,6 @@ export interface QuoteMasterActivity {
   details?: Record<string, any>;
   // Relations
   user?: ExtendedUser;
-  team?: ExtendedTeam;
 }
 
 // Notification types

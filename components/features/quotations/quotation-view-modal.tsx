@@ -203,13 +203,6 @@ export function QuotationViewModal({
 
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-muted-foreground">
-                    Bếp
-                  </p>
-                  <p className="font-semibold">{quotation.teamName || "-"}</p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">
                     Khu vực
                   </p>
                   <p className="font-semibold">{quotation.region}</p>

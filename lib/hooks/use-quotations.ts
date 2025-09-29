@@ -11,8 +11,6 @@ export interface Quotation {
   supplierId: number;
   supplierName: string | null;
   supplierCode: string | null;
-  teamId: number;
-  teamName: string | null;
   region: string;
   category: string;
   status: string;
@@ -36,7 +34,6 @@ export interface QuotationsResponse {
     period?: string | null;
     supplier?: string | null;
     region?: string | null;
-    teamId?: number | null;
     status?: string;
     sort?: string;
     order?: string;
@@ -336,8 +333,6 @@ export function useQuotations() {
     // Legacy helpers for backward compatibility
     getQuotationsByPeriod: (period: string) =>
       data?.data?.filter((quotation) => quotation.period === period) || [],
-    getQuotationsByTeam: (teamId: number) =>
-      data?.data?.filter((quotation) => quotation.teamId === teamId) || [],
     getQuotationsBySupplier: (supplierId: number) =>
       data?.data?.filter((quotation) => quotation.supplierId === supplierId) || [],
   };

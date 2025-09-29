@@ -12,14 +12,13 @@ import {
   isNull,
 } from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
-import { quotations, suppliers, teams, quoteItems } from "@/lib/db/schema";
+import { quotations, suppliers, quoteItems } from "@/lib/db/schema";
 import { getUser, getUserWithTeams } from "@/lib/db/queries";
 import { getUserPermissions } from "@/lib/auth/permissions";
 import { quotationQuerySchema } from "@/lib/schemas/quotation.schemas";
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('[API /quotations] - Request received.');
 
     // 1. Authentication check
     const user = await getUser();
@@ -70,31 +69,7 @@ export async function GET(request: NextRequest) {
 
     const params = queryResult.data;
 
-    // 2. Log parsed parameters
-    console.log('[API /quotations] - Parsed Params:', {
-      search: params.search,
-      period: params.period,
-      supplier: params.supplier,
-      region: params.region,
-      status: params.status,
-      sort: params.sort,
-      order: params.order,
-      page: params.page,
-      limit: params.limit
-    });
-
-    // 4. Determine user's accessible team IDs for permission-based filtering
-    let accessibleTeamIds: number[] = [];
-    if (permissions.teamRestricted) {
-      accessibleTeamIds = userWithTeams.map((team) => team.teamId);
-      if (accessibleTeamIds.length === 0) {
-        return NextResponse.json({
-          data: [],
-          pagination: { page: 1, limit: params.limit, total: 0, pages: 0 },
-          filters: params,
-        });
-      }
-    }
+    // 4. V3.2: No team-based filtering - centralized purchasing model
 
     // 5. Build where conditions
     const conditions = [sql`${isNull(quotations.createdAt)} = false`]; // Exclude soft-deleted if needed
@@ -137,22 +112,18 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(quotations.status, params.status));
     }
 
-    // Team-based permission filtering
-    if (permissions.teamRestricted && accessibleTeamIds.length > 0) {
-      conditions.push(inArray(quotations.teamId, accessibleTeamIds));
-    }
+    // V3.2: No team-based filtering needed - centralized purchasing model
 
-    // 6. Safe column mapping for sorting
+    // 6. Safe column mapping for sorting - only use main table columns to avoid undefined references
     const getSortColumn = (sortField: string) => {
-      switch (sortField) {
+      // Ensure sortField is defined and is a string
+      const field = sortField || "createdAt";
+
+      switch (field) {
         case "quotationId":
           return quotations.quotationId;
         case "period":
           return quotations.period;
-        case "supplierCode":
-          return suppliers.supplierCode;
-        case "supplierName":
-          return suppliers.name;
         case "region":
           return quotations.region;
         case "category":
@@ -169,13 +140,12 @@ export async function GET(request: NextRequest) {
       }
     };
 
+    // Safely get sort column and ensure we have valid values
     const sortColumn = getSortColumn(params.sort);
-    const orderByClause =
-      params.order === "desc" ? desc(sortColumn) : asc(sortColumn);
+    const sortOrder = params.order || "desc";
+    const orderByClause = sortOrder === "desc" ? desc(sortColumn) : asc(sortColumn);
 
     // 7. Execute main query with complex JOINs
-    console.log('[API /quotations] - Executing database query...');
-
     const baseQuery = db
       .select({
         id: quotations.id,
@@ -184,8 +154,6 @@ export async function GET(request: NextRequest) {
         supplierId: quotations.supplierId,
         supplierName: suppliers.name,
         supplierCode: suppliers.supplierCode,
-        teamId: quotations.teamId,
-        teamName: teams.name,
         region: quotations.region,
         category: quotations.category,
         status: quotations.status,
@@ -202,7 +170,6 @@ export async function GET(request: NextRequest) {
       })
       .from(quotations)
       .leftJoin(suppliers, eq(quotations.supplierId, suppliers.id))
-      .leftJoin(teams, eq(quotations.teamId, teams.id))
       .where(and(...conditions))
       .orderBy(orderByClause);
 
@@ -217,14 +184,10 @@ export async function GET(request: NextRequest) {
         .select({ totalCount: count() })
         .from(quotations)
         .leftJoin(suppliers, eq(quotations.supplierId, suppliers.id))
-        .leftJoin(teams, eq(quotations.teamId, teams.id))
         .where(and(...conditions)),
     ]);
 
-    // 8. Log successful database query completion
-    console.log('[API /quotations] - DB query successful, found', data.length, 'records.');
-
-    // 9. Calculate pagination metadata
+    // 8. Calculate pagination metadata
     const totalPages = Math.ceil(totalCount / params.limit);
 
     // 10. Return standardized response format
@@ -241,16 +204,13 @@ export async function GET(request: NextRequest) {
         period: params.period || null,
         supplier: params.supplier || null,
         region: params.region || null,
-        teamId: params.teamId || null,
         status: params.status,
         sort: params.sort,
         order: params.order,
       },
     });
   } catch (error) {
-    console.error('[API /quotations] - CRITICAL ERROR:', error);
-    console.error('[API /quotations] - Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
-    console.error('[API /quotations] - Error message:', error instanceof Error ? error.message : error);
+    console.error("Quotations API Error:", error);
     return NextResponse.json(
       { error: "Có lỗi xảy ra khi tải danh sách báo giá" },
       { status: 500 }
