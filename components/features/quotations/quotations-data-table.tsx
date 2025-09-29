@@ -188,7 +188,10 @@ function useQuotations() {
 }
 
 // Table columns definition
-const createColumns = (permissions: PermissionSet | null): ColumnDef<QuotationWithDetails>[] => [
+const createColumns = (
+  permissions: PermissionSet | null,
+  onViewDetails: (quotation: QuotationWithDetails) => void
+): ColumnDef<QuotationWithDetails>[] => [
   {
     accessorKey: "period",
     header: ({ column }) => {
@@ -284,7 +287,7 @@ const createColumns = (permissions: PermissionSet | null): ColumnDef<QuotationWi
     cell: ({ row }) => {
       const quotation = row.original;
 
-      return <QuotationActions quotation={quotation} permissions={permissions} />;
+      return <QuotationActions quotation={quotation} permissions={permissions} onViewDetails={onViewDetails} />;
     },
   },
 ];
@@ -292,26 +295,17 @@ const createColumns = (permissions: PermissionSet | null): ColumnDef<QuotationWi
 // Actions dropdown for each quotation row
 function QuotationActions({
   quotation,
-  permissions
+  permissions,
+  onViewDetails
 }: {
   quotation: QuotationWithDetails;
   permissions: PermissionSet | null;
+  onViewDetails: (quotation: QuotationWithDetails) => void;
 }) {
   const router = useRouter();
-  const [showDetailsModal, setShowDetailsModal] = React.useState(false);
 
   const handleViewDetails = () => {
-    setShowDetailsModal(true);
-  };
-
-  const handleCloseDetailsModal = (open: boolean) => {
-    setShowDetailsModal(open);
-    if (!open) {
-      // Ensure state is fully reset when modal closes
-      setTimeout(() => {
-        setShowDetailsModal(false);
-      }, 0);
-    }
+    onViewDetails(quotation);
   };
 
   const handleCompare = () => {
@@ -373,13 +367,6 @@ function QuotationActions({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <QuoteDetailsModal
-        key={`details-modal-${quotation.id}-${showDetailsModal ? 'open' : 'closed'}`}
-        quotationId={quotation.id}
-        open={showDetailsModal}
-        onOpenChange={handleCloseDetailsModal}
-      />
     </>
   );
 }
@@ -506,7 +493,11 @@ export function QuotationsDataTable() {
   const [rowSelection, setRowSelection] = React.useState({});
   const [showImportModal, setShowImportModal] = React.useState(false);
 
-  const columns = React.useMemo(() => createColumns(permissions), [permissions]);
+  // Modal states - CENTRALIZED STATE MANAGEMENT like Suppliers
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
+  const [selectedQuotation, setSelectedQuotation] = React.useState<QuotationWithDetails | null>(null);
+
+  const columns = React.useMemo(() => createColumns(permissions, handleViewDetailsClick), [permissions, handleViewDetailsClick]);
 
   const table = useReactTable({
     data,
@@ -542,6 +533,17 @@ export function QuotationsDataTable() {
     setShowImportModal(false);
     refetch();
     toast.success("Import báo giá thành công");
+  };
+
+  // Modal handlers - CENTRALIZED like Suppliers pattern
+  const handleViewDetailsClick = (quotation: QuotationWithDetails) => {
+    setSelectedQuotation(quotation);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleCloseDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setSelectedQuotation(null);
   };
 
   if (loading && data.length === 0) {
@@ -742,6 +744,17 @@ export function QuotationsDataTable() {
         open={showImportModal}
         onOpenChange={setShowImportModal}
         onSuccess={handleImportSuccess}
+      />
+
+      {/* Details Modal - CENTRALIZED like Suppliers pattern */}
+      <QuoteDetailsModal
+        quotationId={selectedQuotation?.id || null}
+        open={isDetailsModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCloseDetailsModal();
+          }
+        }}
       />
     </div>
   );
