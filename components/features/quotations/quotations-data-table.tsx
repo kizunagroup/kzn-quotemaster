@@ -497,6 +497,30 @@ export function QuotationsDataTable() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
   const [selectedQuotation, setSelectedQuotation] = React.useState<QuotationWithDetails | null>(null);
 
+  // Modal handlers - CENTRALIZED like Suppliers pattern (MOVED BEFORE columns definition)
+  const handleViewDetailsClick = (quotation: QuotationWithDetails) => {
+    setSelectedQuotation(quotation);
+    setIsDetailsModalOpen(true);
+  };
+
+  const handleCloseDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setSelectedQuotation(null);
+  };
+
+  const handleClearFilters = () => {
+    setPeriod("");
+    setRegion("");
+    setSupplierId("");
+    setStatus("");
+  };
+
+  const handleImportSuccess = () => {
+    setShowImportModal(false);
+    refetch();
+    toast.success("Import báo giá thành công");
+  };
+
   const columns = React.useMemo(() => createColumns(permissions, handleViewDetailsClick), [permissions, handleViewDetailsClick]);
 
   const table = useReactTable({
@@ -521,30 +545,6 @@ export function QuotationsDataTable() {
       pagination,
     },
   });
-
-  const handleClearFilters = () => {
-    setPeriod("");
-    setRegion("");
-    setSupplierId("");
-    setStatus("");
-  };
-
-  const handleImportSuccess = () => {
-    setShowImportModal(false);
-    refetch();
-    toast.success("Import báo giá thành công");
-  };
-
-  // Modal handlers - CENTRALIZED like Suppliers pattern
-  const handleViewDetailsClick = (quotation: QuotationWithDetails) => {
-    setSelectedQuotation(quotation);
-    setIsDetailsModalOpen(true);
-  };
-
-  const handleCloseDetailsModal = () => {
-    setIsDetailsModalOpen(false);
-    setSelectedQuotation(null);
-  };
 
   if (loading && data.length === 0) {
     return (
