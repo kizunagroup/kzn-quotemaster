@@ -56,7 +56,7 @@ export interface ParseResult {
  * - Sheet 1: "Thông tin báo giá" - Contains quotation metadata
  * - Sheet 2: "Danh sách sản phẩm" - Contains product pricing data
  */
-export async function processExcelFile(file: File): Promise<ParseResult> {
+export async function processExcelFile(file: File, region: string): Promise<ParseResult> {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
@@ -84,7 +84,7 @@ export async function processExcelFile(file: File): Promise<ParseResult> {
 
     // Parse quotation info sheet
     const infoSheet = workbook.getWorksheet('Thông tin báo giá');
-    const infoResult = parseQuotationInfo(infoSheet);
+    const infoResult = parseQuotationInfo(infoSheet, region);
 
     if (!infoResult.success) {
       errors.push(...infoResult.errors);
@@ -137,64 +137,55 @@ export async function processExcelFile(file: File): Promise<ParseResult> {
 
 /**
  * Parse the quotation information sheet
+ * Reads data directly from fixed cells according to specification:
+ * - B3: period (Kỳ báo giá)
+ * - B6: supplierCode (Mã NCC)
+ * - B7: supplierName (Tên NCC)
  */
-function parseQuotationInfo(sheet: any): { success: boolean; data?: QuotationInfo; errors: ValidationError[] } {
+function parseQuotationInfo(sheet: any, region: string): { success: boolean; data?: QuotationInfo; errors: ValidationError[] } {
   const errors: ValidationError[] = [];
 
   try {
-    // Use exceljs worksheet API
-    // Assuming the info sheet has labeled cells like:
-    // A1: "Kỳ báo giá:", B1: "2024-01-01"
-    // A2: "Khu vực:", B2: "Hà Nội"
-    // A3: "Mã NCC:", B3: "NCC001"
-    // A4: "Tên NCC:", B4: "Công ty ABC"
+    // Read data directly from fixed cells as per specification
+    const periodCell = sheet.getCell('B3');
+    const supplierCodeCell = sheet.getCell('B6');
+    const supplierNameCell = sheet.getCell('B7');
 
-    const data: Record<string, string> = {};
-    const maxRow = Math.min(sheet.actualRowCount || 10, 10);
+    // Extract values and handle potential null/undefined
+    const period = periodCell.value ? String(periodCell.value).trim() : '';
+    const supplierCode = supplierCodeCell.value ? String(supplierCodeCell.value).trim() : '';
+    const supplierName = supplierNameCell.value ? String(supplierNameCell.value).trim() : '';
 
-    // Read key-value pairs from the sheet
-    for (let row = 1; row <= maxRow; row++) {
-      const keyCell = sheet.getCell(row, 1);
-      const valueCell = sheet.getCell(row, 2);
+    // Optional fields - check for quote date in nearby cells
+    const quoteDateCell = sheet.getCell('B8'); // Assuming quote date might be in B8
+    const quoteDate = quoteDateCell.value ? String(quoteDateCell.value).trim() : undefined;
 
-      if (keyCell.value && valueCell.value) {
-        const key = String(keyCell.value).trim().replace(':', '');
-        const value = String(valueCell.value).trim();
-        data[key] = value;
-      }
-    }
-
-    // Map Vietnamese labels to English fields
-    const fieldMapping: Record<string, string> = {
-      'Kỳ báo giá': 'period',
-      'Khu vực': 'region',
-      'Mã NCC': 'supplierCode',
-      'Tên NCC': 'supplierName',
-      'Ngày báo giá': 'quoteDate'
+    // Build the quotation info object using the region from the import form
+    const quotationInfo: QuotationInfo = {
+      period,
+      region, // Use region passed from import form
+      supplierCode,
+      supplierName,
+      quoteDate
     };
 
-    const mappedData: Partial<QuotationInfo> = {};
-
-    for (const [vietnameseLabel, englishField] of Object.entries(fieldMapping)) {
-      if (data[vietnameseLabel]) {
-        mappedData[englishField as keyof QuotationInfo] = data[vietnameseLabel];
-      }
-    }
-
     // Validate required fields
-    const requiredFields = ['period', 'region', 'supplierCode', 'supplierName'];
-    const missingFields = requiredFields.filter(field => !mappedData[field as keyof QuotationInfo]);
+    const missingFields: string[] = [];
+    if (!period) missingFields.push('period (B3)');
+    if (!region) missingFields.push('region (from form)');
+    if (!supplierCode) missingFields.push('supplierCode (B6)');
+    if (!supplierName) missingFields.push('supplierName (B7)');
 
     if (missingFields.length > 0) {
       errors.push({
         type: 'error',
-        message: `Thiếu thông tin bắt buộc trong sheet "Thông tin báo giá": ${missingFields.join(', ')}`
+        message: `Thiếu thông tin bắt buộc: ${missingFields.join(', ')}`
       });
       return { success: false, errors };
     }
 
     // Validate the data against schema
-    const validationResult = QuotationInfoSchema.safeParse(mappedData);
+    const validationResult = QuotationInfoSchema.safeParse(quotationInfo);
     if (!validationResult.success) {
       errors.push({
         type: 'error',
@@ -323,9 +314,9 @@ function parseQuotationItems(sheet: any): {
                 });
                 continue;
               }
-              item[field as keyof QuotationItem] = numValue;
+              (item as any)[field] = numValue;
             } else {
-              item[field as keyof QuotationItem] = String(cellValue).trim();
+              (item as any)[field] = String(cellValue).trim();
             }
           }
         }

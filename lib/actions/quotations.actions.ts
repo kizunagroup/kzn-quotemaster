@@ -196,8 +196,8 @@ export async function importQuotationsFromExcel(
     // Process each file
     for (const file of files) {
       try {
-        // Parse Excel file
-        const parseResult: ParseResult = await processExcelFile(file);
+        // Parse Excel file with region from import data
+        const parseResult: ParseResult = await processExcelFile(file, region);
 
         if (!parseResult.success || !parseResult.data) {
           result.errors.push(`File ${file.name}: ${parseResult.errors.map(e => e.message).join(', ')}`);
