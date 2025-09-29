@@ -196,20 +196,15 @@ export async function importQuotationsFromExcel(
     // Process each file
     for (const file of files) {
       try {
-        // Parse Excel file with region from import data
-        const parseResult: ParseResult = await processExcelFile(file, region);
+        // Parse Excel file with region and period from import data
+        const parseResult: ParseResult = await processExcelFile(file, region, period);
 
         if (!parseResult.success || !parseResult.data) {
           result.errors.push(`File ${file.name}: ${parseResult.errors.map(e => e.message).join(', ')}`);
           continue;
         }
 
-        // Validate that period and region match
-        if (parseResult.data.info.period !== period) {
-          result.errors.push(`File ${file.name}: Kỳ báo giá trong file (${parseResult.data.info.period}) không khớp với kỳ đã chọn (${period})`);
-          continue;
-        }
-
+        // Validate that region matches (period is now provided from form, not Excel)
         if (parseResult.data.info.region !== region) {
           result.errors.push(`File ${file.name}: Khu vực trong file (${parseResult.data.info.region}) không khớp với khu vực đã chọn (${region})`);
           continue;
@@ -358,7 +353,7 @@ export async function importQuotationsFromExcel(
 /**
  * Get detailed quotation with all items
  */
-export async function getQuotationDetails(id: number): Promise<QuotationDetailsWithItems> {
+export async function getQuotationDetails(id: number): Promise<QuotationDetailsWithItems | { error: string }> {
   try {
     // Authorization check
     await checkProcurementRole();
@@ -399,7 +394,7 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
       .limit(1);
 
     if (!quotation) {
-      throw new Error("Không tìm thấy báo giá");
+      return { error: "Báo giá không tồn tại" };
     }
 
     // Get quote items with product info
@@ -445,9 +440,9 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
 
   } catch (error) {
     console.error("Error in getQuotationDetails:", error);
-    throw new Error(
-      error instanceof Error ? error.message : "Lỗi khi tải chi tiết báo giá"
-    );
+    return {
+      error: error instanceof Error ? error.message : "Lỗi khi tải chi tiết báo giá"
+    };
   }
 }
 

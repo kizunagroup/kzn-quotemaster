@@ -64,7 +64,8 @@ export interface ParseResult {
  */
 export async function processExcelFile(
   file: File,
-  region: string
+  region: string,
+  period: string
 ): Promise<ParseResult> {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
@@ -95,7 +96,7 @@ export async function processExcelFile(
 
     // Parse quotation info sheet
     const infoSheet = workbook.getWorksheet("Thông tin báo giá");
-    const infoResult = parseQuotationInfo(infoSheet, region);
+    const infoResult = parseQuotationInfo(infoSheet, region, period);
 
     if (!infoResult.success) {
       errors.push(...infoResult.errors);
@@ -150,24 +151,24 @@ export async function processExcelFile(
 /**
  * Parse the quotation information sheet
  * Reads data directly from fixed cells according to specification:
- * - B3: period (Kỳ báo giá)
  * - B6: supplierCode (Mã NCC)
  * - B7: supplierName (Tên NCC)
+ * Note: period and region are provided from the import form
  */
 function parseQuotationInfo(
   sheet: any,
-  region: string
+  region: string,
+  period: string
 ): { success: boolean; data?: QuotationInfo; errors: ValidationError[] } {
   const errors: ValidationError[] = [];
 
   try {
     // Read data directly from fixed cells as per specification
-    const periodCell = sheet.getCell("B3");
+    // Note: period is now provided from import form, not from Excel
     const supplierCodeCell = sheet.getCell("B6");
     const supplierNameCell = sheet.getCell("B7");
 
     // Extract values and handle potential null/undefined
-    const period = periodCell.value ? String(periodCell.value).trim() : "";
     const supplierCode = supplierCodeCell.value
       ? String(supplierCodeCell.value).trim()
       : "";
@@ -192,7 +193,7 @@ function parseQuotationInfo(
 
     // Validate required fields
     const missingFields: string[] = [];
-    if (!period) missingFields.push("period (B3)");
+    if (!period) missingFields.push("period (from form)");
     if (!region) missingFields.push("region (from form)");
     if (!supplierCode) missingFields.push("supplierCode (B6)");
     if (!supplierName) missingFields.push("supplierName (B7)");
