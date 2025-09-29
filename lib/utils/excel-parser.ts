@@ -357,7 +357,9 @@ function parseQuotationItems(sheet: any): {
               }
               (item as any)[field] = numValue;
             } else {
-              (item as any)[field] = String(cellValue).trim();
+              const stringValue = String(cellValue).trim();
+              // Apply normalization for productCode
+              (item as any)[field] = field === 'productCode' ? stringValue.toUpperCase() : stringValue;
             }
           }
         }

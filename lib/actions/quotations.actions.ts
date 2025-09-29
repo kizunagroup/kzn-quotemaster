@@ -205,35 +205,75 @@ export async function importQuotationsFromExcel(
         }
 
         // Validate that region matches (period is now provided from form, not Excel)
-        if (parseResult.data.info.region !== region) {
-          result.errors.push(`File ${file.name}: Khu vực trong file (${parseResult.data.info.region}) không khớp với khu vực đã chọn (${region})`);
+        if (parseResult.data?.info?.region !== region) {
+          result.errors.push(`File ${file.name}: Khu vực trong file (${parseResult.data?.info?.region || 'N/A'}) không khớp với khu vực đã chọn (${region})`);
           continue;
         }
 
         // Validate supplier exists
-        const [supplier] = await db
-          .select()
-          .from(suppliers)
-          .where(eq(suppliers.supplierCode, parseResult.data.info.supplierCode))
-          .limit(1);
-
-        if (!supplier) {
-          result.errors.push(`File ${file.name}: Không tìm thấy nhà cung cấp với mã ${parseResult.data.info.supplierCode}`);
+        const supplierCode = parseResult.data?.info?.supplierCode;
+        if (!supplierCode) {
+          result.errors.push(`File ${file.name}: Thiếu mã nhà cung cấp`);
           continue;
         }
 
-        // Validate all products exist
-        const productCodes = parseResult.data.items.map(item => item.productCode);
+        const [supplier] = await db
+          .select()
+          .from(suppliers)
+          .where(eq(suppliers.supplierCode, supplierCode))
+          .limit(1);
+
+        if (!supplier) {
+          result.errors.push(`File ${file.name}: Không tìm thấy nhà cung cấp với mã ${supplierCode}`);
+          continue;
+        }
+
+        // Validate all products exist with input normalization
+        if (!parseResult.data?.items) {
+          result.errors.push(`File ${file.name}: Dữ liệu sản phẩm không hợp lệ`);
+          continue;
+        }
+
+        const productCodes = parseResult.data.items.map(item => {
+          if (!item?.productCode) {
+            throw new Error('Product code is missing or invalid');
+          }
+          return item.productCode.trim().toUpperCase();
+        });
+
         const existingProducts = await db
           .select()
           .from(products)
           .where(inArray(products.productCode, productCodes));
 
-        const existingProductCodes = new Set(existingProducts.map(p => p.productCode));
-        const missingProducts = productCodes.filter(code => !existingProductCodes.has(code));
+        const existingProductCodes = new Set(existingProducts.map(p => p.productCode?.trim().toUpperCase()).filter(Boolean));
+        const missingProducts = [];
+        const validProducts = [];
+
+        // Granular validation with detailed reporting
+        for (let i = 0; i < productCodes.length; i++) {
+          const normalizedCode = productCodes[i];
+          const originalItem = parseResult.data.items[i];
+
+          if (existingProductCodes.has(normalizedCode)) {
+            validProducts.push(normalizedCode);
+          } else {
+            missingProducts.push({
+              code: originalItem.productCode,
+              normalizedCode,
+              row: i + 2 // Excel row number (accounting for header)
+            });
+          }
+        }
 
         if (missingProducts.length > 0) {
-          result.errors.push(`File ${file.name}: Không tìm thấy sản phẩm với mã: ${missingProducts.join(', ')}`);
+          const errorDetails = missingProducts.map(p => `${p.code} (dòng ${p.row})`).join(', ');
+          result.errors.push(`File ${file.name}: Không tìm thấy sản phẩm với mã: ${errorDetails}`);
+
+          // Add warning if normalization might help
+          if (missingProducts.some(p => p.code !== p.normalizedCode)) {
+            result.warnings.push(`File ${file.name}: Một số mã sản phẩm đã được chuẩn hóa (loại bỏ khoảng trắng, chuyển thành chữ hoa) nhưng vẫn không tìm thấy`);
+          }
           continue;
         }
 
@@ -264,7 +304,7 @@ export async function importQuotationsFromExcel(
             await tx
               .update(quotations)
               .set({
-                quoteDate: parseResult.data.info.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
+                quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
                 updateDate: new Date(),
                 updatedAt: new Date(),
               })
@@ -286,8 +326,8 @@ export async function importQuotationsFromExcel(
                 period,
                 supplierId: supplier.id,
                 region,
-                category: parseResult.data.items[0]?.productCode.substring(0, 2) || 'GEN', // Simple category logic
-                quoteDate: parseResult.data.info.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
+                category: parseResult.data?.items?.[0]?.productCode?.substring(0, 2) || 'GEN', // Simple category logic
+                quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
                 status: 'pending',
                 createdBy: user.id,
               })
@@ -296,20 +336,39 @@ export async function importQuotationsFromExcel(
             quotationId = newQuotation.id;
           }
 
-          // Create product code to ID mapping
-          const productMap = new Map(existingProducts.map(p => [p.productCode, p.id]));
+          // Create product code to ID mapping with normalization
+          const productMap = new Map();
+          existingProducts.forEach(p => {
+            if (p.productCode) {
+              productMap.set(p.productCode.trim().toUpperCase(), p.id);
+            }
+          });
 
-          // Insert quote items
-          const quoteItemsData = parseResult.data.items.map(item => ({
-            quotationId,
-            productId: productMap.get(item.productCode)!,
-            quantity: item.quantity,
-            initialPrice: item.initialPrice,
-            vatPercentage: item.vatRate,
-            currency: 'VND',
-            pricePerUnit: item.initialPrice,
-            notes: item.notes || null,
-          }));
+          // Insert quote items with safe mapping
+          const quoteItemsData = [];
+          for (const item of parseResult.data?.items || []) {
+            if (!item?.productCode) {
+              throw new Error('Invalid item data: missing productCode');
+            }
+
+            const normalizedCode = item.productCode.trim().toUpperCase();
+            const productId = productMap.get(normalizedCode);
+
+            if (!productId) {
+              throw new Error(`Product mapping failed for code: ${item.productCode}`);
+            }
+
+            quoteItemsData.push({
+              quotationId,
+              productId,
+              quantity: item.quantity ?? 1,
+              initialPrice: item.initialPrice ?? 0,
+              vatPercentage: item.vatRate ?? 0,
+              currency: 'VND',
+              pricePerUnit: item.initialPrice ?? 0,
+              notes: item.notes || null,
+            });
+          }
 
           await tx.insert(quoteItems).values(quoteItemsData);
 

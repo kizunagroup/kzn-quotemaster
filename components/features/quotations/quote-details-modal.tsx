@@ -29,7 +29,7 @@ import {
 
 import { PriceBadge } from "@/components/ui/price-badge";
 import { getQuotationDetails } from "@/lib/actions/quotations.actions";
-import type { QuotationWithDetails } from "@/lib/actions/quotations.actions";
+import type { QuotationDetailsWithItems } from "@/lib/types/quotations.types";
 
 interface QuoteDetailsModalProps {
   quotationId: number | null;
@@ -40,7 +40,7 @@ interface QuoteDetailsModalProps {
 type LoadingState =
   | { type: "idle" }
   | { type: "loading" }
-  | { type: "success"; data: QuotationWithDetails }
+  | { type: "success"; data: QuotationDetailsWithItems }
   | { type: "error"; error: string };
 
 export function QuoteDetailsModal({
@@ -57,14 +57,16 @@ export function QuoteDetailsModal({
 
       getQuotationDetails(quotationId)
         .then((result) => {
-          if (result.success && result.data) {
-            setState({ type: "success", data: result.data });
-          } else {
+          // Check if result has error property (error case) or is data object (success case)
+          if ('error' in result) {
             setState({
               type: "error",
-              error: result.errors.join(", ") || "Không thể tải thông tin báo giá"
+              error: result.error || "Không thể tải thông tin báo giá"
             });
             toast.error("Không thể tải thông tin báo giá");
+          } else {
+            // Result is QuotationDetailsWithItems data object
+            setState({ type: "success", data: result });
           }
         })
         .catch((error) => {
@@ -160,9 +162,9 @@ export function QuoteDetailsModal({
                           Nhà cung cấp
                         </label>
                         <div className="font-medium">{quotation.supplier.name}</div>
-                        {quotation.supplier.contactEmail && (
+                        {quotation.supplier.email && (
                           <div className="text-sm text-muted-foreground">
-                            {quotation.supplier.contactEmail}
+                            {quotation.supplier.email}
                           </div>
                         )}
                       </div>
@@ -215,16 +217,6 @@ export function QuoteDetailsModal({
                         </div>
                       </div>
 
-                      {quotation.approvedAt && (
-                        <div className="space-y-1">
-                          <label className="text-sm font-medium text-muted-foreground">
-                            Ngày duyệt
-                          </label>
-                          <div className="text-sm">
-                            {format(new Date(quotation.approvedAt), "dd/MM/yyyy HH:mm", { locale: vi })}
-                          </div>
-                        </div>
-                      )}
                     </div>
 
                     {quotation.notes && (
@@ -250,7 +242,7 @@ export function QuoteDetailsModal({
                       <Package className="h-5 w-5" />
                       Danh sách Sản phẩm
                       <Badge variant="outline" className="ml-2">
-                        {quotation.items.length} sản phẩm
+                        {quotation.items?.length ?? 0} sản phẩm
                       </Badge>
                     </CardTitle>
                   </CardHeader>
@@ -269,8 +261,14 @@ export function QuoteDetailsModal({
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {quotation.items.map((item, index) => {
-                            const totalPrice = item.quantity * item.unitPrice;
+                          {quotation.items && Array.isArray(quotation.items) && quotation.items.length > 0 ? (
+                            quotation.items.map((item, index) => {
+                              // Defensive checks for item data
+                              if (!item) return null;
+
+                              const quantity = item.quantity ?? 0;
+                              const initialPrice = item.initialPrice ?? 0;
+                              const totalPrice = quantity * initialPrice;
 
                             return (
                               <TableRow key={item.id}>
@@ -278,25 +276,25 @@ export function QuoteDetailsModal({
                                   {index + 1}
                                 </TableCell>
                                 <TableCell className="font-mono text-sm">
-                                  {item.product.code}
+                                  {item.product?.productCode ?? 'N/A'}
                                 </TableCell>
                                 <TableCell>
                                   <div>
-                                    <div className="font-medium">{item.product.name}</div>
-                                    {item.product.description && (
+                                    <div className="font-medium">{item.product?.name ?? 'Sản phẩm không xác định'}</div>
+                                    {item.product?.specification && (
                                       <div className="text-sm text-muted-foreground">
-                                        {item.product.description}
+                                        {item.product.specification}
                                       </div>
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell>{item.product.unit}</TableCell>
+                                <TableCell>{item.product?.unit ?? 'N/A'}</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {item.quantity.toLocaleString('vi-VN')}
+                                  {quantity.toLocaleString('vi-VN')}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <PriceBadge
-                                    price={item.unitPrice}
+                                    price={initialPrice}
                                     size="sm"
                                     className="justify-end"
                                   />
@@ -310,7 +308,14 @@ export function QuoteDetailsModal({
                                 </TableCell>
                               </TableRow>
                             );
-                          })}
+                          })
+                          ) : (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                Không có sản phẩm nào trong báo giá này
+                              </TableCell>
+                            </TableRow>
+                          )}
                         </TableBody>
                       </Table>
                     </div>
@@ -320,8 +325,13 @@ export function QuoteDetailsModal({
                       <div className="flex justify-between items-center">
                         <span className="text-lg font-medium">Tổng giá trị báo giá:</span>
                         <PriceBadge
-                          price={quotation.items.reduce(
-                            (sum, item) => sum + item.quantity * item.unitPrice,
+                          price={(quotation.items ?? []).reduce(
+                            (sum, item) => {
+                              if (!item) return sum;
+                              const quantity = item.quantity ?? 0;
+                              const initialPrice = item.initialPrice ?? 0;
+                              return sum + (quantity * initialPrice);
+                            },
                             0
                           )}
                           size="lg"
