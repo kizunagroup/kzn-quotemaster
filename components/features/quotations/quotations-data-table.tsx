@@ -53,10 +53,10 @@ import {
   getAvailablePeriods,
   getAvailableSuppliers,
   cancelQuotation,
+  getCurrentUserPermissions,
   type QuotationWithDetails,
 } from "@/lib/actions/quotations.actions";
-import { getUserPermissions, type PermissionSet } from "@/lib/auth/permissions";
-import { getSession } from "@/lib/auth/session";
+import { type PermissionSet } from "@/lib/auth/permissions";
 import { ImportExcelModal } from "./import-excel-modal";
 import { QuoteDetailsModal } from "./quote-details-modal";
 
@@ -119,18 +119,33 @@ function useQuotations() {
   // Fetch helper data
   const fetchHelperData = React.useCallback(async () => {
     try {
-      const [periods, suppliers, session] = await Promise.all([
+      const [periods, suppliers, permissionsResult] = await Promise.all([
         getAvailablePeriods(),
         getAvailableSuppliers(),
-        getSession(),
+        getCurrentUserPermissions(),
       ]);
       setAvailablePeriods(periods);
       setAvailableSuppliers(suppliers);
 
       // Load user permissions
-      if (session?.user?.id) {
-        const userPermissions = await getUserPermissions(session.user.id);
-        setPermissions(userPermissions);
+      if (permissionsResult.success && permissionsResult.permissions) {
+        setPermissions(permissionsResult.permissions);
+      } else {
+        console.error("Failed to load permissions:", permissionsResult.error);
+        // Set default restrictive permissions
+        setPermissions({
+          canViewQuotes: false,
+          canCreateQuotes: false,
+          canApproveQuotes: false,
+          canNegotiateQuotes: false,
+          canManageProducts: false,
+          canManageSuppliers: false,
+          canManageKitchens: false,
+          canManageStaff: false,
+          canViewAnalytics: false,
+          canExportData: false,
+          teamRestricted: true,
+        });
       }
     } catch (error) {
       console.error("Error fetching helper data:", error);

@@ -337,40 +337,8 @@ export const ROLE_PERMISSIONS: Record<Role, PermissionSet> = {
   },
 };
 
-// Utility function to merge permissions (get highest permission level)
-function mergePermissions(permissionSets: PermissionSet[]): PermissionSet {
-  if (permissionSets.length === 0) {
-    // Default to most restrictive permissions
-    return {
-      canViewQuotes: false,
-      canCreateQuotes: false,
-      canApproveQuotes: false,
-      canNegotiateQuotes: false,
-      canManageProducts: false,
-      canManageSuppliers: false,
-      canManageKitchens: false,
-      canManageStaff: false,
-      canViewAnalytics: false,
-      canExportData: false,
-      teamRestricted: true,
-    };
-  }
-
-  return permissionSets.reduce((merged, current) => ({
-    canViewQuotes: merged.canViewQuotes || current.canViewQuotes,
-    canCreateQuotes: merged.canCreateQuotes || current.canCreateQuotes,
-    canApproveQuotes: merged.canApproveQuotes || current.canApproveQuotes,
-    canNegotiateQuotes: merged.canNegotiateQuotes || current.canNegotiateQuotes,
-    canManageProducts: merged.canManageProducts || current.canManageProducts,
-    canManageSuppliers: merged.canManageSuppliers || current.canManageSuppliers,
-    canManageKitchens: merged.canManageKitchens || current.canManageKitchens,
-    canManageStaff: merged.canManageStaff || current.canManageStaff,
-    canViewAnalytics: merged.canViewAnalytics || current.canViewAnalytics,
-    canExportData: merged.canExportData || current.canExportData,
-    // If ANY role is not team restricted, user has global access
-    teamRestricted: merged.teamRestricted && current.teamRestricted,
-  }));
-}
+// Import client-safe utility functions
+import { mergePermissions, parseRole } from './utils';
 
 // Authorization utility functions
 
@@ -435,44 +403,8 @@ export async function checkPermission(
   }
 }
 
-export function parseRole(role: string): { department: string; level: string } | null {
-  // Handle template roles
-  if (role === 'owner' || role === 'member') {
-    return {
-      department: 'TEMPLATE',
-      level: role.toUpperCase()
-    };
-  }
-
-  // Handle QuoteMaster enhanced roles
-  const parts = role.split('_');
-  if (parts.length === 2) {
-    const [department, level] = parts;
-
-    // Validate department and level
-    if (Object.values(Department).includes(department as Department) &&
-        Object.values(Level).includes(level as Level)) {
-      return { department, level };
-    }
-  }
-
-  return null;
-}
-
-// Helper function to check if a role is valid
-export function isValidRole(role: string): role is Role {
-  return role in ROLE_PERMISSIONS;
-}
-
-// Helper function to get all roles for a department
-export function getRolesForDepartment(department: Department): QuoteMasterRole[] {
-  return Object.values(Level).map(level => `${department}_${level}` as QuoteMasterRole);
-}
-
-// Helper function to get the highest role in a department
-export function getHighestRoleInDepartment(department: Department): QuoteMasterRole {
-  return `${department}_SUPER_ADMIN` as QuoteMasterRole;
-}
+// Export client-safe utility functions from utils.ts
+export { parseRole, isValidRole, getRolesForDepartment, getHighestRoleInDepartment } from './utils';
 
 // Helper function to check if user has any role in a department
 export async function userHasRoleInDepartment(userId: number, department: Department): Promise<boolean> {

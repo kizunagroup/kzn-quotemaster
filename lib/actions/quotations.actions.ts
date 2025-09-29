@@ -18,6 +18,8 @@ import {
 import { getUser } from "@/lib/db/queries";
 import { eq, and, inArray, desc, sql, like } from "drizzle-orm";
 import { processExcelFile, type ParseResult } from "@/lib/utils/excel-parser";
+import { getUserPermissions, type PermissionSet } from "@/lib/auth/permissions";
+import { getSession } from "@/lib/auth/session";
 
 // ==================== VALIDATION SCHEMAS ====================
 
@@ -641,5 +643,37 @@ export async function getAvailableSuppliers(): Promise<Array<{ id: number; code:
   } catch (error) {
     console.error("Error in getAvailableSuppliers:", error);
     throw new Error("Lỗi khi tải danh sách nhà cung cấp");
+  }
+}
+
+/**
+ * Server Action to get current user's permissions
+ * This allows Client Components to get permissions without importing server-only functions
+ */
+export async function getCurrentUserPermissions(): Promise<{
+  success: boolean;
+  permissions?: PermissionSet;
+  error?: string;
+}> {
+  try {
+    const session = await getSession();
+    if (!session?.user?.id) {
+      return {
+        success: false,
+        error: "Không tìm thấy phiên đăng nhập",
+      };
+    }
+
+    const permissions = await getUserPermissions(session.user.id);
+    return {
+      success: true,
+      permissions,
+    };
+  } catch (error) {
+    console.error("Error in getCurrentUserPermissions:", error);
+    return {
+      success: false,
+      error: "Lỗi khi tải quyền người dùng",
+    };
   }
 }
