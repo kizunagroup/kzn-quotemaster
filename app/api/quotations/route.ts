@@ -19,6 +19,8 @@ import { quotationQuerySchema } from "@/lib/schemas/quotation.schemas";
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('[API /quotations] - Request received.');
+
     // 1. Authentication check
     const user = await getUser();
     if (!user) {
@@ -67,6 +69,19 @@ export async function GET(request: NextRequest) {
     }
 
     const params = queryResult.data;
+
+    // 2. Log parsed parameters
+    console.log('[API /quotations] - Parsed Params:', {
+      search: params.search,
+      period: params.period,
+      supplier: params.supplier,
+      region: params.region,
+      status: params.status,
+      sort: params.sort,
+      order: params.order,
+      page: params.page,
+      limit: params.limit
+    });
 
     // 4. Determine user's accessible team IDs for permission-based filtering
     let accessibleTeamIds: number[] = [];
@@ -159,6 +174,8 @@ export async function GET(request: NextRequest) {
       params.order === "desc" ? desc(sortColumn) : asc(sortColumn);
 
     // 7. Execute main query with complex JOINs
+    console.log('[API /quotations] - Executing database query...');
+
     const baseQuery = db
       .select({
         id: quotations.id,
@@ -204,6 +221,9 @@ export async function GET(request: NextRequest) {
         .where(and(...conditions)),
     ]);
 
+    // 8. Log successful database query completion
+    console.log('[API /quotations] - DB query successful, found', data.length, 'records.');
+
     // 9. Calculate pagination metadata
     const totalPages = Math.ceil(totalCount / params.limit);
 
@@ -228,7 +248,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Quotations API Error:", error);
+    console.error('[API /quotations] - CRITICAL ERROR:', error);
+    console.error('[API /quotations] - Error stack:', error instanceof Error ? error.stack : 'No stack trace available');
+    console.error('[API /quotations] - Error message:', error instanceof Error ? error.message : error);
     return NextResponse.json(
       { error: "Có lỗi xảy ra khi tải danh sách báo giá" },
       { status: 500 }
