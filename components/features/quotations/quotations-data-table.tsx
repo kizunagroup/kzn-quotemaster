@@ -14,20 +14,18 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Eye, FileSpreadsheet, GitCompare, MoreHorizontal, X } from "lucide-react";
+import { ArrowUpDown, Eye, GitCompare, MoreHorizontal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import {
   Table,
   TableBody,
@@ -36,18 +34,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
-import { RegionAutocomplete } from "@/components/ui/region-autocomplete";
+import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import {
   getQuotations,
   getAvailablePeriods,
@@ -59,6 +48,7 @@ import {
 import { type PermissionSet } from "@/lib/auth/permissions";
 import { ImportExcelModal } from "./import-excel-modal";
 import { QuoteDetailsModal } from "./quote-details-modal";
+import { QuotationsTableToolbar } from "./quotations-table-toolbar";
 
 // Status badge styling
 const statusConfig = {
@@ -371,98 +361,6 @@ function QuotationActions({
   );
 }
 
-// Filter toolbar
-function QuotationsFilters({
-  period,
-  setPeriod,
-  region,
-  setRegion,
-  supplierId,
-  setSupplierId,
-  status,
-  setStatus,
-  availablePeriods,
-  availableSuppliers,
-  onClearFilters,
-}: {
-  period: string;
-  setPeriod: (value: string) => void;
-  region: string;
-  setRegion: (value: string) => void;
-  supplierId: string;
-  setSupplierId: (value: string) => void;
-  status: string;
-  setStatus: (value: string) => void;
-  availablePeriods: string[];
-  availableSuppliers: Array<{ id: number; code: string; name: string }>;
-  onClearFilters: () => void;
-}) {
-  const hasActiveFilters = period || region || supplierId || status;
-
-  return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-2">
-      <div className="flex flex-1 flex-col gap-2 md:flex-row">
-        {/* Period Filter */}
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-full md:w-[180px]">
-            <SelectValue placeholder="Kỳ báo giá" />
-          </SelectTrigger>
-          <SelectContent>
-            {availablePeriods.map((p) => (
-              <SelectItem key={p} value={p}>
-                {p}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Region Filter */}
-        <RegionAutocomplete
-          value={region}
-          onValueChange={setRegion}
-          placeholder="Khu vực"
-          className="w-full md:w-[180px]"
-        />
-
-        {/* Supplier Filter */}
-        <Select value={supplierId} onValueChange={setSupplierId}>
-          <SelectTrigger className="w-full md:w-[200px]">
-            <SelectValue placeholder="Nhà cung cấp" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableSuppliers.map((supplier) => (
-              <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                {supplier.code} - {supplier.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {/* Status Filter */}
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-full md:w-[150px]">
-            <SelectValue placeholder="Trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(statusConfig).map(([key, config]) => (
-              <SelectItem key={key} value={key}>
-                {config.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Clear Filters */}
-      {hasActiveFilters && (
-        <Button variant="outline" onClick={onClearFilters}>
-          <X className="mr-2 h-4 w-4" />
-          Xóa bộ lọc
-        </Button>
-      )}
-    </div>
-  );
-}
 
 // Main data table component
 export function QuotationsDataTable() {
@@ -546,198 +444,97 @@ export function QuotationsDataTable() {
     },
   });
 
-  if (loading && data.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Quản lý Báo giá Vùng</CardTitle>
-          <CardDescription>Đang tải dữ liệu...</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-64 w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Check permissions
+  // Check permissions first
   if (permissions && !permissions.canViewQuotes) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Không có quyền truy cập</CardTitle>
-          <CardDescription>
+      <div className="flex h-[450px] shrink-0 items-center justify-center rounded-md border border-dashed">
+        <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
+          <h3 className="mt-4 text-lg font-semibold">Không có quyền truy cập</h3>
+          <p className="mb-4 mt-2 text-sm text-muted-foreground">
             Bạn không có quyền xem báo giá. Vui lòng liên hệ quản trị viên để được cấp quyền.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+          </p>
+        </div>
+      </div>
     );
   }
 
-  return (
-    <div className="w-full space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Quản lý Báo giá Vùng</h1>
-          <p className="text-muted-foreground">
-            Quản lý và theo dõi các báo giá từ nhà cung cấp theo khu vực
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {permissions?.canCreateQuotes && (
-            <Button
-              variant="outline"
-              onClick={() => setShowImportModal(true)}
-            >
-              <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Import Excel...
-            </Button>
-          )}
-        </div>
-      </div>
+  const hasActiveFilters = period || region || supplierId || status;
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Bộ lọc</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <QuotationsFilters
-            period={period}
-            setPeriod={setPeriod}
-            region={region}
-            setRegion={setRegion}
-            supplierId={supplierId}
-            setSupplierId={setSupplierId}
-            status={status}
-            setStatus={setStatus}
-            availablePeriods={availablePeriods}
-            availableSuppliers={availableSuppliers}
-            onClearFilters={handleClearFilters}
-          />
-        </CardContent>
-      </Card>
+  return (
+    <div className="space-y-4">
+      {/* Toolbar */}
+      <QuotationsTableToolbar
+        onSearchChange={() => {}} // No search in quotations
+        selectedPeriod={period}
+        onPeriodChange={setPeriod}
+        selectedSupplier={supplierId}
+        onSupplierChange={setSupplierId}
+        selectedRegion={region}
+        onRegionChange={setRegion}
+        selectedStatus={status}
+        onStatusChange={setStatus}
+        onClearFilters={handleClearFilters}
+        hasActiveFilters={hasActiveFilters}
+        table={table}
+        onImportClick={() => setShowImportModal(true)}
+        availablePeriods={availablePeriods}
+        availableSuppliers={availableSuppliers}
+      />
 
       {/* Data Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Danh sách Báo giá</CardTitle>
-              <CardDescription>
-                {totalCount > 0 ? `Tìm thấy ${totalCount} báo giá` : "Không có báo giá nào"}
-              </CardDescription>
-            </div>
-            <div className="flex items-center space-x-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    Cột hiển thị <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {table
-                    .getAllColumns()
-                    .filter((column) => column.getCanHide())
-                    .map((column) => {
-                      return (
-                        <DropdownMenuCheckboxItem
-                          key={column.id}
-                          className="capitalize"
-                          checked={column.getIsVisible()}
-                          onCheckedChange={(value) => column.toggleVisibility(!!value)}
-                        >
-                          {column.id}
-                        </DropdownMenuCheckboxItem>
-                      );
-                    })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id}>
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  return (
+                    <TableHead key={header.id}>
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
                           )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      {loading ? "Đang tải..." : "Không có kết quả."}
+                    </TableHead>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
                     </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  {loading ? "Đang tải..." : "Không có kết quả."}
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-          {/* Pagination */}
-          <div className="flex items-center justify-between space-x-2 py-4">
-            <div className="text-sm text-muted-foreground">
-              Trang {pagination.pageIndex + 1} / {totalPages} (Tổng cộng {totalCount} báo giá)
-            </div>
-            <div className="flex items-center space-x-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage() || loading}
-              >
-                Trước
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage() || loading}
-              >
-                Sau
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Pagination */}
+      <DataTablePagination table={table} />
 
       {/* Import Modal */}
       <ImportExcelModal
