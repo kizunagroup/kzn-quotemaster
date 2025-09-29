@@ -27,12 +27,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
-import type { Quotation } from "@/lib/hooks/use-quotations";
-import {
-  getQuotationPeriods,
-  getQuotationSuppliers,
-  getQuotationRegions
-} from "@/lib/actions/quotation.actions";
+import { FileSpreadsheet } from "lucide-react";
+import type { QuotationWithDetails } from "@/lib/actions/quotations.actions";
 
 // Static status options (these don't change)
 const statusOptions = [
@@ -43,19 +39,6 @@ const statusOptions = [
   { value: "cancelled", label: "Đã Hủy" },
 ] as const;
 
-// Dynamic option types
-type OptionType = { value: string; label: string };
-
-// Helper function to format period display
-function formatPeriodLabel(period: string): string {
-  const [year, month] = period.split('-');
-  const monthNames = [
-    'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
-    'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
-  ];
-  const monthIndex = parseInt(month) - 1;
-  return `${monthNames[monthIndex]}/${year}`;
-}
 
 interface QuotationsTableToolbarProps {
   // Search props
@@ -78,99 +61,40 @@ interface QuotationsTableToolbarProps {
   hasActiveFiltersOnly?: boolean;
 
   // Table instance for column visibility
-  table: Table<Quotation>;
+  table: Table<QuotationWithDetails>;
+
+  // Actions
+  onImportClick: () => void;
+
+  // Available filter options
+  availablePeriods: string[];
+  availableSuppliers: Array<{ id: number; code: string; name: string }>;
 }
 
 export function QuotationsTableToolbar({
   searchValue = "",
   onSearchChange,
-  selectedPeriod = "all",
+  selectedPeriod = "",
   onPeriodChange,
-  selectedSupplier = "all",
+  selectedSupplier = "",
   onSupplierChange,
-  selectedRegion = "all",
+  selectedRegion = "",
   onRegionChange,
-  selectedStatus = "all",
+  selectedStatus = "",
   onStatusChange,
   onClearFilters,
   hasActiveFilters,
   hasActiveFiltersOnly = false,
   table,
+  onImportClick,
+  availablePeriods,
+  availableSuppliers,
 }: QuotationsTableToolbarProps) {
   // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
 
-  // Dynamic filter options state
-  const [periodOptions, setPeriodOptions] = useState<OptionType[]>([
-    { value: "all", label: "Tất cả kỳ báo giá" }
-  ]);
-  const [supplierOptions, setSupplierOptions] = useState<OptionType[]>([
-    { value: "all", label: "Tất cả nhà cung cấp" }
-  ]);
-  const [regionOptions, setRegionOptions] = useState<OptionType[]>([
-    { value: "all", label: "Tất cả khu vực" }
-  ]);
-
-  // Loading states
-  const [isLoadingOptions, setIsLoadingOptions] = useState(true);
-
   // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
-
-  // Load dynamic filter options on component mount
-  useEffect(() => {
-    const loadFilterOptions = async () => {
-      try {
-        setIsLoadingOptions(true);
-
-        // Fetch all filter options in parallel
-        const [periods, suppliers, regions] = await Promise.all([
-          getQuotationPeriods(),
-          getQuotationSuppliers(),
-          getQuotationRegions()
-        ]);
-
-        // Format period options
-        const formattedPeriods: OptionType[] = [
-          { value: "all", label: "Tất cả kỳ báo giá" },
-          ...periods.map(period => ({
-            value: period,
-            label: formatPeriodLabel(period)
-          }))
-        ];
-
-        // Format supplier options
-        const formattedSuppliers: OptionType[] = [
-          { value: "all", label: "Tất cả nhà cung cấp" },
-          ...suppliers.map(supplier => ({
-            value: supplier.id.toString(),
-            label: supplier.name
-          }))
-        ];
-
-
-        // Format region options from database
-        const formattedRegions: OptionType[] = [
-          { value: "all", label: "Tất cả khu vực" },
-          ...regions.map(region => ({
-            value: region,
-            label: region
-          }))
-        ];
-
-        // Update state
-        setPeriodOptions(formattedPeriods);
-        setSupplierOptions(formattedSuppliers);
-        setRegionOptions(formattedRegions);
-      } catch (error) {
-        console.error('Failed to load filter options:', error);
-      } finally {
-        setIsLoadingOptions(false);
-      }
-    };
-
-    loadFilterOptions();
-  }, []);
 
   // Sync local search value with external prop when it changes
   useEffect(() => {
@@ -189,16 +113,10 @@ export function QuotationsTableToolbar({
     setLocalSearchValue(value);
   };
 
-  // Placeholder add button handler
-  const handleAddClick = () => {
-    // TODO: Implement in future phase
-    console.log("Add quotation functionality will be implemented in Phase 2");
-  };
-
   return (
     <DataTableToolbar
       searchValue={localSearchValue}
-      searchPlaceholder="Tìm kiếm theo Quotation ID, nhà cung cấp, khu vực..."
+      searchPlaceholder="Tìm kiếm theo mã báo giá, nhà cung cấp, khu vực..."
       onSearchChange={handleLocalSearchChange}
       onClearFilters={onClearFilters}
       hasActiveFilters={hasActiveFilters}
@@ -253,73 +171,55 @@ export function QuotationsTableToolbar({
             </Tooltip>
           </TooltipProvider>
 
-          {/* Add Button (Placeholder) */}
-          <Button onClick={handleAddClick}>
-            <Plus className="mr-2 h-4 w-4" />
-            Thêm
+          {/* Import Button - PRIMARY ACTION */}
+          <Button onClick={onImportClick}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            Import Báo giá
           </Button>
         </div>
       }
     >
-      {/* Filter Controls */}
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* Period Filter */}
-        <Select value={selectedPeriod} onValueChange={onPeriodChange} disabled={isLoadingOptions}>
-          <SelectTrigger className="h-8 w-[160px]">
-            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Kỳ báo giá"} />
-          </SelectTrigger>
-          <SelectContent>
-            {periodOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Period Filter */}
+      <Select value={selectedPeriod} onValueChange={onPeriodChange}>
+        <SelectTrigger className="h-8 w-[150px]">
+          <SelectValue placeholder="Kỳ báo giá" />
+        </SelectTrigger>
+        <SelectContent>
+          {availablePeriods.map((period) => (
+            <SelectItem key={period} value={period}>
+              {period}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-        {/* Supplier Filter */}
-        <Select value={selectedSupplier} onValueChange={onSupplierChange} disabled={isLoadingOptions}>
-          <SelectTrigger className="h-8 w-[160px]">
-            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Nhà cung cấp"} />
-          </SelectTrigger>
-          <SelectContent>
-            {supplierOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Supplier Filter */}
+      <Select value={selectedSupplier} onValueChange={onSupplierChange}>
+        <SelectTrigger className="h-8 w-[200px]">
+          <SelectValue placeholder="Nhà cung cấp" />
+        </SelectTrigger>
+        <SelectContent>
+          {availableSuppliers.map((supplier) => (
+            <SelectItem key={supplier.id} value={supplier.id.toString()}>
+              {supplier.code} - {supplier.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
 
-        {/* Region Filter */}
-        <Select value={selectedRegion} onValueChange={onRegionChange} disabled={isLoadingOptions}>
-          <SelectTrigger className="h-8 w-[140px]">
-            <SelectValue placeholder={isLoadingOptions ? "Đang tải..." : "Khu vực"} />
-          </SelectTrigger>
-          <SelectContent>
-            {regionOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-
-        {/* Status Filter */}
-        <Select value={selectedStatus} onValueChange={onStatusChange}>
-          <SelectTrigger className="h-8 w-[160px]">
-            <SelectValue placeholder="Trạng thái" />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Status Filter */}
+      <Select value={selectedStatus} onValueChange={onStatusChange}>
+        <SelectTrigger className="h-8 w-[150px]">
+          <SelectValue placeholder="Trạng thái" />
+        </SelectTrigger>
+        <SelectContent>
+          {statusOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </DataTableToolbar>
   );
 }
@@ -327,15 +227,14 @@ export function QuotationsTableToolbar({
 // Helper function to get display names for columns
 function getColumnDisplayName(columnId: string): string {
   const columnNames: Record<string, string> = {
-    quotationId: "Quotation ID",
     period: "Kỳ báo giá",
-    supplierCode: "Supplier ID",
-    supplierName: "Tên nhà cung cấp",
     region: "Khu vực",
-    category: "Nhóm hàng",
-    quoteDate: "Ngày báo giá",
-    updateDate: "Ngày cập nhật",
+    "supplier.supplierCode": "Mã NCC",
+    "supplier.name": "Tên NCC",
     status: "Trạng thái",
+    itemCount: "Số SP",
+    createdAt: "Ngày tạo",
+    "creator.name": "Người tạo",
   };
 
   return columnNames[columnId] || columnId;
