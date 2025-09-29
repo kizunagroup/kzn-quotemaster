@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Metadata } from "next/metadata";
+import { Metadata } from "next";
 import { SuppliersDataTable } from "@/components/features/suppliers/suppliers-data-table";
 
 export const metadata: Metadata = {

@@ -61,16 +61,18 @@ export async function processExcelFile(file: File): Promise<ParseResult> {
   const warnings: ValidationWarning[] = [];
 
   try {
-    // Dynamic import to reduce bundle size
-    const XLSX = await import('xlsx');
+    // Use exceljs for Excel file processing
+    const ExcelJS = await import('exceljs');
 
     // Read the Excel file
     const arrayBuffer = await file.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(arrayBuffer);
 
     // Validate required sheets exist
     const requiredSheets = ['Thông tin báo giá', 'Danh sách sản phẩm'];
-    const missingSheets = requiredSheets.filter(sheet => !workbook.SheetNames.includes(sheet));
+    const worksheetNames = workbook.worksheets.map(ws => ws.name);
+    const missingSheets = requiredSheets.filter(sheet => !worksheetNames.includes(sheet));
 
     if (missingSheets.length > 0) {
       errors.push({
@@ -81,7 +83,7 @@ export async function processExcelFile(file: File): Promise<ParseResult> {
     }
 
     // Parse quotation info sheet
-    const infoSheet = workbook.Sheets['Thông tin báo giá'];
+    const infoSheet = workbook.getWorksheet('Thông tin báo giá');
     const infoResult = parseQuotationInfo(infoSheet);
 
     if (!infoResult.success) {
@@ -90,7 +92,7 @@ export async function processExcelFile(file: File): Promise<ParseResult> {
     }
 
     // Parse product items sheet
-    const itemsSheet = workbook.Sheets['Danh sách sản phẩm'];
+    const itemsSheet = workbook.getWorksheet('Danh sách sản phẩm');
     const itemsResult = parseQuotationItems(itemsSheet);
 
     if (!itemsResult.success) {
@@ -140,27 +142,24 @@ function parseQuotationInfo(sheet: any): { success: boolean; data?: QuotationInf
   const errors: ValidationError[] = [];
 
   try {
-    // Dynamic import for xlsx utilities
-    const XLSX = require('xlsx');
-
-    // Convert sheet to JSON with expected structure
+    // Use exceljs worksheet API
     // Assuming the info sheet has labeled cells like:
     // A1: "Kỳ báo giá:", B1: "2024-01-01"
     // A2: "Khu vực:", B2: "Hà Nội"
     // A3: "Mã NCC:", B3: "NCC001"
     // A4: "Tên NCC:", B4: "Công ty ABC"
 
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:B10');
     const data: Record<string, string> = {};
+    const maxRow = Math.min(sheet.actualRowCount || 10, 10);
 
     // Read key-value pairs from the sheet
-    for (let row = range.s.r; row <= range.e.r; row++) {
-      const keyCell = sheet[XLSX.utils.encode_cell({ r: row, c: 0 })];
-      const valueCell = sheet[XLSX.utils.encode_cell({ r: row, c: 1 })];
+    for (let row = 1; row <= maxRow; row++) {
+      const keyCell = sheet.getCell(row, 1);
+      const valueCell = sheet.getCell(row, 2);
 
-      if (keyCell && valueCell) {
-        const key = String(keyCell.v).trim().replace(':', '');
-        const value = String(valueCell.v).trim();
+      if (keyCell.value && valueCell.value) {
+        const key = String(keyCell.value).trim().replace(':', '');
+        const value = String(valueCell.value).trim();
         data[key] = value;
       }
     }
@@ -232,11 +231,20 @@ function parseQuotationItems(sheet: any): {
   const warnings: ValidationWarning[] = [];
 
   try {
-    // Dynamic import for xlsx utilities
-    const XLSX = require('xlsx');
-
+    // Use exceljs worksheet API
     // Convert sheet to JSON array (assuming first row is headers)
-    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    const jsonData: any[][] = [];
+    const maxRow = sheet.actualRowCount || 0;
+    const maxCol = sheet.actualColumnCount || 0;
+
+    for (let row = 1; row <= maxRow; row++) {
+      const rowData: any[] = [];
+      for (let col = 1; col <= maxCol; col++) {
+        const cell = sheet.getCell(row, col);
+        rowData.push(cell.value);
+      }
+      jsonData.push(rowData);
+    }
 
     if (jsonData.length < 2) {
       errors.push({

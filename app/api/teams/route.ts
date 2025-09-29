@@ -6,11 +6,11 @@ import { and, eq, ilike, isNull, asc, desc, sql, inArray } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 import { teamQuerySchema } from '@/lib/schemas/team.schemas';
 
-// Exported constants for valid status values
-export const VALID_STATUSES = ['all', 'active', 'inactive'] as const;
+// Constants for valid status values
+const VALID_STATUSES = ['all', 'active', 'inactive'] as const;
 
 // Valid team types for filtering
-export const VALID_TEAM_TYPES = ['all', 'KITCHEN', 'OFFICE'] as const;
+const VALID_TEAM_TYPES = ['all', 'KITCHEN', 'OFFICE'] as const;
 
 // Valid sort columns for the teams table (updated for generic team management)
 const VALID_SORT_COLUMNS = ['name', 'teamCode', 'region', 'teamType', 'status', 'createdAt', 'updatedAt'] as const;

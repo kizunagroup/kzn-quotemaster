@@ -16,7 +16,7 @@ import {
 import { getUser, getUserWithTeams } from "@/lib/db/queries";
 
 // Exported constants for valid status values
-export const VALID_STATUSES = [
+const VALID_STATUSES = [
   "all",
   "active",
   "inactive",

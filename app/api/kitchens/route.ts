@@ -5,8 +5,8 @@ import { teams, users } from '@/lib/db/schema';
 import { and, eq, ilike, isNull, asc, desc, sql } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 
-// Exported constants for valid status values
-export const VALID_STATUSES = ['all', 'active', 'inactive'] as const;
+// Constants for valid status values
+const VALID_STATUSES = ['all', 'active', 'inactive'] as const;
 
 // Valid sort columns for the teams table
 const VALID_SORT_COLUMNS = ['name', 'kitchenCode', 'region', 'status', 'createdAt', 'updatedAt'] as const;
