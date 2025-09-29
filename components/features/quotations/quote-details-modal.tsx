@@ -264,10 +264,12 @@ export function QuoteDetailsModal({
                           {quotation.items && Array.isArray(quotation.items) && quotation.items.length > 0 ? (
                             quotation.items.map((item, index) => {
                               // Defensive checks for item data
-                              if (!item) return null;
+                              if (!item || !item.product) return null;
 
-                              const quantity = item.quantity ?? 0;
-                              const initialPrice = item.initialPrice ?? 0;
+                              // SMART CLIENT: Safe string-to-number conversion for display
+                              // Server returns decimals as strings, we convert them here for calculations
+                              const quantity = parseFloat(String(item.quantity || 0)) || 0;
+                              const initialPrice = parseFloat(String(item.initialPrice || 0)) || 0;
                               const totalPrice = quantity * initialPrice;
 
                             return (
@@ -327,9 +329,10 @@ export function QuoteDetailsModal({
                         <PriceBadge
                           price={(quotation.items ?? []).reduce(
                             (sum, item) => {
-                              if (!item) return sum;
-                              const quantity = item.quantity ?? 0;
-                              const initialPrice = item.initialPrice ?? 0;
+                              if (!item || !item.product) return sum;
+                              // SMART CLIENT: Safe string-to-number conversion for summary calculation
+                              const quantity = parseFloat(String(item.quantity || 0)) || 0;
+                              const initialPrice = parseFloat(String(item.initialPrice || 0)) || 0;
                               return sum + (quantity * initialPrice);
                             },
                             0

@@ -365,7 +365,6 @@ export async function importQuotationsFromExcel(
               initialPrice: item.initialPrice ?? 0,
               vatPercentage: item.vatRate ?? 0,
               currency: 'VND',
-              pricePerUnit: item.initialPrice ?? 0,
               notes: item.notes || null,
             });
           }
@@ -410,14 +409,16 @@ export async function importQuotationsFromExcel(
 }
 
 /**
- * Get detailed quotation with all items
+ * Get detailed quotation with all items - SIMPLIFIED "DUMB SERVER" VERSION
+ * This function only fetches raw data - NO data transformation or type conversion
+ * All presentation logic is handled by the client component
  */
 export async function getQuotationDetails(id: number): Promise<QuotationDetailsWithItems | { error: string }> {
   try {
     // Authorization check
     await checkProcurementRole();
 
-    // Get quotation with supplier and creator info
+    // Get quotation with supplier and creator info - raw data only
     const [quotation] = await db
       .select({
         id: quotations.id,
@@ -456,19 +457,18 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
       return { error: "Báo giá không tồn tại" };
     }
 
-    // Get quote items with product info
+    // Get quote items with product info - raw data only, Drizzle returns decimals as strings
     const items = await db
       .select({
         id: quoteItems.id,
         quotationId: quoteItems.quotationId,
         productId: quoteItems.productId,
-        quantity: quoteItems.quantity,
-        initialPrice: quoteItems.initialPrice,
-        negotiatedPrice: quoteItems.negotiatedPrice,
-        approvedPrice: quoteItems.approvedPrice,
-        vatPercentage: quoteItems.vatPercentage,
+        quantity: quoteItems.quantity, // Returns as string (decimal from DB)
+        initialPrice: quoteItems.initialPrice, // Returns as string (decimal from DB)
+        negotiatedPrice: quoteItems.negotiatedPrice, // Returns as string (decimal from DB)
+        approvedPrice: quoteItems.approvedPrice, // Returns as string (decimal from DB)
+        vatPercentage: quoteItems.vatPercentage, // Returns as string (decimal from DB)
         currency: quoteItems.currency,
-        pricePerUnit: quoteItems.pricePerUnit,
         negotiationRounds: quoteItems.negotiationRounds,
         lastNegotiatedAt: quoteItems.lastNegotiatedAt,
         approvedAt: quoteItems.approvedAt,
@@ -483,8 +483,8 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
           specification: products.specification,
           unit: products.unit,
           category: products.category,
-          basePrice: products.basePrice,
-          baseQuantity: products.baseQuantity,
+          basePrice: products.basePrice, // Returns as string (decimal from DB)
+          baseQuantity: products.baseQuantity, // Returns as string (decimal from DB)
         },
       })
       .from(quoteItems)
@@ -492,6 +492,7 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
       .where(eq(quoteItems.quotationId, id))
       .orderBy(products.productCode);
 
+    // Return raw data - no transformation
     return {
       ...quotation,
       items,
@@ -513,7 +514,7 @@ export async function updateQuotationStatus(
 ): Promise<{ success: string }> {
   try {
     // Authorization check for status changes
-    const user = await checkManagerRole();
+    await checkManagerRole();
 
     // Validate input
     const validatedData = UpdateQuotationStatusSchema.parse(data);
@@ -606,7 +607,7 @@ export async function getAvailableRegions(): Promise<string[]> {
       .where(sql`${teams.region} IS NOT NULL AND ${teams.region} != ''`)
       .orderBy(teams.region);
 
-    return regions.map(r => r.region).filter(Boolean);
+    return regions.map(r => r.region).filter((region): region is string => Boolean(region));
 
   } catch (error) {
     console.error("Error in getAvailableRegions:", error);
@@ -651,7 +652,7 @@ export async function getAvailableSuppliers(): Promise<Array<{ id: number; code:
       .where(eq(suppliers.status, 'active'))
       .orderBy(suppliers.supplierCode);
 
-    return supplierList;
+    return supplierList.filter((supplier): supplier is { id: number; code: string; name: string } => Boolean(supplier.code));
 
   } catch (error) {
     console.error("Error in getAvailableSuppliers:", error);

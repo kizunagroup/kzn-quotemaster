@@ -9,6 +9,14 @@ import {
   UserMinus,
   Mail,
   CheckCircle,
+  FileText,
+  ThumbsUp,
+  MessageSquare,
+  X,
+  Package,
+  Truck,
+  Building2,
+  Database,
   type LucideIcon,
 } from 'lucide-react';
 import { ActivityType } from '@/lib/db/schema';
@@ -25,6 +33,20 @@ const iconMap: Record<ActivityType, LucideIcon> = {
   [ActivityType.REMOVE_TEAM_MEMBER]: UserMinus,
   [ActivityType.INVITE_TEAM_MEMBER]: Mail,
   [ActivityType.ACCEPT_INVITATION]: CheckCircle,
+  [ActivityType.UPLOAD_QUOTE]: FileText,
+  [ActivityType.APPROVE_QUOTE]: ThumbsUp,
+  [ActivityType.NEGOTIATE_QUOTE]: MessageSquare,
+  [ActivityType.CANCEL_QUOTE]: X,
+  [ActivityType.CREATE_PRODUCT]: Package,
+  [ActivityType.UPDATE_PRODUCT]: Package,
+  [ActivityType.DELETE_PRODUCT]: Package,
+  [ActivityType.CREATE_SUPPLIER]: Truck,
+  [ActivityType.UPDATE_SUPPLIER]: Truck,
+  [ActivityType.DELETE_SUPPLIER]: Truck,
+  [ActivityType.CREATE_KITCHEN]: Building2,
+  [ActivityType.UPDATE_KITCHEN]: Building2,
+  [ActivityType.DELETE_KITCHEN]: Building2,
+  [ActivityType.SEED_DATABASE]: Database,
 };
 
 function getRelativeTime(date: Date) {
