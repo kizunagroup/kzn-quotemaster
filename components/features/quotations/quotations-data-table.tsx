@@ -534,7 +534,18 @@ export function QuotationsDataTable() {
       </div>
 
       {/* Pagination */}
-      <DataTablePagination table={table} />
+      {pagination && !loading && totalCount !== undefined && totalPages !== undefined && (
+        <DataTablePagination
+          pagination={{
+            page: pagination.pageIndex + 1,
+            limit: pagination.pageSize,
+            total: totalCount,
+            pages: totalPages,
+          }}
+          onPageChange={(page) => setPagination(prev => ({ ...prev, pageIndex: page - 1 }))}
+          onPageSizeChange={(pageSize) => setPagination(prev => ({ ...prev, pageSize, pageIndex: 0 }))}
+        />
+      )}
 
       {/* Import Modal */}
       <ImportExcelModal
