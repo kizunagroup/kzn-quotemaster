@@ -1,0 +1,1 @@
+ALTER TABLE "quote_items" DROP COLUMN "price_per_unit";

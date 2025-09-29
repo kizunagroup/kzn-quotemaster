@@ -434,6 +434,10 @@ export async function seedDatabase() {
       const manager = departmentUsers.find((u) => u.isManager);
       const randomRegion = regions[Math.floor(Math.random() * regions.length)];
 
+      if (!manager) {
+        throw new Error(`No manager found for department ${departmentName}`);
+      }
+
       const [team] = await db
         .insert(teams)
         .values({
@@ -703,7 +707,7 @@ export async function seedDatabase() {
         category: category,
         unit: unit,
         specification: `${item} chất lượng cao, nguồn gốc rõ ràng`,
-        baseQuantity: baseQuantity,
+        baseQuantity: baseQuantity.toString(),
       });
 
       categoryIndex++;
@@ -807,8 +811,8 @@ export async function seedDatabase() {
           quotationItemsData.push({
             quotationId: insertedQuotation.id,
             productId: product.id,
-            quantity: quantity,
-            pricePerUnit: unitPrice,
+            quantity: quantity.toString(),
+            initialPrice: unitPrice.toString(),
             notes: `${product.name} cho khu vực ${region}`,
             createdAt: new Date(period),
             updatedAt: new Date(),
@@ -845,7 +849,7 @@ export async function seedDatabase() {
         productId: item.productId,
         supplierId: quotation.supplierId,
         period: quotation.period,
-        price: item.pricePerUnit, // Use pricePerUnit as the price value
+        price: item.initialPrice?.toString() || "0", // Use initialPrice as the price value
         priceType: "approved", // Since these are from approved quotations
         region: quotation.region,
       });

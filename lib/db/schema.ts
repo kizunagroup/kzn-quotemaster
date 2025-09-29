@@ -299,7 +299,6 @@ export const quoteItems = pgTable(
       scale: 2,
     }).default("0"),
     currency: varchar("currency", { length: 3 }).default("VND"),
-    pricePerUnit: decimal("price_per_unit", { precision: 12, scale: 2 }),
     negotiationRounds: integer("negotiation_rounds").default(0),
     lastNegotiatedAt: timestamp("last_negotiated_at"),
     approvedAt: timestamp("approved_at"),
