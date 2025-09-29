@@ -26,6 +26,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import { PriceBadge } from "@/components/ui/price-badge";
 import { getQuotationDetails } from "@/lib/actions/quotations.actions";
@@ -175,7 +181,7 @@ export function QuoteDetailsModal({
                           Kỳ báo giá
                         </label>
                         <div className="font-medium">
-                          {format(new Date(quotation.period), "dd/MM/yyyy", { locale: vi })}
+                          {quotation.period}
                         </div>
                       </div>
 
@@ -255,7 +261,18 @@ export function QuoteDetailsModal({
                             <TableHead>Mã sản phẩm</TableHead>
                             <TableHead>Tên sản phẩm</TableHead>
                             <TableHead>Đơn vị</TableHead>
-                            <TableHead className="text-right">Số lượng</TableHead>
+                            <TableHead className="text-right">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    Số lượng
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Số lượng cơ sở dùng để tham khảo</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </TableHead>
                             <TableHead className="text-right">Đơn giá</TableHead>
                             <TableHead className="text-right">Thành tiền</TableHead>
                           </TableRow>
@@ -268,9 +285,9 @@ export function QuoteDetailsModal({
 
                               // SMART CLIENT: Safe string-to-number conversion for display
                               // Server returns decimals as strings, we convert them here for calculations
-                              const quantity = parseFloat(String(item.quantity || 0)) || 0;
+                              const baseQuantity = parseFloat(String(item.baseQuantity || 0)) || 0;
                               const initialPrice = parseFloat(String(item.initialPrice || 0)) || 0;
-                              const totalPrice = quantity * initialPrice;
+                              const totalPrice = baseQuantity * initialPrice;
 
                             return (
                               <TableRow key={item.id}>
@@ -292,13 +309,14 @@ export function QuoteDetailsModal({
                                 </TableCell>
                                 <TableCell>{item.product?.unit ?? 'N/A'}</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {quantity.toLocaleString('vi-VN')}
+                                  {baseQuantity.toLocaleString('vi-VN')}
                                 </TableCell>
                                 <TableCell className="text-right">
                                   <PriceBadge
                                     price={initialPrice}
                                     size="sm"
                                     className="justify-end"
+                                    showCurrency={false}
                                   />
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -306,6 +324,7 @@ export function QuoteDetailsModal({
                                     price={totalPrice}
                                     size="sm"
                                     className="justify-end font-medium"
+                                    showCurrency={false}
                                   />
                                 </TableCell>
                               </TableRow>
@@ -331,14 +350,15 @@ export function QuoteDetailsModal({
                             (sum, item) => {
                               if (!item || !item.product) return sum;
                               // SMART CLIENT: Safe string-to-number conversion for summary calculation
-                              const quantity = parseFloat(String(item.quantity || 0)) || 0;
+                              const baseQuantity = parseFloat(String(item.baseQuantity || 0)) || 0;
                               const initialPrice = parseFloat(String(item.initialPrice || 0)) || 0;
-                              return sum + (quantity * initialPrice);
+                              return sum + (baseQuantity * initialPrice);
                             },
                             0
                           )}
                           size="lg"
                           className="text-lg"
+                          showCurrency={false}
                         />
                       </div>
                     </div>

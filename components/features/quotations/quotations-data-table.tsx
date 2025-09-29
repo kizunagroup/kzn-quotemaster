@@ -304,6 +304,16 @@ function QuotationActions({
     setShowDetailsModal(true);
   };
 
+  const handleCloseDetailsModal = (open: boolean) => {
+    setShowDetailsModal(open);
+    if (!open) {
+      // Ensure state is fully reset when modal closes
+      setTimeout(() => {
+        setShowDetailsModal(false);
+      }, 0);
+    }
+  };
+
   const handleCompare = () => {
     // Navigate to comparison page with pre-filled filters
     const params = new URLSearchParams({
@@ -365,9 +375,10 @@ function QuotationActions({
       </DropdownMenu>
 
       <QuoteDetailsModal
+        key={`details-modal-${quotation.id}-${showDetailsModal ? 'open' : 'closed'}`}
         quotationId={quotation.id}
         open={showDetailsModal}
-        onOpenChange={setShowDetailsModal}
+        onOpenChange={handleCloseDetailsModal}
       />
     </>
   );

@@ -486,6 +486,7 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
           basePrice: products.basePrice, // Returns as string (decimal from DB)
           baseQuantity: products.baseQuantity, // Returns as string (decimal from DB)
         },
+        baseQuantity: products.baseQuantity, // Future-proofing: Available for COALESCE with kitchen_period_demands
       })
       .from(quoteItems)
       .leftJoin(products, eq(quoteItems.productId, products.id))
