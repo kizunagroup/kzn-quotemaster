@@ -1,21 +1,27 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // Validation schemas for Excel data structure
 export const QuotationInfoSchema = z.object({
-  period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Period must be in YYYY-MM-DD format'),
-  region: z.string().min(1, 'Region is required'),
-  supplierCode: z.string().min(1, 'Supplier code is required'),
-  supplierName: z.string().min(1, 'Supplier name is required'),
+  period: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Period must be in YYYY-MM-DD format"),
+  region: z.string().min(1, "Region is required"),
+  supplierCode: z.string().min(1, "Supplier code is required"),
+  supplierName: z.string().min(1, "Supplier name is required"),
   quoteDate: z.string().optional(),
 });
 
 export const QuotationItemSchema = z.object({
-  productCode: z.string().min(1, 'Product code is required'),
-  productName: z.string().min(1, 'Product name is required'),
-  unit: z.string().min(1, 'Unit is required'),
-  quantity: z.number().positive('Quantity must be positive'),
-  initialPrice: z.number().nonnegative('Price must be non-negative'),
-  vatRate: z.number().min(0).max(100, 'VAT rate must be between 0 and 100'),
+  productCode: z.string().min(1, "Product code is required"),
+  productName: z.string().optional(),
+  unit: z.string().optional(),
+  quantity: z
+    .number()
+    .positive("Quantity must be positive")
+    .optional()
+    .default(1),
+  initialPrice: z.number().nonnegative("Price must be non-negative"),
+  vatRate: z.number().min(0).max(100, "VAT rate must be between 0 and 100"),
   specification: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -30,14 +36,14 @@ export type QuotationItem = z.infer<typeof QuotationItemSchema>;
 export type ParsedQuotation = z.infer<typeof ParsedQuotationSchema>;
 
 export interface ValidationError {
-  type: 'error';
+  type: "error";
   message: string;
   field?: string;
   row?: number;
 }
 
 export interface ValidationWarning {
-  type: 'warning';
+  type: "warning";
   message: string;
   field?: string;
   row?: number;
@@ -56,13 +62,16 @@ export interface ParseResult {
  * - Sheet 1: "Thông tin báo giá" - Contains quotation metadata
  * - Sheet 2: "Danh sách sản phẩm" - Contains product pricing data
  */
-export async function processExcelFile(file: File, region: string): Promise<ParseResult> {
+export async function processExcelFile(
+  file: File,
+  region: string
+): Promise<ParseResult> {
   const errors: ValidationError[] = [];
   const warnings: ValidationWarning[] = [];
 
   try {
     // Use exceljs for Excel file processing
-    const ExcelJS = await import('exceljs');
+    const ExcelJS = await import("exceljs");
 
     // Read the Excel file
     const arrayBuffer = await file.arrayBuffer();
@@ -70,20 +79,22 @@ export async function processExcelFile(file: File, region: string): Promise<Pars
     await workbook.xlsx.load(arrayBuffer);
 
     // Validate required sheets exist
-    const requiredSheets = ['Thông tin báo giá', 'Danh sách sản phẩm'];
-    const worksheetNames = workbook.worksheets.map(ws => ws.name);
-    const missingSheets = requiredSheets.filter(sheet => !worksheetNames.includes(sheet));
+    const requiredSheets = ["Thông tin báo giá", "Danh sách sản phẩm"];
+    const worksheetNames = workbook.worksheets.map((ws) => ws.name);
+    const missingSheets = requiredSheets.filter(
+      (sheet) => !worksheetNames.includes(sheet)
+    );
 
     if (missingSheets.length > 0) {
       errors.push({
-        type: 'error',
-        message: `Thiếu sheet bắt buộc: ${missingSheets.join(', ')}`
+        type: "error",
+        message: `Thiếu sheet bắt buộc: ${missingSheets.join(", ")}`,
       });
       return { success: false, errors, warnings };
     }
 
     // Parse quotation info sheet
-    const infoSheet = workbook.getWorksheet('Thông tin báo giá');
+    const infoSheet = workbook.getWorksheet("Thông tin báo giá");
     const infoResult = parseQuotationInfo(infoSheet, region);
 
     if (!infoResult.success) {
@@ -92,7 +103,7 @@ export async function processExcelFile(file: File, region: string): Promise<Pars
     }
 
     // Parse product items sheet
-    const itemsSheet = workbook.getWorksheet('Danh sách sản phẩm');
+    const itemsSheet = workbook.getWorksheet("Danh sách sản phẩm");
     const itemsResult = parseQuotationItems(itemsSheet);
 
     if (!itemsResult.success) {
@@ -107,14 +118,14 @@ export async function processExcelFile(file: File, region: string): Promise<Pars
     // Validate the complete parsed data
     const parsedData: ParsedQuotation = {
       info: infoResult.data!,
-      items: itemsResult.data!
+      items: itemsResult.data!,
     };
 
     const validationResult = ParsedQuotationSchema.safeParse(parsedData);
     if (!validationResult.success) {
       errors.push({
-        type: 'error',
-        message: 'Dữ liệu không hợp lệ: ' + validationResult.error.message
+        type: "error",
+        message: "Dữ liệu không hợp lệ: " + validationResult.error.message,
       });
       return { success: false, errors, warnings };
     }
@@ -123,13 +134,14 @@ export async function processExcelFile(file: File, region: string): Promise<Pars
       success: true,
       data: parsedData,
       errors,
-      warnings
+      warnings,
     };
-
   } catch (error) {
     errors.push({
-      type: 'error',
-      message: `Lỗi đọc file Excel: ${error instanceof Error ? error.message : 'Unknown error'}`
+      type: "error",
+      message: `Lỗi đọc file Excel: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
     });
     return { success: false, errors, warnings };
   }
@@ -142,23 +154,32 @@ export async function processExcelFile(file: File, region: string): Promise<Pars
  * - B6: supplierCode (Mã NCC)
  * - B7: supplierName (Tên NCC)
  */
-function parseQuotationInfo(sheet: any, region: string): { success: boolean; data?: QuotationInfo; errors: ValidationError[] } {
+function parseQuotationInfo(
+  sheet: any,
+  region: string
+): { success: boolean; data?: QuotationInfo; errors: ValidationError[] } {
   const errors: ValidationError[] = [];
 
   try {
     // Read data directly from fixed cells as per specification
-    const periodCell = sheet.getCell('B3');
-    const supplierCodeCell = sheet.getCell('B6');
-    const supplierNameCell = sheet.getCell('B7');
+    const periodCell = sheet.getCell("B3");
+    const supplierCodeCell = sheet.getCell("B6");
+    const supplierNameCell = sheet.getCell("B7");
 
     // Extract values and handle potential null/undefined
-    const period = periodCell.value ? String(periodCell.value).trim() : '';
-    const supplierCode = supplierCodeCell.value ? String(supplierCodeCell.value).trim() : '';
-    const supplierName = supplierNameCell.value ? String(supplierNameCell.value).trim() : '';
+    const period = periodCell.value ? String(periodCell.value).trim() : "";
+    const supplierCode = supplierCodeCell.value
+      ? String(supplierCodeCell.value).trim()
+      : "";
+    const supplierName = supplierNameCell.value
+      ? String(supplierNameCell.value).trim()
+      : "";
 
     // Optional fields - check for quote date in nearby cells
-    const quoteDateCell = sheet.getCell('B8'); // Assuming quote date might be in B8
-    const quoteDate = quoteDateCell.value ? String(quoteDateCell.value).trim() : undefined;
+    const quoteDateCell = sheet.getCell("B8"); // Assuming quote date might be in B8
+    const quoteDate = quoteDateCell.value
+      ? String(quoteDateCell.value).trim()
+      : undefined;
 
     // Build the quotation info object using the region from the import form
     const quotationInfo: QuotationInfo = {
@@ -166,20 +187,20 @@ function parseQuotationInfo(sheet: any, region: string): { success: boolean; dat
       region, // Use region passed from import form
       supplierCode,
       supplierName,
-      quoteDate
+      quoteDate,
     };
 
     // Validate required fields
     const missingFields: string[] = [];
-    if (!period) missingFields.push('period (B3)');
-    if (!region) missingFields.push('region (from form)');
-    if (!supplierCode) missingFields.push('supplierCode (B6)');
-    if (!supplierName) missingFields.push('supplierName (B7)');
+    if (!period) missingFields.push("period (B3)");
+    if (!region) missingFields.push("region (from form)");
+    if (!supplierCode) missingFields.push("supplierCode (B6)");
+    if (!supplierName) missingFields.push("supplierName (B7)");
 
     if (missingFields.length > 0) {
       errors.push({
-        type: 'error',
-        message: `Thiếu thông tin bắt buộc: ${missingFields.join(', ')}`
+        type: "error",
+        message: `Thiếu thông tin bắt buộc: ${missingFields.join(", ")}`,
       });
       return { success: false, errors };
     }
@@ -188,8 +209,9 @@ function parseQuotationInfo(sheet: any, region: string): { success: boolean; dat
     const validationResult = QuotationInfoSchema.safeParse(quotationInfo);
     if (!validationResult.success) {
       errors.push({
-        type: 'error',
-        message: 'Thông tin báo giá không hợp lệ: ' + validationResult.error.message
+        type: "error",
+        message:
+          "Thông tin báo giá không hợp lệ: " + validationResult.error.message,
       });
       return { success: false, errors };
     }
@@ -197,13 +219,14 @@ function parseQuotationInfo(sheet: any, region: string): { success: boolean; dat
     return {
       success: true,
       data: validationResult.data,
-      errors
+      errors,
     };
-
   } catch (error) {
     errors.push({
-      type: 'error',
-      message: `Lỗi đọc sheet "Thông tin báo giá": ${error instanceof Error ? error.message : 'Unknown error'}`
+      type: "error",
+      message: `Lỗi đọc sheet "Thông tin báo giá": ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
     });
     return { success: false, errors };
   }
@@ -239,8 +262,8 @@ function parseQuotationItems(sheet: any): {
 
     if (jsonData.length < 2) {
       errors.push({
-        type: 'error',
-        message: 'Sheet "Danh sách sản phẩm" không có dữ liệu'
+        type: "error",
+        message: 'Sheet "Danh sách sản phẩm" không có dữ liệu',
       });
       return { success: false, errors, warnings };
     }
@@ -250,35 +273,44 @@ function parseQuotationItems(sheet: any): {
 
     // Expected column mapping (Vietnamese headers to English fields)
     const columnMapping: Record<string, string> = {
-      'Mã sản phẩm': 'productCode',
-      'Tên sản phẩm': 'productName',
-      'Quy cách': 'specification',
-      'Đơn vị tính': 'unit',
-      'Số lượng': 'quantity',
-      'Đơn giá': 'initialPrice',
-      'VAT (%)': 'vatRate',
-      'Ghi chú': 'notes'
+      "Mã sản phẩm": "productCode",
+      "Tên sản phẩm": "productName",
+      "Quy cách": "specification",
+      "Đơn vị tính": "unit",
+      "Số lượng": "quantity",
+      "Đơn giá": "initialPrice",
+      "VAT %": "vatRate",
+      "Ghi chú": "notes",
     };
 
     // Find column indexes
     const columnIndexes: Record<string, number> = {};
-    for (const [vietnameseHeader, englishField] of Object.entries(columnMapping)) {
-      const index = headers.findIndex(header =>
-        String(header).trim().toLowerCase().includes(vietnameseHeader.toLowerCase())
+    for (const [vietnameseHeader, englishField] of Object.entries(
+      columnMapping
+    )) {
+      const index = headers.findIndex((header) =>
+        String(header)
+          .trim()
+          .toLowerCase()
+          .includes(vietnameseHeader.toLowerCase())
       );
       if (index !== -1) {
         columnIndexes[englishField] = index;
       }
     }
 
-    // Validate required columns exist
-    const requiredColumns = ['productCode', 'productName', 'unit', 'quantity', 'initialPrice'];
-    const missingColumns = requiredColumns.filter(col => columnIndexes[col] === undefined);
+    // Validate required columns exist (only mandatory columns per business requirements)
+    const requiredColumns = ["productCode", "initialPrice", "vatRate"];
+    const missingColumns = requiredColumns.filter(
+      (col) => columnIndexes[col] === undefined
+    );
 
     if (missingColumns.length > 0) {
       errors.push({
-        type: 'error',
-        message: `Thiếu cột bắt buộc trong sheet "Danh sách sản phẩm": ${missingColumns.join(', ')}`
+        type: "error",
+        message: `Thiếu cột bắt buộc trong sheet "Danh sách sản phẩm": ${missingColumns.join(
+          ", "
+        )}`,
       });
       return { success: false, errors, warnings };
     }
@@ -291,7 +323,7 @@ function parseQuotationItems(sheet: any): {
       const rowNumber = i + 1; // 1-based row number
 
       // Skip empty rows
-      if (!row || row.every(cell => !cell)) {
+      if (!row || row.every((cell) => !cell)) {
         continue;
       }
 
@@ -302,15 +334,23 @@ function parseQuotationItems(sheet: any): {
         for (const [field, columnIndex] of Object.entries(columnIndexes)) {
           const cellValue = row[columnIndex];
 
-          if (cellValue !== undefined && cellValue !== null && cellValue !== '') {
-            if (field === 'quantity' || field === 'initialPrice' || field === 'vatRate') {
+          if (
+            cellValue !== undefined &&
+            cellValue !== null &&
+            cellValue !== ""
+          ) {
+            if (
+              field === "quantity" ||
+              field === "initialPrice" ||
+              field === "vatRate"
+            ) {
               const numValue = Number(cellValue);
               if (isNaN(numValue)) {
                 errors.push({
-                  type: 'error',
+                  type: "error",
                   message: `Giá trị số không hợp lệ tại dòng ${rowNumber}, cột ${field}`,
                   field,
-                  row: rowNumber
+                  row: rowNumber,
                 });
                 continue;
               }
@@ -321,14 +361,26 @@ function parseQuotationItems(sheet: any): {
           }
         }
 
-        // Set default VAT rate if not provided
-        if (item.vatRate === undefined) {
-          item.vatRate = 0;
+        // Set defaults for optional fields
+        if ((item as any).vatRate === undefined) {
+          (item as any).vatRate = 0;
           warnings.push({
-            type: 'warning',
+            type: "warning",
             message: `Không có thông tin VAT tại dòng ${rowNumber}, sử dụng mặc định 0%`,
-            row: rowNumber
+            row: rowNumber,
           });
+        }
+
+        if ((item as any).quantity === undefined) {
+          (item as any).quantity = 1;
+        }
+
+        if ((item as any).productName === undefined) {
+          (item as any).productName = "";
+        }
+
+        if ((item as any).unit === undefined) {
+          (item as any).unit = "";
         }
 
         // Validate the item
@@ -337,25 +389,27 @@ function parseQuotationItems(sheet: any): {
           items.push(validationResult.data);
         } else {
           errors.push({
-            type: 'error',
+            type: "error",
             message: `Dữ liệu không hợp lệ tại dòng ${rowNumber}: ${validationResult.error.message}`,
-            row: rowNumber
+            row: rowNumber,
           });
         }
-
       } catch (error) {
         errors.push({
-          type: 'error',
-          message: `Lỗi xử lý dòng ${rowNumber}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          row: rowNumber
+          type: "error",
+          message: `Lỗi xử lý dòng ${rowNumber}: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          row: rowNumber,
         });
       }
     }
 
     if (items.length === 0) {
       errors.push({
-        type: 'error',
-        message: 'Không tìm thấy sản phẩm hợp lệ nào trong sheet "Danh sách sản phẩm"'
+        type: "error",
+        message:
+          'Không tìm thấy sản phẩm hợp lệ nào trong sheet "Danh sách sản phẩm"',
       });
       return { success: false, errors, warnings };
     }
@@ -364,13 +418,14 @@ function parseQuotationItems(sheet: any): {
       success: true,
       data: items,
       errors,
-      warnings
+      warnings,
     };
-
   } catch (error) {
     errors.push({
-      type: 'error',
-      message: `Lỗi đọc sheet "Danh sách sản phẩm": ${error instanceof Error ? error.message : 'Unknown error'}`
+      type: "error",
+      message: `Lỗi đọc sheet "Danh sách sản phẩm": ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
     });
     return { success: false, errors, warnings };
   }
@@ -398,6 +453,6 @@ export async function validateCodes(
     validSupplier: false,
     validProducts: [],
     invalidProducts: productCodes,
-    productNames: {}
+    productNames: {},
   };
 }
