@@ -55,6 +55,8 @@ import {
   cancelQuotation,
   type QuotationWithDetails,
 } from "@/lib/actions/quotations.actions";
+import { getUserPermissions, type PermissionSet } from "@/lib/auth/permissions";
+import { getSession } from "@/lib/auth/session";
 import { ImportExcelModal } from "./import-excel-modal";
 import { QuoteDetailsModal } from "./quote-details-modal";
 
@@ -76,6 +78,7 @@ function useQuotations() {
   });
   const [totalPages, setTotalPages] = React.useState(0);
   const [totalCount, setTotalCount] = React.useState(0);
+  const [permissions, setPermissions] = React.useState<PermissionSet | null>(null);
 
   // Filters
   const [period, setPeriod] = React.useState<string>("");
@@ -116,12 +119,19 @@ function useQuotations() {
   // Fetch helper data
   const fetchHelperData = React.useCallback(async () => {
     try {
-      const [periods, suppliers] = await Promise.all([
+      const [periods, suppliers, session] = await Promise.all([
         getAvailablePeriods(),
         getAvailableSuppliers(),
+        getSession(),
       ]);
       setAvailablePeriods(periods);
       setAvailableSuppliers(suppliers);
+
+      // Load user permissions
+      if (session?.user?.id) {
+        const userPermissions = await getUserPermissions(session.user.id);
+        setPermissions(userPermissions);
+      }
     } catch (error) {
       console.error("Error fetching helper data:", error);
     }
@@ -144,6 +154,7 @@ function useQuotations() {
     setPagination,
     totalPages,
     totalCount,
+    permissions,
     // Filters
     period,
     setPeriod,
@@ -162,7 +173,7 @@ function useQuotations() {
 }
 
 // Table columns definition
-const columns: ColumnDef<QuotationWithDetails>[] = [
+const createColumns = (permissions: PermissionSet | null): ColumnDef<QuotationWithDetails>[] => [
   {
     accessorKey: "period",
     header: ({ column }) => {
@@ -258,13 +269,19 @@ const columns: ColumnDef<QuotationWithDetails>[] = [
     cell: ({ row }) => {
       const quotation = row.original;
 
-      return <QuotationActions quotation={quotation} />;
+      return <QuotationActions quotation={quotation} permissions={permissions} />;
     },
   },
 ];
 
 // Actions dropdown for each quotation row
-function QuotationActions({ quotation }: { quotation: QuotationWithDetails }) {
+function QuotationActions({
+  quotation,
+  permissions
+}: {
+  quotation: QuotationWithDetails;
+  permissions: PermissionSet | null;
+}) {
   const router = useRouter();
   const [showDetailsModal, setShowDetailsModal] = React.useState(false);
 
@@ -294,7 +311,10 @@ function QuotationActions({ quotation }: { quotation: QuotationWithDetails }) {
     }
   };
 
-  const canCancel = quotation.status === "pending" || quotation.status === "negotiation";
+  // Permission checks
+  const canViewDetails = permissions?.canViewQuotes ?? false;
+  const canCancel = (permissions?.canApproveQuotes ?? false) &&
+                   (quotation.status === "pending" || quotation.status === "negotiation");
 
   return (
     <>
@@ -307,15 +327,19 @@ function QuotationActions({ quotation }: { quotation: QuotationWithDetails }) {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>Hành động</DropdownMenuLabel>
-          <DropdownMenuItem onClick={handleViewDetails}>
-            <Eye className="mr-2 h-4 w-4" />
-            Xem chi tiết
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleCompare}>
-            <GitCompare className="mr-2 h-4 w-4" />
-            So sánh
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
+          {canViewDetails && (
+            <DropdownMenuItem onClick={handleViewDetails}>
+              <Eye className="mr-2 h-4 w-4" />
+              Xem chi tiết
+            </DropdownMenuItem>
+          )}
+          {canViewDetails && (
+            <DropdownMenuItem onClick={handleCompare}>
+              <GitCompare className="mr-2 h-4 w-4" />
+              So sánh
+            </DropdownMenuItem>
+          )}
+          {canViewDetails && canCancel && <DropdownMenuSeparator />}
           {canCancel && (
             <DropdownMenuItem onClick={handleCancel} className="text-destructive">
               <X className="mr-2 h-4 w-4" />
@@ -436,6 +460,7 @@ export function QuotationsDataTable() {
     setPagination,
     totalPages,
     totalCount,
+    permissions,
     period,
     setPeriod,
     region,
@@ -454,6 +479,8 @@ export function QuotationsDataTable() {
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [showImportModal, setShowImportModal] = React.useState(false);
+
+  const columns = React.useMemo(() => createColumns(permissions), [permissions]);
 
   const table = useReactTable({
     data,
@@ -508,6 +535,20 @@ export function QuotationsDataTable() {
     );
   }
 
+  // Check permissions
+  if (permissions && !permissions.canViewQuotes) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Không có quyền truy cập</CardTitle>
+          <CardDescription>
+            Bạn không có quyền xem báo giá. Vui lòng liên hệ quản trị viên để được cấp quyền.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
   return (
     <div className="w-full space-y-4">
       {/* Header */}
@@ -519,13 +560,15 @@ export function QuotationsDataTable() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowImportModal(true)}
-          >
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Import Excel...
-          </Button>
+          {permissions?.canCreateQuotes && (
+            <Button
+              variant="outline"
+              onClick={() => setShowImportModal(true)}
+            >
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Import Excel...
+            </Button>
+          )}
         </div>
       </div>
 
