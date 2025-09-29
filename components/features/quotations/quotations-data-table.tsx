@@ -37,13 +37,13 @@ import {
 import { toast } from "sonner";
 
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { DataTableColumnHeader } from "@/components/ui/data-table-column-header";
+import { useQuotations, type Quotation } from "@/lib/hooks/use-quotations";
 import {
-  getQuotations,
-  getAvailablePeriods,
-  getAvailableSuppliers,
   cancelQuotation,
   getCurrentUserPermissions,
-  type QuotationWithDetails,
+  getAvailablePeriods,
+  getAvailableSuppliers,
 } from "@/lib/actions/quotations.actions";
 import { type PermissionSet } from "@/lib/auth/permissions";
 import { ImportExcelModal } from "./import-excel-modal";
@@ -58,143 +58,51 @@ const statusConfig = {
   cancelled: { label: "Đã hủy", variant: "destructive" as const },
 };
 
-// Hook for managing quotations data and state
-function useQuotations() {
-  const [data, setData] = React.useState<QuotationWithDetails[]>([]);
-  const [loading, setLoading] = React.useState(true);
-  const [pagination, setPagination] = React.useState({
-    pageIndex: 0,
-    pageSize: 50,
-  });
-  const [totalPages, setTotalPages] = React.useState(0);
-  const [totalCount, setTotalCount] = React.useState(0);
-  const [permissions, setPermissions] = React.useState<PermissionSet | null>(null);
+// Get status variant for badges (matching Products pattern)
+const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status.toLowerCase()) {
+    case "approved":
+      return "default";
+    case "pending":
+      return "secondary";
+    case "negotiation":
+      return "outline";
+    case "cancelled":
+      return "destructive";
+    default:
+      return "outline";
+  }
+};
 
-  // Filters
-  const [period, setPeriod] = React.useState<string>("");
-  const [region, setRegion] = React.useState<string>("");
-  const [supplierId, setSupplierId] = React.useState<string>("");
-  const [status, setStatus] = React.useState<string>("");
+// Get status label (matching Products pattern)
+const getStatusLabel = (status: string): string => {
+  switch (status.toLowerCase()) {
+    case "approved":
+      return "Đã duyệt";
+    case "pending":
+      return "Chờ duyệt";
+    case "negotiation":
+      return "Đàm phán";
+    case "cancelled":
+      return "Đã hủy";
+    default:
+      return status;
+  }
+};
 
-  // Helper data
-  const [availablePeriods, setAvailablePeriods] = React.useState<string[]>([]);
-  const [availableSuppliers, setAvailableSuppliers] = React.useState<Array<{ id: number; code: string; name: string }>>([]);
-
-  // Fetch quotations data
-  const fetchQuotations = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const filters = {
-        period: period || undefined,
-        region: region || undefined,
-        supplierId: supplierId ? parseInt(supplierId) : undefined,
-        status: status || undefined,
-        page: pagination.pageIndex + 1,
-        limit: pagination.pageSize,
-      };
-
-      const result = await getQuotations(filters);
-      setData(result.data);
-      setTotalPages(result.pagination.totalPages);
-      setTotalCount(result.pagination.total);
-    } catch (error) {
-      console.error("Error fetching quotations:", error);
-      toast.error("Lỗi khi tải danh sách báo giá");
-      setData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [period, region, supplierId, status, pagination.pageIndex, pagination.pageSize]);
-
-  // Fetch helper data
-  const fetchHelperData = React.useCallback(async () => {
-    try {
-      const [periods, suppliers, permissionsResult] = await Promise.all([
-        getAvailablePeriods(),
-        getAvailableSuppliers(),
-        getCurrentUserPermissions(),
-      ]);
-      setAvailablePeriods(periods);
-      setAvailableSuppliers(suppliers);
-
-      // Load user permissions
-      if (permissionsResult.success && permissionsResult.permissions) {
-        setPermissions(permissionsResult.permissions);
-      } else {
-        console.error("Failed to load permissions:", permissionsResult.error);
-        // Set default restrictive permissions
-        setPermissions({
-          canViewQuotes: false,
-          canCreateQuotes: false,
-          canApproveQuotes: false,
-          canNegotiateQuotes: false,
-          canManageProducts: false,
-          canManageSuppliers: false,
-          canManageKitchens: false,
-          canManageStaff: false,
-          canViewAnalytics: false,
-          canExportData: false,
-          teamRestricted: true,
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching helper data:", error);
-    }
-  }, []);
-
-  // Initial load
-  React.useEffect(() => {
-    fetchHelperData();
-  }, [fetchHelperData]);
-
-  // Fetch quotations when filters or pagination change
-  React.useEffect(() => {
-    fetchQuotations();
-  }, [fetchQuotations]);
-
-  return {
-    data,
-    loading,
-    pagination,
-    setPagination,
-    totalPages,
-    totalCount,
-    permissions,
-    // Filters
-    period,
-    setPeriod,
-    region,
-    setRegion,
-    supplierId,
-    setSupplierId,
-    status,
-    setStatus,
-    // Helper data
-    availablePeriods,
-    availableSuppliers,
-    // Actions
-    refetch: fetchQuotations,
-  };
-}
-
-// Table columns definition
+// Table columns definition (matching Products pattern)
 const createColumns = (
   permissions: PermissionSet | null,
-  onViewDetails: (quotation: QuotationWithDetails) => void
-): ColumnDef<QuotationWithDetails>[] => [
+  onViewDetails: (quotation: Quotation) => void,
+  onSort: (column: string) => void
+): ColumnDef<Quotation>[] => [
   {
     accessorKey: "period",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Kỳ báo giá
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Kỳ báo giá" />
+    ),
     cell: ({ row }) => (
       <div className="font-medium">{row.getValue("period")}</div>
     ),
@@ -207,18 +115,18 @@ const createColumns = (
     ),
   },
   {
-    accessorKey: "supplier.supplierCode",
+    accessorKey: "supplierCode",
     header: "Mã NCC",
     cell: ({ row }) => (
-      <div className="font-mono text-sm">{row.original.supplier?.supplierCode}</div>
+      <div className="font-mono text-sm">{row.getValue("supplierCode")}</div>
     ),
   },
   {
-    accessorKey: "supplier.name",
+    accessorKey: "supplierName",
     header: "Tên NCC",
     cell: ({ row }) => (
-      <div className="max-w-[200px] truncate" title={row.original.supplier?.name}>
-        {row.original.supplier?.name}
+      <div className="max-w-[200px] truncate" title={row.getValue("supplierName") as string}>
+        {row.getValue("supplierName")}
       </div>
     ),
   },
@@ -226,12 +134,10 @@ const createColumns = (
     accessorKey: "status",
     header: "Trạng thái",
     cell: ({ row }) => {
-      const status = row.getValue("status") as keyof typeof statusConfig;
-      const config = statusConfig[status] || statusConfig.pending;
-
+      const status = row.getValue("status") as string;
       return (
-        <Badge variant={config.variant}>
-          {config.label}
+        <Badge variant={getStatusVariant(status)}>
+          {getStatusLabel(status)}
         </Badge>
       );
     },
@@ -245,52 +151,37 @@ const createColumns = (
   },
   {
     accessorKey: "createdAt",
-    header: ({ column }) => {
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Ngày tạo" />
+    ),
+    cell: ({ row }) => {
+      const date = row.getValue("createdAt") as Date | null;
       return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Ngày tạo
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
+        <div className="text-sm">
+          {date ? new Date(date).toLocaleDateString("vi-VN") : "N/A"}
+        </div>
       );
     },
-    cell: ({ row }) => (
-      <div className="text-sm">
-        {new Date(row.getValue("createdAt")).toLocaleDateString("vi-VN")}
-      </div>
-    ),
-  },
-  {
-    accessorKey: "creator.name",
-    header: "Người tạo",
-    cell: ({ row }) => (
-      <div className="max-w-[120px] truncate">
-        {row.original.creator?.name || "N/A"}
-      </div>
-    ),
   },
   {
     id: "actions",
     enableHiding: false,
     cell: ({ row }) => {
       const quotation = row.original;
-
       return <QuotationActions quotation={quotation} permissions={permissions} onViewDetails={onViewDetails} />;
     },
   },
 ];
 
-// Actions dropdown for each quotation row
+// Actions dropdown for each quotation row (matching Products pattern)
 function QuotationActions({
   quotation,
   permissions,
   onViewDetails
 }: {
-  quotation: QuotationWithDetails;
+  quotation: Quotation;
   permissions: PermissionSet | null;
-  onViewDetails: (quotation: QuotationWithDetails) => void;
+  onViewDetails: (quotation: Quotation) => void;
 }) {
   const router = useRouter();
 
@@ -362,41 +253,128 @@ function QuotationActions({
 }
 
 
-// Main data table component
+// Main data table component (refactored to match Products pattern)
 export function QuotationsDataTable() {
+  const [permissions, setPermissions] = React.useState<PermissionSet | null>(null);
+  const [availablePeriods, setAvailablePeriods] = React.useState<string[]>([]);
+  const [availableSuppliers, setAvailableSuppliers] = React.useState<Array<{ id: number; code: string; name: string }>>([]);
+
+  // Use the new useQuotations hook (following Products pattern)
   const {
-    data,
-    loading,
+    quotations,
     pagination,
+    isLoading,
+    error,
+    isEmpty,
+    refresh,
+    urlState,
+    setSearch,
+    setFilter,
+    setSort,
     setPagination,
-    totalPages,
-    totalCount,
-    permissions,
-    period,
-    setPeriod,
-    region,
-    setRegion,
-    supplierId,
-    setSupplierId,
-    status,
-    setStatus,
-    availablePeriods,
-    availableSuppliers,
-    refetch,
+    clearFilters,
+    hasActiveFilters,
+    hasActiveFiltersOnly,
   } = useQuotations();
 
-  const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [showImportModal, setShowImportModal] = React.useState(false);
-
   // Modal states - CENTRALIZED STATE MANAGEMENT like Suppliers
+  const [showImportModal, setShowImportModal] = React.useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
-  const [selectedQuotation, setSelectedQuotation] = React.useState<QuotationWithDetails | null>(null);
+  const [selectedQuotation, setSelectedQuotation] = React.useState<Quotation | null>(null);
 
-  // Modal handlers - CENTRALIZED like Suppliers pattern (MOVED BEFORE columns definition)
-  const handleViewDetailsClick = (quotation: QuotationWithDetails) => {
+  // Convert our URL sort state to TanStack Table sorting format (matching Products pattern)
+  const sorting: SortingState = React.useMemo(() => {
+    if (urlState.sort.column && urlState.sort.order) {
+      return [
+        { id: urlState.sort.column, desc: urlState.sort.order === "desc" },
+      ];
+    }
+    return [];
+  }, [urlState.sort.column, urlState.sort.order]);
+
+  // Handle TanStack Table sorting changes and sync with URL state (matching Products pattern)
+  const handleSortingChange = (updater: any) => {
+    const newSorting =
+      typeof updater === "function" ? updater(sorting) : updater;
+
+    if (newSorting.length === 0) {
+      // No sorting - clear sort from URL
+      setSort("");
+    } else {
+      // Extract the first sort (single column sorting)
+      const { id } = newSorting[0];
+      setSort(id);
+    }
+  };
+
+  // Fetch helper data (permissions, periods, suppliers) on mount
+  React.useEffect(() => {
+    const fetchHelperData = async () => {
+      try {
+        const [periods, suppliers, permissionsResult] = await Promise.all([
+          getAvailablePeriods(),
+          getAvailableSuppliers(),
+          getCurrentUserPermissions(),
+        ]);
+        setAvailablePeriods(periods);
+        setAvailableSuppliers(suppliers);
+
+        if (permissionsResult.success && permissionsResult.permissions) {
+          setPermissions(permissionsResult.permissions);
+        } else {
+          setPermissions({
+            canViewQuotes: false,
+            canCreateQuotes: false,
+            canApproveQuotes: false,
+            canNegotiateQuotes: false,
+            canManageProducts: false,
+            canManageSuppliers: false,
+            canManageKitchens: false,
+            canManageStaff: false,
+            canViewAnalytics: false,
+            canExportData: false,
+            teamRestricted: true,
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching helper data:", error);
+      }
+    };
+
+    fetchHelperData();
+  }, []);
+
+  // Event handlers - CENTRALIZED like Products pattern
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+  };
+
+  const handlePeriodChange = (value: string) => {
+    setFilter("period", value === "all" ? null : value);
+  };
+
+  const handleSupplierChange = (value: string) => {
+    setFilter("supplier", value === "all" ? null : value);
+  };
+
+  const handleRegionChange = (value: string) => {
+    setFilter("region", value === "all" ? null : value);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setFilter("status", value === "all" ? null : value);
+  };
+
+  const handlePageChange = (page: number) => {
+    setPagination({ page });
+  };
+
+  const handlePageSizeChange = (pageSize: number) => {
+    setPagination({ limit: pageSize, page: 1 });
+  };
+
+  // Modal handlers - CENTRALIZED like Products pattern
+  const handleViewDetailsClick = (quotation: Quotation) => {
     setSelectedQuotation(quotation);
     setIsDetailsModalOpen(true);
   };
@@ -406,41 +384,40 @@ export function QuotationsDataTable() {
     setSelectedQuotation(null);
   };
 
-  const handleClearFilters = () => {
-    setPeriod("");
-    setRegion("");
-    setSupplierId("");
-    setStatus("");
-  };
-
   const handleImportSuccess = () => {
     setShowImportModal(false);
-    refetch();
+    refresh();
     toast.success("Import báo giá thành công");
   };
 
-  const columns = React.useMemo(() => createColumns(permissions, handleViewDetailsClick), [permissions, handleViewDetailsClick]);
+  // Table configuration - matching Products pattern
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
+
+  const columns = React.useMemo(
+    () => createColumns(permissions, handleViewDetailsClick, setSort),
+    [permissions, handleViewDetailsClick, setSort]
+  );
 
   const table = useReactTable({
-    data,
+    data: quotations,
     columns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onSortingChange: handleSortingChange,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
-    onPaginationChange: setPagination,
     manualPagination: true,
-    pageCount: totalPages,
+    manualSorting: true,
+    pageCount: pagination?.pages || 0,
     state: {
       sorting,
-      columnFilters,
       columnVisibility,
       rowSelection,
-      pagination,
+      pagination: {
+        pageIndex: (pagination?.page || 1) - 1,
+        pageSize: pagination?.limit || 10,
+      },
     },
   });
 
@@ -458,23 +435,23 @@ export function QuotationsDataTable() {
     );
   }
 
-  const hasActiveFilters = period || region || supplierId || status;
-
   return (
     <div className="space-y-4">
       {/* Toolbar */}
       <QuotationsTableToolbar
-        onSearchChange={() => {}} // No search in quotations
-        selectedPeriod={period}
-        onPeriodChange={setPeriod}
-        selectedSupplier={supplierId}
-        onSupplierChange={setSupplierId}
-        selectedRegion={region}
-        onRegionChange={setRegion}
-        selectedStatus={status}
-        onStatusChange={setStatus}
-        onClearFilters={handleClearFilters}
+        searchValue={urlState.filters.search || ""}
+        onSearchChange={handleSearchChange}
+        selectedPeriod={urlState.filters.period || "all"}
+        onPeriodChange={handlePeriodChange}
+        selectedSupplier={urlState.filters.supplier || "all"}
+        onSupplierChange={handleSupplierChange}
+        selectedRegion={urlState.filters.region || "all"}
+        onRegionChange={handleRegionChange}
+        selectedStatus={urlState.filters.status || "all"}
+        onStatusChange={handleStatusChange}
+        onClearFilters={clearFilters}
         hasActiveFilters={hasActiveFilters}
+        hasActiveFiltersOnly={hasActiveFiltersOnly}
         table={table}
         onImportClick={() => setShowImportModal(true)}
         availablePeriods={availablePeriods}
@@ -525,7 +502,7 @@ export function QuotationsDataTable() {
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  {loading ? "Đang tải..." : "Không có kết quả."}
+                  {isLoading ? "Đang tải..." : "Không có kết quả."}
                 </TableCell>
               </TableRow>
             )}
@@ -534,16 +511,11 @@ export function QuotationsDataTable() {
       </div>
 
       {/* Pagination */}
-      {pagination && !loading && totalCount !== undefined && totalPages !== undefined && (
+      {pagination && (
         <DataTablePagination
-          pagination={{
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-            total: totalCount,
-            pages: totalPages,
-          }}
-          onPageChange={(page) => setPagination(prev => ({ ...prev, pageIndex: page - 1 }))}
-          onPageSizeChange={(pageSize) => setPagination(prev => ({ ...prev, pageSize, pageIndex: 0 }))}
+          pagination={pagination}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
         />
       )}
 

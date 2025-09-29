@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
 import { FileSpreadsheet } from "lucide-react";
-import type { QuotationWithDetails } from "@/lib/actions/quotations.actions";
+import type { Quotation } from "@/lib/hooks/use-quotations";
 
 // Static status options (these don't change)
 const statusOptions = [
@@ -61,7 +61,7 @@ interface QuotationsTableToolbarProps {
   hasActiveFiltersOnly?: boolean;
 
   // Table instance for column visibility
-  table: Table<QuotationWithDetails>;
+  table: Table<Quotation>;
 
   // Actions
   onImportClick: () => void;

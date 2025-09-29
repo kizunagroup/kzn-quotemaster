@@ -286,11 +286,58 @@ export function useQuotations() {
     getQuotationsByPeriod: (period: string) =>
       data?.data?.filter((quotation) => quotation.period === period) || [],
 
-    // Team-based helpers
+    // Quotation-specific convenience methods (matching Products pattern)
+    searchQuotations: (searchTerm: string) => {
+      setSearch(searchTerm);
+    },
+    filterByPeriod: (period: string) => {
+      setFilter("period", period === "all" ? null : period);
+    },
+    filterBySupplier: (supplier: string) => {
+      setFilter("supplier", supplier === "all" ? null : supplier);
+    },
+    filterByRegion: (region: string) => {
+      setFilter("region", region === "all" ? null : region);
+    },
+    filterByStatus: (status: string) => {
+      setFilter("status", status === "all" ? null : status);
+    },
+
+    // Data management helpers (from current data)
+    regions: Array.from(
+      new Set(data?.data?.map((quotation) => quotation.region) || [])
+    ).sort(),
+
+    periods: Array.from(
+      new Set(data?.data?.map((quotation) => quotation.period) || [])
+    ).sort(),
+
+    suppliers: Array.from(
+      new Map(
+        data?.data?.map((quotation) => [
+          quotation.supplierId,
+          {
+            id: quotation.supplierId,
+            name: quotation.supplierName || '',
+            code: quotation.supplierCode || '',
+          },
+        ]) || []
+      ).values()
+    ).sort((a, b) => a.name.localeCompare(b.name)),
+
+    // Quotation lookup helpers
+    getQuotationById: (id: number) =>
+      data?.data?.find((quotation) => quotation.id === id),
+    getQuotationByQuotationId: (quotationId: string) =>
+      data?.data?.find(
+        (quotation) => quotation.quotationId.toLowerCase() === quotationId.toLowerCase()
+      ),
+
+    // Legacy helpers for backward compatibility
+    getQuotationsByPeriod: (period: string) =>
+      data?.data?.filter((quotation) => quotation.period === period) || [],
     getQuotationsByTeam: (teamId: number) =>
       data?.data?.filter((quotation) => quotation.teamId === teamId) || [],
-
-    // Supplier-based helpers
     getQuotationsBySupplier: (supplierId: number) =>
       data?.data?.filter((quotation) => quotation.supplierId === supplierId) || [],
   };
