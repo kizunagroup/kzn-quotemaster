@@ -35,7 +35,7 @@ import {
 } from "@/lib/actions/quote-comparison.actions";
 import { ApprovalModal } from "@/components/features/quote-comparison/approval-modal";
 import { toast } from "sonner";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatPercentage } from "@/lib/utils";
 
 export default function ComparisonPage() {
   // Filter states
@@ -585,10 +585,7 @@ export default function ComparisonPage() {
                     {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
                       ? "+"
                       : ""}
-                    {matrixData.overviewKPIs.comparisonVsInitial.percentage.toFixed(
-                      1
-                    )}
-                    %
+                    {formatPercentage(matrixData.overviewKPIs.comparisonVsInitial.percentage)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {matrixData.overviewKPIs.comparisonVsInitial.difference > 0
@@ -623,10 +620,7 @@ export default function ComparisonPage() {
                           .percentage > 0
                           ? "+"
                           : ""}
-                        {matrixData.overviewKPIs.comparisonVsPrevious.percentage.toFixed(
-                          1
-                        )}
-                        %
+                        {formatPercentage(matrixData.overviewKPIs.comparisonVsPrevious.percentage)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {matrixData.overviewKPIs.comparisonVsPrevious
@@ -670,10 +664,7 @@ export default function ComparisonPage() {
                         {matrixData.overviewKPIs.comparisonVsBase.percentage > 0
                           ? "+"
                           : ""}
-                        {matrixData.overviewKPIs.comparisonVsBase.percentage.toFixed(
-                          1
-                        )}
-                        %
+                        {formatPercentage(matrixData.overviewKPIs.comparisonVsBase.percentage)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {matrixData.overviewKPIs.comparisonVsBase.difference > 0
