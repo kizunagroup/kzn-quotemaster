@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Category filter - filter by quotations that have products in the specified category
-    if (params.category) {
+    if (params.category && params.category !== "all") {
       conditions.push(
         sql`EXISTS (
           SELECT 1 FROM ${quoteItems} qi
