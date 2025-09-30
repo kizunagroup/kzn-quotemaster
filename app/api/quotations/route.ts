@@ -176,14 +176,15 @@ export async function GET(request: NextRequest) {
         supplierName: suppliers.name,
         supplierCode: suppliers.supplierCode,
         region: quotations.region,
-        // Categories derived from quote items
+        // Categories derived from quote items - with null filter
         categories: sql<string[]>`COALESCE((
           SELECT array_agg(DISTINCT ${products.category})
           FROM ${quoteItems}
           JOIN ${products} ON ${quoteItems.productId} = ${products.id}
           WHERE ${quoteItems.quotationId} = ${quotations.id}
+            AND ${products.category} IS NOT NULL
+            AND ${products.category} != ''
         ), '{}'::text[])`,
-        category: quotations.category,
         status: quotations.status,
         quoteDate: quotations.quoteDate,
         updateDate: quotations.updateDate,

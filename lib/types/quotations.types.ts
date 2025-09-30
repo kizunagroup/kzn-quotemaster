@@ -8,7 +8,7 @@ export const QuotationFiltersSchema = z.object({
   period: z.string().optional(),
   region: z.string().optional(),
   supplierId: z.number().optional(),
-  status: z.enum(['pending', 'negotiation', 'approved', 'cancelled']).optional(),
+  status: z.enum(['pending', 'negotiation', 'approved', 'cancelled', 'all']).optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(50),
 });

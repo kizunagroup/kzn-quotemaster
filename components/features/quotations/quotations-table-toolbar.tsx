@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDebounce } from "use-debounce";
-import { Plus, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { Table } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import {
@@ -287,5 +287,4 @@ function getColumnDisplayName(columnId: string): string {
   return columnNames[columnId] || columnId;
 }
 
-// Export helpers for use in other components
-export { statusOptions, getStatusLabel, getStatusVariant };
+// Helpers are already exported above - no need to re-export

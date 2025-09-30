@@ -91,7 +91,7 @@ export async function getQuotations(filters?: z.infer<typeof QuotationFiltersSch
       whereConditions.push(eq(quotations.supplierId, supplierId));
     }
 
-    if (status) {
+    if (status && status !== "all") {
       whereConditions.push(eq(quotations.status, status));
     }
 
@@ -105,7 +105,6 @@ export async function getQuotations(filters?: z.infer<typeof QuotationFiltersSch
         quotationId: quotations.quotationId,
         period: quotations.period,
         region: quotations.region,
-        category: quotations.category,
         status: quotations.status,
         quoteDate: quotations.quoteDate,
         updateDate: quotations.updateDate,
@@ -425,7 +424,6 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
         quotationId: quotations.quotationId,
         period: quotations.period,
         region: quotations.region,
-        category: quotations.category,
         status: quotations.status,
         quoteDate: quotations.quoteDate,
         updateDate: quotations.updateDate,

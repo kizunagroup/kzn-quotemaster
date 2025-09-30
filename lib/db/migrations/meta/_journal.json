@@ -57,6 +57,13 @@
       "when": 1759119709213,
       "tag": "0007_wise_warstar",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1759201401621,
+      "tag": "0008_conscious_jack_flag",
+      "breakpoints": true
     }
   ]
 }

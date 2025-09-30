@@ -1,6 +1,6 @@
 {
-  "id": "2dc142db-9b8a-44cc-8e75-e29a9952b497",
-  "prevId": "0701e544-8506-414b-b489-d68529439dbb",
+  "id": "a0d209d0-1b50-4b94-92f2-9a782430a459",
+  "prevId": "2dc142db-9b8a-44cc-8e75-e29a9952b497",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -655,12 +655,6 @@
         "region": {
           "name": "region",
           "type": "varchar(50)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "category": {
-          "name": "category",
-          "type": "varchar(100)",
           "primaryKey": false,
           "notNull": true
         },
