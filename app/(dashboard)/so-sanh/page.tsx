@@ -10,10 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RegionAutocomplete } from "@/components/ui/region-autocomplete";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
-import { getAvailablePeriods, getAvailableCategories } from "@/lib/actions/quotations.actions";
-import { getComparisonMatrix } from "@/lib/actions/quote-comparison.actions";
+import { getAvailablePeriods } from "@/lib/actions/quotations.actions";
+import {
+  getComparisonMatrix,
+  getRegionsForPeriod,
+  getCategoriesForPeriodAndRegion
+} from "@/lib/actions/quote-comparison.actions";
 import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 import { Loader2 } from "lucide-react";
 
@@ -25,8 +28,15 @@ export default function ComparisonPage() {
 
   // Data for select options
   const [periods, setPeriods] = useState<string[]>([]);
+  const [regions, setRegions] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [filtersLoading, setFiltersLoading] = useState(true);
+
+  // Loading states for cascading filters
+  const [periodsLoading, setPeriodsLoading] = useState(true);
+  const [regionsLoading, setRegionsLoading] = useState(false);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+
+  // Error states
   const [filtersError, setFiltersError] = useState<string | null>(null);
 
   // Comparison matrix state
@@ -34,32 +44,92 @@ export default function ComparisonPage() {
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
 
-  // Fetch periods and categories on component mount
+  // Fetch periods on component mount
   useEffect(() => {
-    async function fetchFilterData() {
+    async function fetchPeriods() {
       try {
-        setFiltersLoading(true);
+        setPeriodsLoading(true);
         setFiltersError(null);
 
-        const [availablePeriods, availableCategories] = await Promise.all([
-          getAvailablePeriods(),
-          getAvailableCategories(),
-        ]);
-
+        const availablePeriods = await getAvailablePeriods();
         setPeriods(availablePeriods);
-        setCategories(availableCategories);
       } catch (err) {
-        console.error("Error fetching filter data:", err);
-        setFiltersError("Không thể tải dữ liệu bộ lọc");
+        console.error("Error fetching periods:", err);
+        setFiltersError("Không thể tải danh sách kỳ báo giá");
         setPeriods([]);
-        setCategories([]);
       } finally {
-        setFiltersLoading(false);
+        setPeriodsLoading(false);
       }
     }
 
-    fetchFilterData();
+    fetchPeriods();
   }, []);
+
+  // Fetch regions when period changes (cascading filter)
+  useEffect(() => {
+    if (!period) {
+      setRegions([]);
+      setRegion("");
+      return;
+    }
+
+    async function fetchRegions() {
+      try {
+        setRegionsLoading(true);
+        setFiltersError(null);
+
+        const availableRegions = await getRegionsForPeriod(period);
+        setRegions(availableRegions);
+
+        // Clear region selection if current region is not available
+        if (region && !availableRegions.includes(region)) {
+          setRegion("");
+        }
+      } catch (err) {
+        console.error("Error fetching regions for period:", err);
+        setFiltersError("Không thể tải danh sách khu vực cho kỳ này");
+        setRegions([]);
+        setRegion("");
+      } finally {
+        setRegionsLoading(false);
+      }
+    }
+
+    fetchRegions();
+  }, [period]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch categories when period or region changes (cascading filter)
+  useEffect(() => {
+    if (!period || !region) {
+      setCategories([]);
+      setCategory("");
+      return;
+    }
+
+    async function fetchCategories() {
+      try {
+        setCategoriesLoading(true);
+        setFiltersError(null);
+
+        const availableCategories = await getCategoriesForPeriodAndRegion(period, region);
+        setCategories(availableCategories);
+
+        // Clear category selection if current category is not available
+        if (category && !availableCategories.includes(category)) {
+          setCategory("");
+        }
+      } catch (err) {
+        console.error("Error fetching categories for period and region:", err);
+        setFiltersError("Không thể tải danh sách nhóm hàng cho kỳ và khu vực này");
+        setCategories([]);
+        setCategory("");
+      } finally {
+        setCategoriesLoading(false);
+      }
+    }
+
+    fetchCategories();
+  }, [period, region]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle comparison action
   const handleCompareClick = async () => {
@@ -111,9 +181,9 @@ export default function ComparisonPage() {
           {/* Period Filter */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Kỳ báo giá</label>
-            <Select value={period} onValueChange={setPeriod} disabled={filtersLoading}>
+            <Select value={period} onValueChange={setPeriod} disabled={periodsLoading}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder={filtersLoading ? "Đang tải..." : "Chọn kỳ báo giá..."} />
+                <SelectValue placeholder={periodsLoading ? "Đang tải..." : "Chọn kỳ báo giá..."} />
               </SelectTrigger>
               <SelectContent>
                 {periods.map((p) => (
@@ -123,25 +193,84 @@ export default function ComparisonPage() {
                 ))}
               </SelectContent>
             </Select>
+            {periodsLoading && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Đang tải kỳ báo giá...
+              </div>
+            )}
           </div>
 
           {/* Region Filter */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Khu vực</label>
-            <RegionAutocomplete
+            <label className="text-sm font-medium">
+              Khu vực
+              {!period && <span className="text-muted-foreground"> (chọn kỳ báo giá trước)</span>}
+            </label>
+            <Select
               value={region}
               onValueChange={setRegion}
-              placeholder="Chọn khu vực..."
-              disabled={filtersLoading}
-            />
+              disabled={!period || regionsLoading}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={
+                    !period
+                      ? "Chọn kỳ báo giá trước..."
+                      : regionsLoading
+                        ? "Đang tải..."
+                        : regions.length === 0
+                          ? "Không có khu vực nào"
+                          : "Chọn khu vực..."
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {regions.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {r}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {regionsLoading && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Đang tải khu vực...
+              </div>
+            )}
+            {period && !regionsLoading && regions.length === 0 && (
+              <div className="text-xs text-amber-600">
+                Không có khu vực nào có báo giá trong kỳ này
+              </div>
+            )}
           </div>
 
           {/* Category Filter */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Nhóm hàng</label>
-            <Select value={category} onValueChange={setCategory} disabled={filtersLoading}>
+            <label className="text-sm font-medium">
+              Nhóm hàng
+              {(!period || !region) && (
+                <span className="text-muted-foreground"> (chọn kỳ & khu vực trước)</span>
+              )}
+            </label>
+            <Select
+              value={category}
+              onValueChange={setCategory}
+              disabled={!period || !region || categoriesLoading}
+            >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder={filtersLoading ? "Đang tải..." : "Chọn nhóm hàng..."} />
+                <SelectValue
+                  placeholder={
+                    !period || !region
+                      ? "Chọn kỳ & khu vực trước..."
+                      : categoriesLoading
+                        ? "Đang tải..."
+                        : categories.length === 0
+                          ? "Không có nhóm hàng nào"
+                          : "Chọn nhóm hàng..."
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((c) => (
@@ -151,6 +280,17 @@ export default function ComparisonPage() {
                 ))}
               </SelectContent>
             </Select>
+            {categoriesLoading && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Đang tải nhóm hàng...
+              </div>
+            )}
+            {period && region && !categoriesLoading && categories.length === 0 && (
+              <div className="text-xs text-amber-600">
+                Không có nhóm hàng nào có báo giá cho kỳ và khu vực này
+              </div>
+            )}
           </div>
         </div>
 

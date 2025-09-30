@@ -172,36 +172,67 @@ export async function getComparisonMatrix(
       );
 
     // STEP 4: Transform database results into PriceItem format
-    const priceItems: PriceItem[] = quotationData.map(row => ({
-      id: row.itemId,
-      productId: row.productId,
-      productCode: row.productCode,
-      productName: row.productName,
-      supplierId: row.supplierId,
-      supplierCode: row.supplierCode,
-      supplierName: row.supplierName,
-      initialPrice: row.initialPrice ? Number(row.initialPrice) : undefined,
-      negotiatedPrice: row.negotiatedPrice ? Number(row.negotiatedPrice) : undefined,
-      approvedPrice: row.approvedPrice ? Number(row.approvedPrice) : undefined,
-      vatRate: Number(row.vatPercentage),
-      currency: row.currency,
-      quantity: row.quantity ? Number(row.quantity) : undefined,
-      unit: row.productUnit,
-    }));
+    // Defensive programming: Ensure quotationData is a valid array
+    const priceItems: PriceItem[] = Array.isArray(quotationData) && quotationData.length > 0
+      ? quotationData.map(row => {
+          // Null-safety checks for each row
+          if (!row || typeof row !== 'object') {
+            console.warn('Invalid quotation row data:', row);
+            return null;
+          }
+
+          return {
+            id: row.itemId || 0,
+            productId: row.productId || 0,
+            productCode: row.productCode || '',
+            productName: row.productName || '',
+            supplierId: row.supplierId || 0,
+            supplierCode: row.supplierCode || '',
+            supplierName: row.supplierName || '',
+            initialPrice: row.initialPrice ? Number(row.initialPrice) : undefined,
+            negotiatedPrice: row.negotiatedPrice ? Number(row.negotiatedPrice) : undefined,
+            approvedPrice: row.approvedPrice ? Number(row.approvedPrice) : undefined,
+            vatRate: row.vatPercentage ? Number(row.vatPercentage) : 0,
+            currency: row.currency || 'VND',
+            quantity: row.quantity ? Number(row.quantity) : undefined,
+            unit: row.productUnit || '',
+          };
+        }).filter(Boolean) as PriceItem[] // Remove any null entries
+      : [];
 
     // STEP 5: Prepare base quantities from all products (fallback for two-tier logic)
-    const productBaseQuantities = allProducts.map(product => ({
-      productId: product.id,
-      baseQuantity: Number(product.baseQuantity || 1),
-    }));
+    // Defensive programming: Ensure allProducts is a valid array
+    const productBaseQuantities = Array.isArray(allProducts) && allProducts.length > 0
+      ? allProducts.map(product => {
+          if (!product || typeof product !== 'object') {
+            console.warn('Invalid product data:', product);
+            return { productId: 0, baseQuantity: 1 };
+          }
+          return {
+            productId: product.id || 0,
+            baseQuantity: Number(product.baseQuantity || 1),
+          };
+        })
+      : [];
 
     // STEP 6: Calculate comparison matrix using utility function
+    // Defensive programming: Ensure kitchenDemands is a valid array
+    const kitchenDemandsProcessed = Array.isArray(kitchenDemands) && kitchenDemands.length > 0
+      ? kitchenDemands.map(d => {
+          if (!d || typeof d !== 'object') {
+            console.warn('Invalid kitchen demand data:', d);
+            return { productId: 0, quantity: 1 };
+          }
+          return {
+            productId: d.productId || 0,
+            quantity: Number(d.quantity || 1),
+          };
+        })
+      : [];
+
     const matrix = calculateComparisonMatrix(
       priceItems,
-      kitchenDemands.map(d => ({
-        productId: d.productId,
-        quantity: Number(d.quantity),
-      })),
+      kitchenDemandsProcessed,
       productBaseQuantities,
       period,
       region,
@@ -209,29 +240,65 @@ export async function getComparisonMatrix(
     );
 
     // STEP 7: Ensure ALL products from category are included (even without quotes)
-    const quotedProductIds = new Set(priceItems.map(item => item.productId));
-    const missingProducts = allProducts.filter(product => !quotedProductIds.has(product.id));
+    // Defensive programming: Ensure matrix and its products array exist
+    if (!matrix || !matrix.products) {
+      console.error('Matrix calculation failed, returning empty matrix');
+      return {
+        products: [],
+        suppliers: [],
+        period,
+        region,
+        category,
+        lastUpdated: new Date(),
+        availableSuppliers: [],
+      };
+    }
+
+    // Defensive programming: Ensure priceItems array exists before mapping
+    const quotedProductIds = Array.isArray(priceItems) && priceItems.length > 0
+      ? new Set(priceItems.map(item => item?.productId).filter(id => id !== undefined))
+      : new Set<number>();
+
+    const missingProducts = Array.isArray(allProducts)
+      ? allProducts.filter(product => product?.id && !quotedProductIds.has(product.id))
+      : [];
 
     // Add missing products to the matrix
     missingProducts.forEach(product => {
-      const quantityInfo = kitchenDemands.find(d => d.productId === product.id) ||
-                          { quantity: Number(product.baseQuantity || 1) };
+      if (!product || !product.id) {
+        console.warn('Invalid missing product data:', product);
+        return;
+      }
+
+      const quantityInfo = Array.isArray(kitchenDemands)
+        ? kitchenDemands.find(d => d?.productId === product.id)
+        : null;
+
+      const quantity = quantityInfo?.quantity
+        ? Number(quantityInfo.quantity)
+        : Number(product.baseQuantity || 1);
 
       matrix.products.push({
         productId: product.id,
-        productCode: product.productCode,
-        productName: product.name,
-        unit: product.unit,
-        quantity: Number(quantityInfo.quantity),
-        quantitySource: kitchenDemands.find(d => d.productId === product.id) ? 'kitchen_demand' : 'base_quantity',
+        productCode: product.productCode || '',
+        productName: product.name || '',
+        unit: product.unit || '',
+        quantity,
+        quantitySource: quantityInfo ? 'kitchen_demand' : 'base_quantity',
         suppliers: {},
         bestSupplierId: undefined,
         bestPrice: undefined,
       });
     });
 
-    // Sort products by product code
-    matrix.products.sort((a, b) => a.productCode.localeCompare(b.productCode));
+    // Sort products by product code - ensure matrix.products exists
+    if (Array.isArray(matrix.products)) {
+      matrix.products.sort((a, b) => {
+        const codeA = a?.productCode || '';
+        const codeB = b?.productCode || '';
+        return codeA.localeCompare(codeB);
+      });
+    }
 
     // STEP 8: Calculate supplier statistics for the comparison matrix
     const supplierStats = new Map();
@@ -256,35 +323,45 @@ export async function getComparisonMatrix(
       );
 
     // Calculate statistics for each supplier
-    allQuotationsInScope.forEach(quote => {
-      if (!supplierStats.has(quote.supplierId)) {
-        supplierStats.set(quote.supplierId, {
-          id: quote.supplierId,
-          code: quote.supplierCode,
-          name: quote.supplierName,
-          status: quote.supplierStatus,
-          totalQuotations: 0,
-          pendingQuotations: 0,
-          negotiationQuotations: 0,
-          approvedQuotations: 0,
-        });
-      }
+    // Defensive programming: Ensure allQuotationsInScope is a valid array
+    if (Array.isArray(allQuotationsInScope) && allQuotationsInScope.length > 0) {
+      allQuotationsInScope.forEach(quote => {
+        if (!quote || typeof quote !== 'object' || !quote.supplierId) {
+          console.warn('Invalid quotation scope data:', quote);
+          return;
+        }
 
-      const stats = supplierStats.get(quote.supplierId);
-      stats.totalQuotations++;
+        if (!supplierStats.has(quote.supplierId)) {
+          supplierStats.set(quote.supplierId, {
+            id: quote.supplierId,
+            code: quote.supplierCode || '',
+            name: quote.supplierName || '',
+            status: quote.supplierStatus || 'unknown',
+            totalQuotations: 0,
+            pendingQuotations: 0,
+            negotiationQuotations: 0,
+            approvedQuotations: 0,
+          });
+        }
 
-      switch (quote.quotationStatus) {
-        case 'pending':
-          stats.pendingQuotations++;
-          break;
-        case 'negotiation':
-          stats.negotiationQuotations++;
-          break;
-        case 'approved':
-          stats.approvedQuotations++;
-          break;
-      }
-    });
+        const stats = supplierStats.get(quote.supplierId);
+        if (stats) {
+          stats.totalQuotations++;
+
+          switch (quote.quotationStatus) {
+            case 'pending':
+              stats.pendingQuotations++;
+              break;
+            case 'negotiation':
+              stats.negotiationQuotations++;
+              break;
+            case 'approved':
+              stats.approvedQuotations++;
+              break;
+          }
+        }
+      });
+    }
 
     return {
       ...matrix,
@@ -619,5 +696,70 @@ export async function getQuotationSummary(period: string, region: string): Promi
   } catch (error) {
     console.error("Error in getQuotationSummary:", error);
     throw new Error("Lỗi khi tải tổng quan báo giá");
+  }
+}
+
+/**
+ * Get regions that have quotations for a specific period (cascading filter)
+ */
+export async function getRegionsForPeriod(period: string): Promise<string[]> {
+  try {
+    await checkManagerRole();
+
+    if (!period) {
+      return [];
+    }
+
+    const regions = await db
+      .selectDistinct({ region: quotations.region })
+      .from(quotations)
+      .where(eq(quotations.period, period))
+      .orderBy(quotations.region);
+
+    return regions
+      .map(r => r.region)
+      .filter((region): region is string => Boolean(region));
+
+  } catch (error) {
+    console.error("Error in getRegionsForPeriod:", error);
+    throw new Error("Lỗi khi tải danh sách khu vực theo kỳ");
+  }
+}
+
+/**
+ * Get product categories that have quotations for a specific period and region (cascading filter)
+ */
+export async function getCategoriesForPeriodAndRegion(
+  period: string,
+  region: string
+): Promise<string[]> {
+  try {
+    await checkManagerRole();
+
+    if (!period || !region) {
+      return [];
+    }
+
+    const categories = await db
+      .selectDistinct({ category: products.category })
+      .from(quotations)
+      .innerJoin(quoteItems, eq(quotations.id, quoteItems.quotationId))
+      .innerJoin(products, eq(quoteItems.productId, products.id))
+      .where(
+        and(
+          eq(quotations.period, period),
+          eq(quotations.region, region),
+          eq(products.status, 'active')
+        )
+      )
+      .orderBy(products.category);
+
+    return categories
+      .map(c => c.category)
+      .filter((category): category is string => Boolean(category));
+
+  } catch (error) {
+    console.error("Error in getCategoriesForPeriodAndRegion:", error);
+    throw new Error("Lỗi khi tải danh sách nhóm hàng theo kỳ và khu vực");
   }
 }
