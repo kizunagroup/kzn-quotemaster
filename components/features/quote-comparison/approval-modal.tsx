@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Loader2, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
 import { approveMultipleQuotations } from "@/lib/actions/quote-comparison.actions";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 
@@ -79,16 +80,20 @@ export function ApprovalModal({
 
       await approveMultipleQuotations({ quotationIds });
 
+      // Show success toast
+      toast.success(`Đã phê duyệt thành công ${quotationIds.length} báo giá từ ${selectedSuppliers.size} nhà cung cấp!`);
+
       // Success - close modal and refresh parent data
       onApprovalComplete();
       setSelectedSuppliers(new Set()); // Reset selections
     } catch (err) {
       console.error('Error approving quotations:', err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Lỗi khi phê duyệt báo giá"
-      );
+      const errorMessage = err instanceof Error
+        ? err.message
+        : "Lỗi khi phê duyệt báo giá";
+
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
