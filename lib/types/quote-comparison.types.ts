@@ -61,6 +61,12 @@ export interface ComparisonMatrixData extends ComparisonMatrix {
     code: string;
     name: string;
     status: string;
+    // NEW: Add quotation-level data
+    quotationId: number | null;  // The regional quotation ID for this supplier
+    quotationStatus: 'draft' | 'submitted' | 'negotiation' | 'approved' | 'rejected' | null;
+    quotationSubmittedAt: Date | null;
+    quotationLastUpdated: Date | null;
+    // Statistics
     totalQuotations: number;
     pendingQuotations: number;
     negotiationQuotations: number;

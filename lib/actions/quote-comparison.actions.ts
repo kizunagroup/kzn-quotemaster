@@ -2,6 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import ExcelJS from "exceljs";
 import { db } from "@/lib/db/drizzle";
 import {
   quotations,
@@ -406,23 +407,60 @@ export async function getComparisonMatrix(
         )
       );
 
-    const supplierStatsMap = new Map();
-    if (Array.isArray(supplierStatsQuery)) {
-      supplierStatsQuery.forEach(quote => {
-        if (!quote?.supplierId) return;
+    // STEP 7b: Get regional quotation data for each supplier
+    console.log(`[getComparisonMatrix] Fetching regional quotation data...`);
+    const regionalQuotationsQuery = await db
+      .select({
+        supplierId: suppliers.id,
+        supplierCode: suppliers.supplierCode,
+        supplierName: suppliers.name,
+        supplierStatus: suppliers.status,
+        quotationId: quotations.id,
+        quotationStatus: quotations.status,
+        quotationSubmittedAt: quotations.submittedAt,
+        quotationLastUpdated: quotations.updatedAt,
+      })
+      .from(suppliers)
+      .leftJoin(quotations, and(
+        eq(quotations.supplierId, suppliers.id),
+        eq(quotations.period, period),
+        eq(quotations.region, region),
+        category ? eq(quotations.category, category) : undefined
+      ))
+      .where(eq(suppliers.status, 'active'));
 
-        if (!supplierStatsMap.has(quote.supplierId)) {
-          supplierStatsMap.set(quote.supplierId, {
-            id: quote.supplierId,
-            code: quote.supplierCode || '',
-            name: quote.supplierName || '',
-            status: quote.supplierStatus || 'unknown',
+    const supplierStatsMap = new Map();
+
+    // Initialize suppliers with regional quotation data
+    if (Array.isArray(regionalQuotationsQuery)) {
+      regionalQuotationsQuery.forEach(item => {
+        if (!item?.supplierId) return;
+
+        if (!supplierStatsMap.has(item.supplierId)) {
+          supplierStatsMap.set(item.supplierId, {
+            id: item.supplierId,
+            code: item.supplierCode || '',
+            name: item.supplierName || '',
+            status: item.supplierStatus || 'unknown',
+            // NEW: Add quotation-level data
+            quotationId: item.quotationId,
+            quotationStatus: item.quotationStatus as 'draft' | 'submitted' | 'negotiation' | 'approved' | 'rejected' | null,
+            quotationSubmittedAt: item.quotationSubmittedAt,
+            quotationLastUpdated: item.quotationLastUpdated,
+            // Statistics (will be populated below)
             totalQuotations: 0,
             pendingQuotations: 0,
             negotiationQuotations: 0,
             approvedQuotations: 0,
           });
         }
+      });
+    }
+
+    // Populate statistics from all quotations
+    if (Array.isArray(supplierStatsQuery)) {
+      supplierStatsQuery.forEach(quote => {
+        if (!quote?.supplierId) return;
 
         const stats = supplierStatsMap.get(quote.supplierId);
         if (stats) {
@@ -1055,4 +1093,157 @@ export async function getCategoriesForPeriodAndRegion(
     console.error("Error in getCategoriesForPeriodAndRegion:", error);
     throw new Error("Lỗi khi tải danh sách nhóm hàng theo kỳ và khu vực");
   }
+}
+
+// Export target price file validation schema
+const ExportTargetPriceSchema = z.object({
+  period: z.string().min(1, "Kỳ báo giá là bắt buộc"),
+  region: z.string().min(1, "Khu vực là bắt buộc"),
+  category: z.string().optional(),
+});
+
+/**
+ * Export target price file based on comparison matrix data
+ */
+export async function exportTargetPriceFile(params: {
+  period: string;
+  region: string;
+  category?: string;
+}): Promise<{
+  success: boolean;
+  downloadUrl?: string;
+  fileName?: string;
+  error?: string;
+}> {
+  try {
+    console.log("[exportTargetPriceFile] Starting export with params:", params);
+
+    // Validate input
+    const validatedData = ExportTargetPriceSchema.parse(params);
+    const { period, region, category } = validatedData;
+
+    // Get comparison matrix data
+    const matrixData = await getComparisonMatrix({ period, region, category });
+
+    if (!matrixData || matrixData.products.length === 0) {
+      throw new Error("Không có dữ liệu sản phẩm để xuất file");
+    }
+
+    // 1. Extract best prices for each product
+    const targetPriceData = matrixData.products.map(product => {
+      const bestSupplier = matrixData.availableSuppliers.find(s => s.id === product.bestSupplierId);
+
+      return {
+        productCode: product.productCode,
+        productName: product.productName,
+        unit: product.unit,
+        quantity: product.quantity,
+        currentBestPrice: product.bestPrice || 0,
+        bestSupplier: bestSupplier?.name || null,
+        targetPrice: product.bestPrice || 0, // Can be adjusted with business rules
+        previousApprovedPrice: product.previousApprovedPrice || 0,
+        notes: '', // For suppliers to add negotiation notes
+      };
+    });
+
+    // 2. Generate Excel file using ExcelJS
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Target Prices');
+
+    // Set up column headers
+    const headers = [
+      'Mã sản phẩm', 'Tên sản phẩm', 'Đơn vị', 'Số lượng',
+      'Giá tốt nhất hiện tại', 'NCC giá tốt nhất', 'Giá mục tiêu',
+      'Giá đã duyệt kỳ trước', 'Ghi chú của NCC'
+    ];
+
+    // Add headers with styling
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE6E6FA' }
+      };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+
+    // Add data rows
+    targetPriceData.forEach(item => {
+      const row = worksheet.addRow([
+        item.productCode,
+        item.productName,
+        item.unit,
+        item.quantity,
+        item.currentBestPrice,
+        item.bestSupplier,
+        item.targetPrice,
+        item.previousApprovedPrice,
+        item.notes
+      ]);
+
+      // Add borders to data cells
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+    });
+
+    // Auto-fit columns
+    worksheet.columns.forEach((column) => {
+      if (column.header) {
+        const maxLength = Math.max(
+          column.header.toString().length,
+          ...worksheet.getColumn(column.letter).values
+            .slice(1) // Skip header
+            .map(val => val ? val.toString().length : 0)
+        );
+        column.width = Math.min(Math.max(maxLength + 2, 10), 50);
+      }
+    });
+
+    // 3. Generate file buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    // 4. Create filename
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '');
+    const fileName = `target-prices-${period}-${region}${category ? `-${category}` : ''}-${timestamp}.xlsx`;
+
+    // 5. For now, return the buffer as base64 (in a real implementation, save to temp storage)
+    const base64Data = Buffer.from(buffer).toString('base64');
+    const downloadUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64Data}`;
+
+    console.log(`[exportTargetPriceFile] Generated Excel file with ${targetPriceData.length} products`);
+
+    return {
+      success: true,
+      downloadUrl,
+      fileName
+    };
+
+  } catch (error) {
+    console.error("Error in exportTargetPriceFile:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Lỗi khi xuất file giá mục tiêu"
+    };
+  }
+}
+
+// Helper function placeholder (would save to actual temp storage in production)
+async function saveToTempStorage(buffer: Buffer, fileName: string): Promise<string> {
+  // In a real implementation, this would save to AWS S3, local storage, etc.
+  // For now, return a data URL
+  const base64Data = Buffer.from(buffer).toString('base64');
+  return `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64Data}`;
 }

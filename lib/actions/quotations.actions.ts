@@ -295,27 +295,50 @@ export async function importQuotationsFromExcel(
           let isUpdate = false;
 
           if (existingQuotation) {
-            if (!overwrite) {
-              throw new Error(`Báo giá đã tồn tại cho NCC ${supplier.supplierCode} trong kỳ ${period} tại ${region}. Vui lòng chọn "Ghi đè" để cập nhật.`);
+            // Handle different update scenarios based on quotation status
+            if (existingQuotation.status === 'negotiation') {
+              // Intelligent update: Update negotiated prices for quotations in negotiation
+              quotationId = existingQuotation.id;
+              isUpdate = true;
+
+              // Update quotation metadata
+              await tx
+                .update(quotations)
+                .set({
+                  quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
+                  updateDate: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(quotations.id, existingQuotation.id));
+
+              // For negotiation status, we'll update negotiated_price instead of replacing items
+              // This will be handled in the item processing loop below
+            } else if (existingQuotation.status === 'draft') {
+              if (!overwrite) {
+                throw new Error(`Báo giá đã tồn tại cho NCC ${supplier.supplierCode} trong kỳ ${period} tại ${region}. Vui lòng chọn "Ghi đè" để cập nhật.`);
+              }
+
+              // Update existing draft quotation (standard overwrite)
+              await tx
+                .update(quotations)
+                .set({
+                  quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
+                  updateDate: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(eq(quotations.id, existingQuotation.id));
+
+              // Delete existing quote items for draft quotations
+              await tx
+                .delete(quoteItems)
+                .where(eq(quoteItems.quotationId, existingQuotation.id));
+
+              quotationId = existingQuotation.id;
+              isUpdate = true;
+            } else {
+              // Cannot update quotations in 'approved', 'rejected', etc. status
+              throw new Error(`Không thể cập nhật báo giá ở trạng thái '${existingQuotation.status}'. Chỉ có thể cập nhật báo giá ở trạng thái 'draft' hoặc 'negotiation'.`);
             }
-
-            // Update existing quotation
-            await tx
-              .update(quotations)
-              .set({
-                quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
-                updateDate: new Date(),
-                updatedAt: new Date(),
-              })
-              .where(eq(quotations.id, existingQuotation.id));
-
-            // Delete existing quote items
-            await tx
-              .delete(quoteItems)
-              .where(eq(quoteItems.quotationId, existingQuotation.id));
-
-            quotationId = existingQuotation.id;
-            isUpdate = true;
           } else {
             // Create new quotation
             const [newQuotation] = await tx
@@ -343,35 +366,75 @@ export async function importQuotationsFromExcel(
             }
           });
 
-          // Insert quote items with safe mapping
-          const quoteItemsData = [];
-          for (const item of parseResult.data?.items || []) {
-            if (!item?.productCode) {
-              throw new Error('Invalid item data: missing productCode');
+          // Handle item processing based on quotation status
+          if (existingQuotation && existingQuotation.status === 'negotiation') {
+            // Update negotiated prices for existing items
+            let updatedItemsCount = 0;
+            for (const item of parseResult.data?.items || []) {
+              if (!item?.productCode) {
+                throw new Error('Invalid item data: missing productCode');
+              }
+
+              const normalizedCode = item.productCode.trim().toUpperCase();
+              const productId = productMap.get(normalizedCode);
+
+              if (!productId) {
+                throw new Error(`Product mapping failed for code: ${item.productCode}`);
+              }
+
+              // Update negotiated price for existing quote item
+              const updateResult = await tx
+                .update(quoteItems)
+                .set({
+                  negotiatedPrice: item.initialPrice ?? 0, // New price goes to negotiatedPrice
+                  negotiationRounds: sql`${quoteItems.negotiationRounds} + 1`,
+                  lastNegotiatedAt: new Date(),
+                  updatedAt: new Date(),
+                  notes: item.notes || quoteItems.notes, // Preserve existing notes if new ones aren't provided
+                })
+                .where(
+                  and(
+                    eq(quoteItems.quotationId, quotationId),
+                    eq(quoteItems.productId, productId)
+                  )
+                );
+
+              updatedItemsCount++;
             }
 
-            const normalizedCode = item.productCode.trim().toUpperCase();
-            const productId = productMap.get(normalizedCode);
+            result.totalItems += updatedItemsCount;
+            console.log(`Updated negotiated prices for ${updatedItemsCount} items in quotation ${quotationId}`);
+          } else {
+            // Insert new quote items (for new quotations or draft updates)
+            const quoteItemsData = [];
+            for (const item of parseResult.data?.items || []) {
+              if (!item?.productCode) {
+                throw new Error('Invalid item data: missing productCode');
+              }
 
-            if (!productId) {
-              throw new Error(`Product mapping failed for code: ${item.productCode}`);
+              const normalizedCode = item.productCode.trim().toUpperCase();
+              const productId = productMap.get(normalizedCode);
+
+              if (!productId) {
+                throw new Error(`Product mapping failed for code: ${item.productCode}`);
+              }
+
+              quoteItemsData.push({
+                quotationId,
+                productId,
+                quantity: item.quantity ?? 1,
+                initialPrice: item.initialPrice ?? 0,
+                vatPercentage: item.vatRate ?? 0,
+                currency: 'VND',
+                notes: item.notes || null,
+              });
             }
 
-            quoteItemsData.push({
-              quotationId,
-              productId,
-              quantity: item.quantity ?? 1,
-              initialPrice: item.initialPrice ?? 0,
-              vatPercentage: item.vatRate ?? 0,
-              currency: 'VND',
-              notes: item.notes || null,
-            });
+            await tx.insert(quoteItems).values(quoteItemsData);
+            result.totalItems += quoteItemsData.length;
           }
 
-          await tx.insert(quoteItems).values(quoteItemsData);
-
           // Update counters
-          result.totalItems += quoteItemsData.length;
           if (isUpdate) {
             result.updatedQuotations++;
           } else {
