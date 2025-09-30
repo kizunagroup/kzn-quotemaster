@@ -437,41 +437,24 @@ export async function getComparisonMatrix(
     let regionalQuotations;
     try {
       console.log(`[getComparisonMatrix] Step 2: Fetching regional quotations for period=${period}, region=${region}, category=${category}...`);
-      const quotationWhere = [
+
+      // Build WHERE conditions for quotations (category filtering is handled at product level)
+      const quotationConditions = [
         eq(quotations.period, period),
         eq(quotations.region, region)
       ];
 
-      if (category) {
-        quotationWhere.push(eq(quotations.category, category));
-      }
-
-      const quotationsQuery = db
+      regionalQuotations = await db
         .select({
           id: quotations.id,
           supplierId: quotations.supplierId,
           status: quotations.status,
-          submittedAt: quotations.submittedAt,
           updatedAt: quotations.updatedAt,
           period: quotations.period,
           region: quotations.region,
-          category: quotations.category,
         })
         .from(quotations)
-        .where(and(...quotationWhere));
-
-      // LOG THE GENERATED SQL QUERY
-      try {
-        console.log('[getComparisonMatrix] Step 2 SQL Query:', quotationsQuery.toSQL());
-      } catch (sqlError) {
-        console.error('[getComparisonMatrix] CRITICAL ERROR generating SQL for Step 2:', sqlError);
-        console.error('[getComparisonMatrix] Period type:', typeof period, 'Value:', period);
-        console.error('[getComparisonMatrix] Region type:', typeof region, 'Value:', region);
-        console.error('[getComparisonMatrix] Category type:', typeof category, 'Value:', category);
-        console.error('[getComparisonMatrix] QuotationWhere array:', quotationWhere);
-      }
-
-      regionalQuotations = await quotationsQuery;
+        .where(and(...quotationConditions));
 
       console.log(`[getComparisonMatrix] Step 2 RESULT: Found ${regionalQuotations.length} regional quotations`);
       if (regionalQuotations.length > 0) {
@@ -479,8 +462,6 @@ export async function getComparisonMatrix(
       }
     } catch (error) {
       console.error('[getComparisonMatrix] CRITICAL ERROR in Step 2 - fetching quotations:', error);
-      console.error('[getComparisonMatrix] Error stack:', error.stack);
-      console.error('[getComparisonMatrix] Query parameters - period:', period, 'region:', region, 'category:', category);
       throw new Error(`Failed to fetch quotations: ${error.message}`);
     }
 
@@ -588,7 +569,7 @@ export async function getComparisonMatrix(
             // Safely update quotation data
             supplierData.quotationId = quotation.id ?? null;
             supplierData.quotationStatus = quotation.status ?? null;
-            supplierData.quotationSubmittedAt = quotation.submittedAt ?? null;
+            supplierData.quotationSubmittedAt = null; // submittedAt field doesn't exist in current schema
             supplierData.quotationLastUpdated = quotation.updatedAt ?? null;
 
             if (index < 3) { // Log first 3 for debugging
