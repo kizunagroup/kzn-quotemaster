@@ -431,6 +431,101 @@ export async function getComparisonMatrix(
       });
     }
 
+    // STEP 8: Calculate Overview KPIs
+    console.log(`[getComparisonMatrix] Calculating overview KPIs...`);
+
+    // Get previous approved prices for comparison
+    const previousApprovedPrices = await getPreviousApprovedPrices(period, region, category);
+
+    // Calculate KPIs
+    let totalCurrentValue = 0;
+    let totalInitialValue = 0;
+    let totalPreviousValue = 0;
+    let totalBaseValue = 0;
+
+    let productsWithPrevious = 0;
+    let productsWithBase = 0;
+
+    matrixProducts.forEach(product => {
+      // Find the best current price (effective price from any supplier)
+      let bestCurrentPrice = 0;
+      let bestInitialPrice = 0;
+
+      Object.values(product.suppliers).forEach(supplierData => {
+        if (supplierData.hasPrice) {
+          const currentPrice = supplierData.pricePerUnit;
+          const initialPrice = supplierData.initialPrice || 0;
+
+          if (bestCurrentPrice === 0 || (currentPrice > 0 && currentPrice < bestCurrentPrice)) {
+            bestCurrentPrice = currentPrice;
+          }
+
+          if (bestInitialPrice === 0 || (initialPrice > 0 && initialPrice < bestInitialPrice)) {
+            bestInitialPrice = initialPrice;
+          }
+        }
+      });
+
+      // Calculate values for this product
+      const productTotalCurrent = bestCurrentPrice * product.quantity;
+      const productTotalInitial = bestInitialPrice * product.quantity;
+
+      totalCurrentValue += productTotalCurrent;
+      totalInitialValue += productTotalInitial;
+
+      // Previous period comparison
+      const previousPrice = previousApprovedPrices.get(product.productId);
+      if (previousPrice) {
+        totalPreviousValue += previousPrice.price * product.quantity;
+        productsWithPrevious++;
+      }
+
+      // Base quantity comparison (use product's base quantity if different from current)
+      const baseQuantity = allProducts.find(p => p.id === product.productId)?.baseQuantity || 1;
+      if (baseQuantity !== product.quantity && bestCurrentPrice > 0) {
+        totalBaseValue += bestCurrentPrice * baseQuantity;
+        productsWithBase++;
+      }
+    });
+
+    // Calculate comparison metrics
+    const comparisonVsInitial = {
+      difference: totalCurrentValue - totalInitialValue,
+      percentage: totalInitialValue > 0 ? ((totalCurrentValue - totalInitialValue) / totalInitialValue) * 100 : 0
+    };
+
+    const comparisonVsPrevious = {
+      difference: productsWithPrevious > 0 ? totalCurrentValue - totalPreviousValue : 0,
+      percentage: productsWithPrevious > 0 && totalPreviousValue > 0
+        ? ((totalCurrentValue - totalPreviousValue) / totalPreviousValue) * 100
+        : 0,
+      hasPreviousData: productsWithPrevious > 0
+    };
+
+    const comparisonVsBase = {
+      difference: productsWithBase > 0 ? totalCurrentValue - totalBaseValue : 0,
+      percentage: productsWithBase > 0 && totalBaseValue > 0
+        ? ((totalCurrentValue - totalBaseValue) / totalBaseValue) * 100
+        : 0,
+      hasBaseData: productsWithBase > 0
+    };
+
+    const overviewKPIs = {
+      totalCurrentValue,
+      comparisonVsInitial,
+      comparisonVsPrevious,
+      comparisonVsBase
+    };
+
+    console.log(`[getComparisonMatrix] KPIs calculated:`, {
+      totalCurrentValue: totalCurrentValue.toFixed(0),
+      vsInitial: `${comparisonVsInitial.percentage.toFixed(1)}%`,
+      vsPrevious: comparisonVsPrevious.hasPreviousData ? `${comparisonVsPrevious.percentage.toFixed(1)}%` : 'No data',
+      vsBase: comparisonVsBase.hasBaseData ? `${comparisonVsBase.percentage.toFixed(1)}%` : 'No data',
+      productsWithPrevious,
+      productsWithBase
+    });
+
     const finalMatrix = {
       products: matrixProducts,
       suppliers: matrixSuppliers,
@@ -438,6 +533,7 @@ export async function getComparisonMatrix(
       region,
       category,
       lastUpdated: new Date(),
+      overviewKPIs,
       availableSuppliers: Array.from(supplierStatsMap.values()),
     };
 
@@ -719,6 +815,88 @@ export async function approveQuotation(
     throw new Error(
       error instanceof Error ? error.message : "Lỗi khi phê duyệt báo giá"
     );
+  }
+}
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Get previous approved prices for a given region and current period
+ * This function finds the most recent period before the current one that has approved prices
+ */
+async function getPreviousApprovedPrices(
+  currentPeriod: string,
+  region: string,
+  category: string
+): Promise<Map<number, { price: number; period: string }>> {
+  try {
+    // Parse current period to find previous periods
+    const [year, month] = currentPeriod.split('-').map(Number);
+
+    // Generate a list of previous periods to check (up to 12 months back)
+    const previousPeriods: string[] = [];
+    for (let i = 1; i <= 12; i++) {
+      let prevYear = year;
+      let prevMonth = month - i;
+
+      while (prevMonth <= 0) {
+        prevMonth += 12;
+        prevYear -= 1;
+      }
+
+      // Generate all possible period formats for this month (XX can be any number)
+      for (let seq = 1; seq <= 31; seq++) {
+        const seqStr = seq.toString().padStart(2, '0');
+        previousPeriods.push(`${prevYear}-${prevMonth.toString().padStart(2, '0')}-${seqStr}`);
+      }
+    }
+
+    console.log(`[getPreviousApprovedPrices] Checking ${previousPeriods.length} previous periods for ${currentPeriod}`);
+
+    // Find approved prices from the most recent previous period
+    const previousApprovedPrices = await db
+      .select({
+        productId: quoteItems.productId,
+        approvedPrice: quoteItems.approvedPrice,
+        period: quotations.period,
+        updatedAt: quoteItems.updatedAt,
+      })
+      .from(quoteItems)
+      .innerJoin(quotations, eq(quoteItems.quotationId, quotations.id))
+      .innerJoin(products, eq(quoteItems.productId, products.id))
+      .where(
+        and(
+          inArray(quotations.period, previousPeriods),
+          eq(quotations.region, region),
+          eq(products.category, category),
+          eq(quotations.status, 'approved'),
+          sql`${quoteItems.approvedPrice} IS NOT NULL`
+        )
+      )
+      .orderBy(desc(quotations.period), desc(quoteItems.updatedAt));
+
+    console.log(`[getPreviousApprovedPrices] Found ${previousApprovedPrices?.length || 0} previous approved prices`);
+
+    // Build a map with the most recent approved price per product
+    const pricesMap = new Map<number, { price: number; period: string }>();
+
+    if (Array.isArray(previousApprovedPrices)) {
+      previousApprovedPrices.forEach(item => {
+        if (item?.productId && item?.approvedPrice && !pricesMap.has(item.productId)) {
+          pricesMap.set(item.productId, {
+            price: Number(item.approvedPrice),
+            period: item.period || 'unknown'
+          });
+        }
+      });
+    }
+
+    console.log(`[getPreviousApprovedPrices] Returning ${pricesMap.size} unique previous approved prices`);
+    return pricesMap;
+
+  } catch (error) {
+    console.error("Error in getPreviousApprovedPrices:", error);
+    return new Map();
   }
 }
 

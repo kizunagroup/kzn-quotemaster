@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
 import { getAvailablePeriods } from "@/lib/actions/quotations.actions";
 import {
@@ -320,45 +321,177 @@ export default function ComparisonPage() {
         </div>
       </div>
 
-      {/* Content Area - Conditional Rendering */}
-      {comparisonLoading ? (
-        <div className="bg-white rounded-lg border p-8">
-          <div className="text-center text-gray-500 space-y-4">
-            <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-            <p className="text-lg">Đang tải dữ liệu so sánh...</p>
-            <p className="text-sm">
-              Đang xử lý ma trận so sánh báo giá cho kỳ {period}, khu vực {region}, nhóm hàng {category}.
-            </p>
-          </div>
-        </div>
-      ) : comparisonError ? (
-        <div className="bg-white rounded-lg border p-8">
-          <div className="text-center space-y-4">
-            <div className="text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
-              <p className="text-lg font-medium">Lỗi tải dữ liệu</p>
-              <p className="text-sm mt-2">{comparisonError}</p>
+      {/* Overview Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tổng quan</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {comparisonLoading ? (
+            <div className="text-center text-gray-500 space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+              <p className="text-lg">Đang tải dữ liệu tổng quan...</p>
             </div>
-            <Button
-              onClick={handleCompareClick}
-              disabled={!isCompareEnabled}
-              variant="outline"
-            >
-              Thử lại
-            </Button>
-          </div>
-        </div>
-      ) : matrixData ? (
-        <ComparisonMatrix matrixData={matrixData} />
-      ) : (
-        <div className="bg-white rounded-lg border p-8">
-          <div className="text-center text-gray-500 space-y-2">
-            <p className="text-lg">Vui lòng chọn các tiêu chí và nhấn 'So sánh' để xem kết quả.</p>
-            <p className="text-sm">
-              Chọn kỳ báo giá, khu vực và nhóm hàng để hiển thị ma trận so sánh giá từ các nhà cung cấp.
-            </p>
-          </div>
-        </div>
-      )}
+          ) : comparisonError ? (
+            <div className="text-center space-y-4">
+              <div className="text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
+                <p className="text-lg font-medium">Lỗi tải dữ liệu</p>
+                <p className="text-sm mt-2">{comparisonError}</p>
+              </div>
+              <Button
+                onClick={handleCompareClick}
+                disabled={!isCompareEnabled}
+                variant="outline"
+              >
+                Thử lại
+              </Button>
+            </div>
+          ) : matrixData ? (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Total Current Value */}
+              <div className="text-center p-4 border rounded-lg">
+                <p className="text-sm text-muted-foreground">Tổng giá trị hiện tại</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {new Intl.NumberFormat('vi-VN', {
+                    style: 'currency',
+                    currency: 'VND',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                  }).format(matrixData.overviewKPIs.totalCurrentValue)}
+                </p>
+              </div>
+
+              {/* Comparison vs Initial */}
+              <div className="text-center p-4 border rounded-lg">
+                <p className="text-sm text-muted-foreground">So với giá ban đầu</p>
+                <p className={`text-2xl font-bold ${
+                  matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
+                    ? 'text-red-600'
+                    : matrixData.overviewKPIs.comparisonVsInitial.percentage < 0
+                      ? 'text-green-600'
+                      : 'text-gray-600'
+                }`}>
+                  {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0 ? '+' : ''}
+                  {matrixData.overviewKPIs.comparisonVsInitial.percentage.toFixed(1)}%
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {matrixData.overviewKPIs.comparisonVsInitial.difference > 0 ? '+' : ''}
+                  {new Intl.NumberFormat('vi-VN', {
+                    style: 'currency',
+                    currency: 'VND',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                  }).format(matrixData.overviewKPIs.comparisonVsInitial.difference)}
+                </p>
+              </div>
+
+              {/* Comparison vs Previous */}
+              <div className="text-center p-4 border rounded-lg">
+                <p className="text-sm text-muted-foreground">So với kỳ trước</p>
+                {matrixData.overviewKPIs.comparisonVsPrevious.hasPreviousData ? (
+                  <>
+                    <p className={`text-2xl font-bold ${
+                      matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0
+                        ? 'text-red-600'
+                        : matrixData.overviewKPIs.comparisonVsPrevious.percentage < 0
+                          ? 'text-green-600'
+                          : 'text-gray-600'
+                    }`}>
+                      {matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0 ? '+' : ''}
+                      {matrixData.overviewKPIs.comparisonVsPrevious.percentage.toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {matrixData.overviewKPIs.comparisonVsPrevious.difference > 0 ? '+' : ''}
+                      {new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      }).format(matrixData.overviewKPIs.comparisonVsPrevious.difference)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-gray-400">N/A</p>
+                    <p className="text-xs text-muted-foreground mt-1">Không có dữ liệu kỳ trước</p>
+                  </>
+                )}
+              </div>
+
+              {/* Comparison vs Base */}
+              <div className="text-center p-4 border rounded-lg">
+                <p className="text-sm text-muted-foreground">So với nhu cầu cơ bản</p>
+                {matrixData.overviewKPIs.comparisonVsBase.hasBaseData ? (
+                  <>
+                    <p className={`text-2xl font-bold ${
+                      matrixData.overviewKPIs.comparisonVsBase.percentage > 0
+                        ? 'text-red-600'
+                        : matrixData.overviewKPIs.comparisonVsBase.percentage < 0
+                          ? 'text-green-600'
+                          : 'text-gray-600'
+                    }`}>
+                      {matrixData.overviewKPIs.comparisonVsBase.percentage > 0 ? '+' : ''}
+                      {matrixData.overviewKPIs.comparisonVsBase.percentage.toFixed(1)}%
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {matrixData.overviewKPIs.comparisonVsBase.difference > 0 ? '+' : ''}
+                      {new Intl.NumberFormat('vi-VN', {
+                        style: 'currency',
+                        currency: 'VND',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                      }).format(matrixData.overviewKPIs.comparisonVsBase.difference)}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-gray-400">N/A</p>
+                    <p className="text-xs text-muted-foreground mt-1">Nhu cầu bằng cơ bản</p>
+                  </>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-gray-500 space-y-2">
+              <p className="text-lg">Vui lòng chọn các tiêu chí và nhấn 'So sánh' để xem tổng quan.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Details Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Chi tiết so sánh</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {comparisonLoading ? (
+            <div className="text-center text-gray-500 space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+              <p className="text-lg">Đang tải ma trận so sánh...</p>
+              <p className="text-sm">
+                Đang xử lý ma trận so sánh báo giá cho kỳ {period}, khu vực {region}, nhóm hàng {category}.
+              </p>
+            </div>
+          ) : comparisonError ? (
+            <div className="text-center space-y-4">
+              <div className="text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
+                <p className="text-lg font-medium">Lỗi tải dữ liệu chi tiết</p>
+                <p className="text-sm mt-2">{comparisonError}</p>
+              </div>
+            </div>
+          ) : matrixData ? (
+            <ComparisonMatrix matrixData={matrixData} />
+          ) : (
+            <div className="text-center text-gray-500 space-y-2">
+              <p className="text-lg">Chọn các tiêu chí và nhấn 'So sánh' để xem chi tiết ma trận.</p>
+              <p className="text-sm">
+                Ma trận sẽ hiển thị so sánh giá từ các nhà cung cấp cho từng sản phẩm.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

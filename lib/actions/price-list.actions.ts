@@ -31,7 +31,7 @@ export const GetAvailablePeriodsSchema = z.object({
 
 export const GetPriceListMatrixSchema = z.object({
   teamId: z.number().positive("ID đội/bếp không hợp lệ"),
-  period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Kỳ báo giá phải có định dạng YYYY-MM-DD"),
+  period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Kỳ báo giá phải có định dạng YYYY-MM-XX"),
 });
 
 // ==================== TYPES ====================

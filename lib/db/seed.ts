@@ -727,16 +727,30 @@ export async function seedDatabase() {
   const quotationData = [];
   const quotationItemsData = [];
 
-  // Generate periods for the last 6 months
+  // Generate periods in YYYY-MM-XX format (sequence-based)
   const periods = [];
   const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1; // getMonth() returns 0-11
+
+  // Generate sequential periods for the last 6 months
   for (let i = 0; i < 6; i++) {
-    const date = new Date(
-      currentDate.getFullYear(),
-      currentDate.getMonth() - i,
-      1
-    );
-    periods.push(date.toISOString().split("T")[0]);
+    let year = currentYear;
+    let month = currentMonth - i;
+
+    // Handle year rollover
+    if (month <= 0) {
+      month += 12;
+      year -= 1;
+    }
+
+    // Create multiple sequence periods per month (01, 02, etc.)
+    const sequenceCount = Math.floor(Math.random() * 3) + 1; // 1-3 sequences per month
+    for (let seq = 1; seq <= sequenceCount; seq++) {
+      const formattedMonth = month.toString().padStart(2, '0');
+      const formattedSequence = seq.toString().padStart(2, '0');
+      periods.push(`${year}-${formattedMonth}-${formattedSequence}`);
+    }
   }
 
   const statuses = ["pending", "approved", "cancelled", "negotiation"];

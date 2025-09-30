@@ -263,7 +263,7 @@ export const quotations = pgTable(
       table.region
     ),
     periodFormatCheck: check(
-      "period_format",
+      "period_format_sequence",
       sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`
     ),
     validStatus: check(
@@ -356,7 +356,7 @@ export const priceHistory = pgTable(
   (table) => ({
     nonNegativePrice: check("non_negative_price", sql`${table.price} >= 0`),
     periodFormatCheck: check(
-      "period_format",
+      "period_format_sequence",
       sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`
     ),
     validPriceType: check(
@@ -422,7 +422,7 @@ export const kitchenPeriodDemands = pgTable(
     uniqueDemand: unique().on(table.teamId, table.productId, table.period),
     positiveQuantity: check("positive_quantity", sql`${table.quantity} > 0`),
     periodFormatCheck: check(
-      "period_format",
+      "period_format_sequence",
       sql`${table.period} ~ '^\\d{4}-\\d{2}-\\d{2}$'`
     ),
     validStatus: check(
