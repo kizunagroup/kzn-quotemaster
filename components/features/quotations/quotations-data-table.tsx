@@ -56,7 +56,8 @@ import { QuotationsTableToolbar, getStatusLabel, getStatusVariant } from "./quot
 const createColumns = (
   permissions: PermissionSet | null,
   onViewDetails: (quotation: Quotation) => void,
-  onSort: (column: string) => void
+  onSort: (column: string) => void,
+  onRefresh: () => void
 ): ColumnDef<Quotation>[] => [
   {
     accessorKey: "period",
@@ -144,7 +145,7 @@ const createColumns = (
     enableHiding: false,
     cell: ({ row }) => {
       const quotation = row.original;
-      return <QuotationActions quotation={quotation} permissions={permissions} onViewDetails={handleViewDetailsClick} onRefresh={refresh} />;
+      return <QuotationActions quotation={quotation} permissions={permissions} onViewDetails={onViewDetails} onRefresh={onRefresh} />;
     },
   },
 ];
@@ -373,8 +374,8 @@ export function QuotationsDataTable() {
   const [rowSelection, setRowSelection] = React.useState({});
 
   const columns = React.useMemo(
-    () => createColumns(permissions, handleViewDetailsClick, setSort),
-    [permissions, handleViewDetailsClick, setSort]
+    () => createColumns(permissions, handleViewDetailsClick, setSort, refresh),
+    [permissions, handleViewDetailsClick, setSort, refresh]
   );
 
   const table = useReactTable({
