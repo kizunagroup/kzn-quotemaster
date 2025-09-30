@@ -65,24 +65,14 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
     }).format(price);
   };
 
-  // Helper function to get price styling based on status and best price
-  const getPriceStyle = (supplierData: any, isBestPrice: boolean) => {
-    // Approved prices get light green background
-    if (supplierData.approvedPrice) {
-      return "bg-green-100 text-green-800 font-medium";
-    }
-
+  // Helper function to get price styling based on best price only
+  const getPriceStyle = (isBestPrice: boolean) => {
     // Best price gets green bold text
     if (isBestPrice) {
       return "text-green-600 font-bold";
     }
 
-    // Negotiated prices get orange text
-    if (supplierData.negotiatedPrice) {
-      return "text-orange-600 font-medium";
-    }
-
-    // Default for initial prices
+    // Default for all other prices
     return "text-gray-900";
   };
 
@@ -101,7 +91,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
         <CardContent>
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader>
+              <TableHeader className="sticky top-0 bg-white z-10">
                 <TableRow>
                   {/* Column 1: Mã SP */}
                   <TableHead className="min-w-[100px]">Mã SP</TableHead>
@@ -119,24 +109,45 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                   <TableHead className="min-w-[120px] text-center">Giá duyệt kỳ trước</TableHead>
 
                   {/* Dynamic supplier columns - simplified headers */}
-                  {suppliers.map((supplier) => (
-                    <TableHead
-                      key={supplier.id}
-                      className="min-w-[150px] text-center"
-                    >
-                      <div className="space-y-1">
-                        <div className="font-medium">{supplier.code}</div>
-                        <div className="text-xs text-muted-foreground truncate">
-                          {supplier.name}
+                  {suppliers.map((supplier) => {
+                    // Get border color based on quotation status from matrixData
+                    const supplierData = matrixData.availableSuppliers.find(s => s.id === supplier.id);
+                    const getBorderClass = (status?: string) => {
+                      if (!status) return '';
+                      switch (status) {
+                        case 'approved':
+                          return 'border-b-2 border-green-500';
+                        case 'negotiation':
+                          return 'border-b-2 border-orange-500';
+                        case 'pending':
+                          return 'border-b-2 border-slate-400';
+                        default:
+                          return '';
+                      }
+                    };
+
+                    return (
+                      <TableHead
+                        key={supplier.id}
+                        className={cn(
+                          "min-w-[150px] text-center",
+                          getBorderClass(supplierData?.quotationStatus)
+                        )}
+                      >
+                        <div className="space-y-1">
+                          <div className="font-medium">{supplier.code}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {supplier.name}
+                          </div>
                         </div>
-                      </div>
-                    </TableHead>
-                  ))}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
               </TableHeader>
 
               <TableBody>
-                {matrixData.products.map((product) => {
+                {matrixData.products.map((product, index) => {
                   // Calculate base price (lowest initial price or first available)
                   const supplierPrices = Object.values(product.suppliers).filter(s => s.initialPrice);
                   const basePrice = supplierPrices.length > 0
@@ -144,7 +155,10 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                     : undefined;
 
                   return (
-                    <TableRow key={product.productId}>
+                    <TableRow
+                      key={product.productId}
+                      className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                    >
                       {/* Column 1: Product Code */}
                       <TableCell className="font-medium">
                         <div className="space-y-1">
@@ -216,7 +230,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                               {/* Current Price Display with Color Coding */}
                               <div className={cn(
                                 "text-lg px-2 py-1 rounded",
-                                getPriceStyle(supplierData, isBestPrice)
+                                getPriceStyle(isBestPrice)
                               )}>
                                 {formatPrice(currentPrice)}
                               </div>
@@ -262,29 +276,15 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
             </Table>
           </div>
 
-          {/* Updated Legend for Color System */}
+          {/* Simplified Legend */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <div className="space-y-3">
-              <div className="font-medium text-gray-700">Hệ thống màu sắc giá cả</div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 bg-green-100 border rounded"></div>
-                  <span>Đã duyệt</span>
-                </div>
+              <div className="font-medium text-gray-700">Chú thích</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border rounded font-bold text-green-600 flex items-center justify-center text-xs">G</div>
-                  <span>Giá tốt nhất</span>
+                  <span>Giá tốt nhất trong hàng</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border rounded text-orange-600 flex items-center justify-center text-xs">N</div>
-                  <span>Đàm phán</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border rounded text-gray-900 flex items-center justify-center text-xs">B</div>
-                  <span>Ban đầu</span>
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground mt-2">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1">
                     <TrendingUpIcon className="h-3 w-3 text-red-600" />

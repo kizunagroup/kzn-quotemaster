@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
 import { getAvailablePeriods } from "@/lib/actions/quotations.actions";
 import {
@@ -19,7 +20,7 @@ import {
   getCategoriesForPeriodAndRegion
 } from "@/lib/actions/quote-comparison.actions";
 import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
-import { Loader2, FileSpreadsheet, CheckCircle } from "lucide-react";
+import { Loader2, FileSpreadsheet, CheckCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { exportTargetPriceFile, initiateBatchNegotiationAndExport } from "@/lib/actions/quote-comparison.actions";
 import { ApprovalModal } from "@/components/features/quote-comparison/approval-modal";
 import { toast } from "sonner";
@@ -418,6 +419,36 @@ export default function ComparisonPage() {
               "So sánh"
             )}
           </Button>
+        </div>
+      </div>
+
+      {/* Color Legend */}
+      <div className="flex flex-wrap items-center gap-6 px-4 py-3 bg-gray-50 rounded-lg text-sm text-muted-foreground">
+        <div className="flex items-center gap-4">
+          <span className="font-medium text-gray-700">Ý nghĩa màu sắc:</span>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 bg-green-100 border rounded"></div>
+            <span>Đã duyệt</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border rounded font-bold text-green-600 flex items-center justify-center text-xs">G</div>
+            <span>Giá tốt nhất</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 border rounded text-orange-600 flex items-center justify-center text-xs">N</div>
+            <span>Đàm phán</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          <span className="font-medium text-gray-700">Thay đổi giá:</span>
+          <div className="flex items-center gap-1">
+            <TrendingUp className="h-3 w-3 text-red-600" />
+            <span>Tăng</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <TrendingDown className="h-3 w-3 text-green-600" />
+            <span>Giảm</span>
+          </div>
         </div>
       </div>
 
