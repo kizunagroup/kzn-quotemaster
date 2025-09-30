@@ -13,7 +13,7 @@ import {
 import { PriceBadge } from "@/components/ui/price-badge";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { ComparisonMatrixData } from "@/lib/actions/quote-comparison.actions";
+import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 
 export interface ComparisonMatrixProps {
   matrixData: ComparisonMatrixData;

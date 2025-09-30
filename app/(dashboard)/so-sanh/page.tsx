@@ -13,7 +13,8 @@ import {
 import { RegionAutocomplete } from "@/components/ui/region-autocomplete";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
 import { getAvailablePeriods, getAvailableCategories } from "@/lib/actions/quotations.actions";
-import { getComparisonMatrix, type ComparisonMatrixData } from "@/lib/actions/quote-comparison.actions";
+import { getComparisonMatrix } from "@/lib/actions/quote-comparison.actions";
+import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 import { Loader2 } from "lucide-react";
 
 export default function ComparisonPage() {
