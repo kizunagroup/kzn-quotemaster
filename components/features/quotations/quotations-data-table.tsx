@@ -144,7 +144,7 @@ const createColumns = (
     enableHiding: false,
     cell: ({ row }) => {
       const quotation = row.original;
-      return <QuotationActions quotation={quotation} permissions={permissions} onViewDetails={onViewDetails} />;
+      return <QuotationActions quotation={quotation} permissions={permissions} onViewDetails={handleViewDetailsClick} onRefresh={refresh} />;
     },
   },
 ];
@@ -153,11 +153,13 @@ const createColumns = (
 function QuotationActions({
   quotation,
   permissions,
-  onViewDetails
+  onViewDetails,
+  onRefresh
 }: {
   quotation: Quotation;
   permissions: PermissionSet | null;
   onViewDetails: (quotation: Quotation) => void;
+  onRefresh: () => void;
 }) {
   const router = useRouter();
 
@@ -179,7 +181,7 @@ function QuotationActions({
       try {
         await cancelQuotation(quotation.id);
         toast.success("Đã hủy báo giá thành công");
-        // Parent component will refresh data
+        onRefresh(); // Refresh the data table
       } catch (error) {
         console.error("Error cancelling quotation:", error);
         toast.error("Lỗi khi hủy báo giá");

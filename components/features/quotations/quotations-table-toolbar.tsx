@@ -35,7 +35,7 @@ export const statusOptions = [
   { value: "all", label: "Tất cả trạng thái" },
   { value: "pending", label: "Chờ Duyệt" },
   { value: "approved", label: "Đã Duyệt" },
-  { value: "negotiation", label: "Đang Thương Lượng" },
+  { value: "negotiation", label: "Đàm phán" },
   { value: "cancelled", label: "Đã Hủy" },
 ] as const;
 
