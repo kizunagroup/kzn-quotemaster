@@ -112,6 +112,15 @@ export async function getComparisonMatrix(
         region,
         category,
         lastUpdated: new Date(),
+        overviewKPIs: {
+          totalCurrentValue: 0,
+          comparisonVsInitial: { difference: 0, percentage: 0 },
+          comparisonVsPrevious: { difference: 0, percentage: 0, hasPreviousData: false },
+          comparisonVsBase: { difference: 0, percentage: 0, hasBaseData: false },
+          totalProducts: 0,
+          totalSuppliers: 0,
+          productsWithPrevious: 0
+        },
         availableSuppliers: [],
       };
     }
@@ -487,10 +496,14 @@ export async function getComparisonMatrix(
         productsWithPrevious++;
       }
 
-      // Base quantity comparison (use product's base quantity if different from current)
-      if (product.baseQuantity !== product.quantity && bestCurrentPrice > 0) {
-        totalBaseValue += bestCurrentPrice * product.baseQuantity;
-        productsWithBase++;
+      // Base quantity comparison (always include for comparison with base quantities)
+      if (bestCurrentPrice > 0) {
+        const baseTotal = bestCurrentPrice * product.baseQuantity;
+        totalBaseValue += baseTotal;
+        // Only count as having "base data" if base quantity differs from current
+        if (product.baseQuantity !== product.quantity) {
+          productsWithBase++;
+        }
       }
     });
 
@@ -520,7 +533,10 @@ export async function getComparisonMatrix(
       totalCurrentValue,
       comparisonVsInitial,
       comparisonVsPrevious,
-      comparisonVsBase
+      comparisonVsBase,
+      totalProducts: matrixProducts.length,
+      totalSuppliers: matrixSuppliers.length,
+      productsWithPrevious
     };
 
     console.log(`[getComparisonMatrix] KPIs calculated:`, {

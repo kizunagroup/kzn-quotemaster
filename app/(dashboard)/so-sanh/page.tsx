@@ -347,108 +347,127 @@ export default function ComparisonPage() {
               </Button>
             </div>
           ) : matrixData ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Total Current Value */}
-              <div className="text-center p-4 border rounded-lg">
-                <p className="text-sm text-muted-foreground">Tổng giá trị hiện tại</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {new Intl.NumberFormat('vi-VN', {
-                    style: 'currency',
-                    currency: 'VND',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0
-                  }).format(matrixData.overviewKPIs.totalCurrentValue)}
-                </p>
+            <div className="space-y-6">
+              {/* Main KPI Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Total Current Value */}
+                <div className="text-center p-4 border rounded-lg">
+                  <p className="text-sm text-muted-foreground">Tổng giá trị hiện tại</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {new Intl.NumberFormat('vi-VN', {
+                      style: 'currency',
+                      currency: 'VND',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    }).format(matrixData.overviewKPIs.totalCurrentValue)}
+                  </p>
+                </div>
+
+                {/* Comparison vs Initial */}
+                <div className="text-center p-4 border rounded-lg">
+                  <p className="text-sm text-muted-foreground">So với giá ban đầu</p>
+                  <p className={`text-2xl font-bold ${
+                    matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
+                      ? 'text-red-600'
+                      : matrixData.overviewKPIs.comparisonVsInitial.percentage < 0
+                        ? 'text-green-600'
+                        : 'text-gray-600'
+                  }`}>
+                    {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0 ? '+' : ''}
+                    {matrixData.overviewKPIs.comparisonVsInitial.percentage.toFixed(1)}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {matrixData.overviewKPIs.comparisonVsInitial.difference > 0 ? '+' : ''}
+                    {new Intl.NumberFormat('vi-VN', {
+                      style: 'currency',
+                      currency: 'VND',
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 0
+                    }).format(matrixData.overviewKPIs.comparisonVsInitial.difference)}
+                  </p>
+                </div>
+
+                {/* Comparison vs Previous */}
+                <div className="text-center p-4 border rounded-lg">
+                  <p className="text-sm text-muted-foreground">So với kỳ trước</p>
+                  {matrixData.overviewKPIs.comparisonVsPrevious.hasPreviousData ? (
+                    <>
+                      <p className={`text-2xl font-bold ${
+                        matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0
+                          ? 'text-red-600'
+                          : matrixData.overviewKPIs.comparisonVsPrevious.percentage < 0
+                            ? 'text-green-600'
+                            : 'text-gray-600'
+                      }`}>
+                        {matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0 ? '+' : ''}
+                        {matrixData.overviewKPIs.comparisonVsPrevious.percentage.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {matrixData.overviewKPIs.comparisonVsPrevious.difference > 0 ? '+' : ''}
+                        {new Intl.NumberFormat('vi-VN', {
+                          style: 'currency',
+                          currency: 'VND',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        }).format(matrixData.overviewKPIs.comparisonVsPrevious.difference)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold text-gray-400">N/A</p>
+                      <p className="text-xs text-muted-foreground mt-1">Không có dữ liệu kỳ trước</p>
+                    </>
+                  )}
+                </div>
+
+                {/* Comparison vs Base */}
+                <div className="text-center p-4 border rounded-lg">
+                  <p className="text-sm text-muted-foreground">So với nhu cầu cơ bản</p>
+                  {matrixData.overviewKPIs.comparisonVsBase.hasBaseData ? (
+                    <>
+                      <p className={`text-2xl font-bold ${
+                        matrixData.overviewKPIs.comparisonVsBase.percentage > 0
+                          ? 'text-red-600'
+                          : matrixData.overviewKPIs.comparisonVsBase.percentage < 0
+                            ? 'text-green-600'
+                            : 'text-gray-600'
+                      }`}>
+                        {matrixData.overviewKPIs.comparisonVsBase.percentage > 0 ? '+' : ''}
+                        {matrixData.overviewKPIs.comparisonVsBase.percentage.toFixed(1)}%
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {matrixData.overviewKPIs.comparisonVsBase.difference > 0 ? '+' : ''}
+                        {new Intl.NumberFormat('vi-VN', {
+                          style: 'currency',
+                          currency: 'VND',
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 0
+                        }).format(matrixData.overviewKPIs.comparisonVsBase.difference)}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-2xl font-bold text-gray-400">N/A</p>
+                      <p className="text-xs text-muted-foreground mt-1">Nhu cầu bằng cơ bản</p>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* Comparison vs Initial */}
-              <div className="text-center p-4 border rounded-lg">
-                <p className="text-sm text-muted-foreground">So với giá ban đầu</p>
-                <p className={`text-2xl font-bold ${
-                  matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
-                    ? 'text-red-600'
-                    : matrixData.overviewKPIs.comparisonVsInitial.percentage < 0
-                      ? 'text-green-600'
-                      : 'text-gray-600'
-                }`}>
-                  {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0 ? '+' : ''}
-                  {matrixData.overviewKPIs.comparisonVsInitial.percentage.toFixed(1)}%
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {matrixData.overviewKPIs.comparisonVsInitial.difference > 0 ? '+' : ''}
-                  {new Intl.NumberFormat('vi-VN', {
-                    style: 'currency',
-                    currency: 'VND',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0
-                  }).format(matrixData.overviewKPIs.comparisonVsInitial.difference)}
-                </p>
-              </div>
-
-              {/* Comparison vs Previous */}
-              <div className="text-center p-4 border rounded-lg">
-                <p className="text-sm text-muted-foreground">So với kỳ trước</p>
-                {matrixData.overviewKPIs.comparisonVsPrevious.hasPreviousData ? (
-                  <>
-                    <p className={`text-2xl font-bold ${
-                      matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0
-                        ? 'text-red-600'
-                        : matrixData.overviewKPIs.comparisonVsPrevious.percentage < 0
-                          ? 'text-green-600'
-                          : 'text-gray-600'
-                    }`}>
-                      {matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0 ? '+' : ''}
-                      {matrixData.overviewKPIs.comparisonVsPrevious.percentage.toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {matrixData.overviewKPIs.comparisonVsPrevious.difference > 0 ? '+' : ''}
-                      {new Intl.NumberFormat('vi-VN', {
-                        style: 'currency',
-                        currency: 'VND',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0
-                      }).format(matrixData.overviewKPIs.comparisonVsPrevious.difference)}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-2xl font-bold text-gray-400">N/A</p>
-                    <p className="text-xs text-muted-foreground mt-1">Không có dữ liệu kỳ trước</p>
-                  </>
-                )}
-              </div>
-
-              {/* Comparison vs Base */}
-              <div className="text-center p-4 border rounded-lg">
-                <p className="text-sm text-muted-foreground">So với nhu cầu cơ bản</p>
-                {matrixData.overviewKPIs.comparisonVsBase.hasBaseData ? (
-                  <>
-                    <p className={`text-2xl font-bold ${
-                      matrixData.overviewKPIs.comparisonVsBase.percentage > 0
-                        ? 'text-red-600'
-                        : matrixData.overviewKPIs.comparisonVsBase.percentage < 0
-                          ? 'text-green-600'
-                          : 'text-gray-600'
-                    }`}>
-                      {matrixData.overviewKPIs.comparisonVsBase.percentage > 0 ? '+' : ''}
-                      {matrixData.overviewKPIs.comparisonVsBase.percentage.toFixed(1)}%
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {matrixData.overviewKPIs.comparisonVsBase.difference > 0 ? '+' : ''}
-                      {new Intl.NumberFormat('vi-VN', {
-                        style: 'currency',
-                        currency: 'VND',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0
-                      }).format(matrixData.overviewKPIs.comparisonVsBase.difference)}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-2xl font-bold text-gray-400">N/A</p>
-                    <p className="text-xs text-muted-foreground mt-1">Nhu cầu bằng cơ bản</p>
-                  </>
-                )}
+              {/* Statistics Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">Tổng sản phẩm</p>
+                  <p className="text-xl font-semibold text-gray-700">{matrixData.overviewKPIs.totalProducts}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">Nhà cung cấp</p>
+                  <p className="text-xl font-semibold text-gray-700">{matrixData.overviewKPIs.totalSuppliers}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">Có giá kỳ trước</p>
+                  <p className="text-xl font-semibold text-gray-700">{matrixData.overviewKPIs.productsWithPrevious} SP</p>
+                </div>
               </div>
             </div>
           ) : (

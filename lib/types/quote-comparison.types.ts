@@ -48,6 +48,9 @@ export interface OverviewKPIs {
     percentage: number;
     hasBaseData: boolean;
   };
+  totalProducts: number;
+  totalSuppliers: number;
+  productsWithPrevious: number;
 }
 
 export interface ComparisonMatrixData extends ComparisonMatrix {

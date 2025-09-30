@@ -92,14 +92,26 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
     return { difference, percentage };
   };
 
-  // Helper function to format currency
+  // Helper function to format price (simplified without currency symbol)
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
     }).format(price);
+  };
+
+  // Helper function to get price styling based on status
+  const getPriceStyle = (supplierData: any, isBestPrice: boolean) => {
+    if (supplierData.approvedPrice) {
+      return "bg-green-100 text-green-800 font-medium";
+    }
+    if (isBestPrice) {
+      return "text-green-600 font-bold";
+    }
+    if (supplierData.negotiatedPrice) {
+      return "text-orange-600";
+    }
+    return "text-gray-900";
   };
 
   return (
@@ -190,19 +202,16 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                         <div className="space-y-1">
                           <div className="font-medium">{product.productName}</div>
                           <div className="text-xs text-muted-foreground">
-                            SL: {product.quantity.toLocaleString('vi-VN')} {product.unit}
+                            SL: {product.quantity.toLocaleString('vi-VN')}
                           </div>
                         </div>
                       </TableCell>
 
                       {/* Base Price */}
-                      <TableCell className="text-center">
+                      <TableCell className="text-center font-mono">
                         {basePrice ? (
-                          <div className="space-y-1">
-                            <div className="font-medium text-gray-600">
-                              {formatPrice(basePrice)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">/ {product.unit}</div>
+                          <div className="font-medium text-gray-600">
+                            {formatPrice(basePrice)}
                           </div>
                         ) : (
                           <div className="text-gray-400 text-sm">N/A</div>
@@ -210,13 +219,10 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       </TableCell>
 
                       {/* Previous Approved Price */}
-                      <TableCell className="text-center">
+                      <TableCell className="text-center font-mono">
                         {product.previousApprovedPrice ? (
-                          <div className="space-y-1">
-                            <div className="font-medium text-blue-600">
-                              {formatPrice(product.previousApprovedPrice)}
-                            </div>
-                            <div className="text-xs text-muted-foreground">/ {product.unit}</div>
+                          <div className="font-medium text-blue-600">
+                            {formatPrice(product.previousApprovedPrice)}
                           </div>
                         ) : (
                           <div className="text-gray-400 text-sm">Chưa có</div>
@@ -240,24 +246,14 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                         const isBestPrice = product.bestSupplierId === supplier.id;
 
                         return (
-                          <TableCell key={supplier.id} className="text-center">
-                            <div className="space-y-3">
-                              {/* Current Price Display with PriceBadge */}
-                              <div className="space-y-1">
-                                <PriceBadge
-                                  price={currentPrice}
-                                  isBestPrice={isBestPrice}
-                                  size="sm"
-                                  currency={supplierData.currency}
-                                />
-                                <div className="text-xs text-muted-foreground">/ {product.unit}</div>
-
-                                {/* Best Price Badge */}
-                                {isBestPrice && (
-                                  <Badge variant="default" className="text-xs bg-green-100 text-green-800">
-                                    Giá tốt nhất
-                                  </Badge>
-                                )}
+                          <TableCell key={supplier.id} className="text-center font-mono">
+                            <div className="space-y-2">
+                              {/* Current Price Display with Color Coding */}
+                              <div className={cn(
+                                "text-lg px-2 py-1 rounded",
+                                getPriceStyle(supplierData, isBestPrice)
+                              )}>
+                                {formatPrice(currentPrice)}
                               </div>
 
                               {/* Variance Display */}
@@ -290,23 +286,6 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                   </TooltipContent>
                                 </Tooltip>
                               )}
-
-                              {/* Price Status Badge */}
-                              <div>
-                                {supplierData.approvedPrice ? (
-                                  <Badge variant="default" className="text-xs bg-green-100 text-green-800">
-                                    Đã duyệt
-                                  </Badge>
-                                ) : supplierData.negotiatedPrice ? (
-                                  <Badge variant="secondary" className="text-xs">
-                                    Đàm phán
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs">
-                                    Báo giá ban đầu
-                                  </Badge>
-                                )}
-                              </div>
                             </div>
                           </TableCell>
                         );
@@ -318,31 +297,27 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
             </Table>
           </div>
 
-          {/* Matrix summary information */}
+          {/* Legend for Color System */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-              <div className="space-y-1">
-                <div className="font-medium text-gray-700">Thống kê</div>
-                <div>Sản phẩm: {matrixData.products.length}</div>
-                <div>Nhà cung cấp: {suppliers.length}</div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="font-medium text-gray-700">Phạm vi</div>
-                <div>Kỳ: {period}</div>
-                <div>Khu vực: {region}</div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="font-medium text-gray-700">Dữ liệu trước</div>
-                <div>
-                  Có giá kỳ trước: {matrixData.products.filter(p => p.previousApprovedPrice).length} SP
+            <div className="space-y-3">
+              <div className="font-medium text-gray-700">Hệ thống màu sắc giá cả</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-green-100 border rounded"></div>
+                  <span>Đã duyệt</span>
                 </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="font-medium text-gray-700">Cập nhật</div>
-                <div>{matrixData.lastUpdated.toLocaleString('vi-VN')}</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border rounded font-bold text-green-600 flex items-center justify-center text-xs">G</div>
+                  <span>Giá tốt nhất</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border rounded text-orange-600 flex items-center justify-center text-xs">N</div>
+                  <span>Đàm phán</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border rounded text-gray-900 flex items-center justify-center text-xs">B</div>
+                  <span>Ban đầu</span>
+                </div>
               </div>
             </div>
           </div>
