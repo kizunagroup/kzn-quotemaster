@@ -423,8 +423,32 @@ export default function ComparisonPage() {
 
       {/* Overview Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Tổng quan</CardTitle>
+          {matrixData && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleBatchNegotiationAndExport}
+                disabled={batchActionLoading}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Xuất & Đàm phán
+              </Button>
+              <Button
+                onClick={handleOpenApprovalModal}
+                disabled={!matrixData || matrixData.availableSuppliers.length === 0}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Duyệt giá
+              </Button>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           {comparisonLoading ? (
@@ -578,50 +602,6 @@ export default function ComparisonPage() {
         </CardContent>
       </Card>
 
-      {/* Actions Section */}
-      {matrixData && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Hành động</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                onClick={handleBatchNegotiationAndExport}
-                disabled={batchActionLoading}
-                className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700"
-              >
-                {batchActionLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Đang xử lý...
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="h-4 w-4" />
-                    Xuất Giá mục tiêu & Đàm phán
-                  </>
-                )}
-              </Button>
-
-              <Button
-                onClick={handleOpenApprovalModal}
-                disabled={!matrixData || matrixData.availableSuppliers.length === 0}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <CheckCircle className="h-4 w-4" />
-                Duyệt giá...
-              </Button>
-            </div>
-
-            <div className="mt-4 text-sm text-muted-foreground">
-              <p><strong>Xuất Giá mục tiêu & Đàm phán:</strong> Chuyển tất cả báo giá đang chờ sang trạng thái đàm phán và xuất file Excel với giá mục tiêu.</p>
-              <p className="mt-1"><strong>Duyệt giá:</strong> Mở modal để chọn và phê duyệt báo giá từ các nhà cung cấp.</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Details Section */}
       <Card>
