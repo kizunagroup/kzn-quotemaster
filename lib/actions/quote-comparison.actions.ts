@@ -407,68 +407,14 @@ export async function getComparisonMatrix(
         )
       );
 
-    // STEP 7b: Get regional quotation data for each supplier
-    console.log(`[getComparisonMatrix] Fetching regional quotation data...`);
-    const regionalQuotationsQuery = await db
-      .select({
-        supplierId: suppliers.id,
-        supplierCode: suppliers.supplierCode,
-        supplierName: suppliers.name,
-        supplierStatus: suppliers.status,
-        quotationId: quotations.id,
-        quotationStatus: quotations.status,
-        quotationSubmittedAt: quotations.submittedAt,
-        quotationLastUpdated: quotations.updatedAt,
-      })
-      .from(suppliers)
-      .leftJoin(quotations, and(
-        eq(quotations.supplierId, suppliers.id),
-        eq(quotations.period, period),
-        eq(quotations.region, region),
-        category ? eq(quotations.category, category) : undefined
-      ))
-      .where(eq(suppliers.status, 'active'));
+    // STEP 7b: HYPER-DEFENSIVE DATABASE QUERIES WITH MANUAL JOINS
+    console.log(`[getComparisonMatrix] === STARTING HYPER-DEFENSIVE DATA FETCHING ===`);
 
-    const supplierStatsMap = new Map();
-
-    // Initialize suppliers with regional quotation data
-    if (Array.isArray(regionalQuotationsQuery) && regionalQuotationsQuery.length > 0) {
-      regionalQuotationsQuery.forEach(item => {
-        // Robust null-safety checks for LEFT JOIN results
-        if (!item || typeof item !== 'object' || !item.supplierId) {
-          console.warn(`[getComparisonMatrix] Skipping invalid supplier data:`, item);
-          return;
-        }
-
-        if (!supplierStatsMap.has(item.supplierId)) {
-          supplierStatsMap.set(item.supplierId, {
-            id: item.supplierId,
-            code: item.supplierCode || '',
-            name: item.supplierName || '',
-            status: item.supplierStatus || 'unknown',
-            // NEW: Add quotation-level data with null-safety checks
-            quotationId: item.quotationId ?? null,
-            quotationStatus: (item.quotationStatus as 'draft' | 'submitted' | 'negotiation' | 'approved' | 'rejected') ?? null,
-            quotationSubmittedAt: item.quotationSubmittedAt ?? null,
-            quotationLastUpdated: item.quotationLastUpdated ?? null,
-            // Statistics (will be populated below)
-            totalQuotations: 0,
-            pendingQuotations: 0,
-            negotiationQuotations: 0,
-            approvedQuotations: 0,
-          });
-        }
-      });
-    } else {
-      console.warn(`[getComparisonMatrix] No regional quotation data found for period=${period}, region=${region}, category=${category}`);
-    }
-
-    // Ensure we have at least basic supplier data even if no regional quotations exist
-    if (supplierStatsMap.size === 0) {
-      console.log(`[getComparisonMatrix] No suppliers with regional quotations found, falling back to active suppliers query...`);
-
-      // Fallback: Get all active suppliers without quotation data
-      const activeSuppliers = await db
+    // Query 1: Get ALL active suppliers first
+    let allActiveSuppliers;
+    try {
+      console.log(`[getComparisonMatrix] Step 1: Fetching active suppliers...`);
+      allActiveSuppliers = await db
         .select({
           id: suppliers.id,
           supplierCode: suppliers.supplierCode,
@@ -478,61 +424,228 @@ export async function getComparisonMatrix(
         .from(suppliers)
         .where(eq(suppliers.status, 'active'));
 
-      activeSuppliers.forEach(supplier => {
-        if (supplier.id) {
-          supplierStatsMap.set(supplier.id, {
+      console.log(`[getComparisonMatrix] Step 1 RESULT: Found ${allActiveSuppliers.length} active suppliers`);
+      if (allActiveSuppliers.length > 0) {
+        console.log(`[getComparisonMatrix] Step 1 SAMPLE:`, allActiveSuppliers[0]);
+      }
+    } catch (error) {
+      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 1 - fetching suppliers:', error);
+      throw new Error(`Failed to fetch suppliers: ${error.message}`);
+    }
+
+    // Query 2: Get regional quotations separately
+    let regionalQuotations;
+    try {
+      console.log(`[getComparisonMatrix] Step 2: Fetching regional quotations for period=${period}, region=${region}, category=${category}...`);
+      const quotationWhere = [
+        eq(quotations.period, period),
+        eq(quotations.region, region)
+      ];
+
+      if (category) {
+        quotationWhere.push(eq(quotations.category, category));
+      }
+
+      regionalQuotations = await db
+        .select({
+          id: quotations.id,
+          supplierId: quotations.supplierId,
+          status: quotations.status,
+          submittedAt: quotations.submittedAt,
+          updatedAt: quotations.updatedAt,
+          period: quotations.period,
+          region: quotations.region,
+          category: quotations.category,
+        })
+        .from(quotations)
+        .where(and(...quotationWhere));
+
+      console.log(`[getComparisonMatrix] Step 2 RESULT: Found ${regionalQuotations.length} regional quotations`);
+      if (regionalQuotations.length > 0) {
+        console.log(`[getComparisonMatrix] Step 2 SAMPLE:`, regionalQuotations[0]);
+      }
+    } catch (error) {
+      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 2 - fetching quotations:', error);
+      throw new Error(`Failed to fetch quotations: ${error.message}`);
+    }
+
+    // Query 3: Get quotation statistics separately
+    let allQuotationStats;
+    try {
+      console.log(`[getComparisonMatrix] Step 3: Fetching quotation statistics...`);
+      allQuotationStats = await db
+        .select({
+          quotationId: quotations.id,
+          quotationStatus: quotations.status,
+          supplierId: quotations.supplierId,
+          supplierCode: suppliers.supplierCode,
+          supplierName: suppliers.name,
+          supplierStatus: suppliers.status,
+        })
+        .from(quotations)
+        .innerJoin(suppliers, eq(quotations.supplierId, suppliers.id))
+        .where(
+          and(
+            eq(quotations.region, region),
+            eq(suppliers.status, 'active')
+          )
+        );
+
+      console.log(`[getComparisonMatrix] Step 3 RESULT: Found ${allQuotationStats.length} quotation statistics`);
+      if (allQuotationStats.length > 0) {
+        console.log(`[getComparisonMatrix] Step 3 SAMPLE:`, allQuotationStats[0]);
+      }
+    } catch (error) {
+      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 3 - fetching stats:', error);
+      throw new Error(`Failed to fetch quotation stats: ${error.message}`);
+    }
+
+    // MANUAL JOIN PROCESS: Build supplier stats map manually
+    const supplierStatsMap = new Map();
+
+    try {
+      console.log(`[getComparisonMatrix] Step 4: Building supplier stats map from ${allActiveSuppliers.length} suppliers...`);
+
+      // Initialize all active suppliers first
+      allActiveSuppliers.forEach((supplier, index) => {
+        try {
+          if (!supplier || typeof supplier !== 'object') {
+            console.warn(`[getComparisonMatrix] Step 4.${index}: Invalid supplier object:`, supplier);
+            return;
+          }
+
+          if (!supplier.id) {
+            console.warn(`[getComparisonMatrix] Step 4.${index}: Supplier missing ID:`, supplier);
+            return;
+          }
+
+          const supplierData = {
             id: supplier.id,
             code: supplier.supplierCode || '',
             name: supplier.name || '',
             status: supplier.status || 'unknown',
-            // No quotation data available
+            // Initialize quotation data as null
             quotationId: null,
             quotationStatus: null,
             quotationSubmittedAt: null,
             quotationLastUpdated: null,
-            // Statistics
+            // Initialize statistics
             totalQuotations: 0,
             pendingQuotations: 0,
             negotiationQuotations: 0,
             approvedQuotations: 0,
-          });
-        }
-      });
-    }
+          };
 
-    // Populate statistics from all quotations
-    if (Array.isArray(supplierStatsQuery) && supplierStatsQuery.length > 0) {
-      supplierStatsQuery.forEach(quote => {
-        if (!quote || typeof quote !== 'object' || !quote.supplierId) {
-          console.warn(`[getComparisonMatrix] Skipping invalid quotation data:`, quote);
-          return;
-        }
+          supplierStatsMap.set(supplier.id, supplierData);
 
-        const stats = supplierStatsMap.get(quote.supplierId);
-        if (stats) {
-          stats.totalQuotations++;
-          switch (quote.quotationStatus) {
-            case 'pending':
-              stats.pendingQuotations++;
-              break;
-            case 'negotiation':
-              stats.negotiationQuotations++;
-              break;
-            case 'approved':
-              stats.approvedQuotations++;
-              break;
-            default:
-              // Handle unknown statuses gracefully
-              console.debug(`[getComparisonMatrix] Unknown quotation status: ${quote.quotationStatus}`);
-              break;
+          if (index < 3) { // Log first 3 for debugging
+            console.log(`[getComparisonMatrix] Step 4.${index}: Added supplier ${supplier.id} (${supplier.supplierCode})`);
           }
-        } else {
-          console.warn(`[getComparisonMatrix] No supplier stats found for supplier ID: ${quote.supplierId}`);
+        } catch (error) {
+          console.error(`[getComparisonMatrix] ERROR in Step 4.${index} - processing supplier:`, error, supplier);
         }
       });
-    } else {
-      console.log(`[getComparisonMatrix] No quotation statistics data available`);
+
+      console.log(`[getComparisonMatrix] Step 4 RESULT: Initialized ${supplierStatsMap.size} suppliers in stats map`);
+    } catch (error) {
+      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 4 - building supplier map:', error);
+      throw new Error(`Failed to build supplier map: ${error.message}`);
     }
+
+    try {
+      console.log(`[getComparisonMatrix] Step 5: Overlaying regional quotation data from ${regionalQuotations.length} quotations...`);
+
+      // Overlay regional quotation data
+      regionalQuotations.forEach((quotation, index) => {
+        try {
+          if (!quotation || typeof quotation !== 'object') {
+            console.warn(`[getComparisonMatrix] Step 5.${index}: Invalid quotation object:`, quotation);
+            return;
+          }
+
+          if (!quotation.supplierId) {
+            console.warn(`[getComparisonMatrix] Step 5.${index}: Quotation missing supplierId:`, quotation);
+            return;
+          }
+
+          const supplierData = supplierStatsMap.get(quotation.supplierId);
+          if (supplierData) {
+            // Safely update quotation data
+            supplierData.quotationId = quotation.id ?? null;
+            supplierData.quotationStatus = quotation.status ?? null;
+            supplierData.quotationSubmittedAt = quotation.submittedAt ?? null;
+            supplierData.quotationLastUpdated = quotation.updatedAt ?? null;
+
+            if (index < 3) { // Log first 3 for debugging
+              console.log(`[getComparisonMatrix] Step 5.${index}: Updated supplier ${quotation.supplierId} with quotation ${quotation.id}`);
+            }
+          } else {
+            console.warn(`[getComparisonMatrix] Step 5.${index}: No supplier found for quotation supplier ID: ${quotation.supplierId}`);
+          }
+        } catch (error) {
+          console.error(`[getComparisonMatrix] ERROR in Step 5.${index} - processing quotation:`, error, quotation);
+        }
+      });
+
+      console.log(`[getComparisonMatrix] Step 5 RESULT: Processed ${regionalQuotations.length} regional quotations`);
+    } catch (error) {
+      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 5 - overlaying quotations:', error);
+      throw new Error(`Failed to overlay quotation data: ${error.message}`);
+    }
+
+    try {
+      console.log(`[getComparisonMatrix] Step 6: Computing statistics from ${allQuotationStats.length} quotation records...`);
+
+      // Populate statistics from all quotations
+      allQuotationStats.forEach((stat, index) => {
+        try {
+          if (!stat || typeof stat !== 'object') {
+            console.warn(`[getComparisonMatrix] Step 6.${index}: Invalid stat object:`, stat);
+            return;
+          }
+
+          if (!stat.supplierId) {
+            console.warn(`[getComparisonMatrix] Step 6.${index}: Stat missing supplierId:`, stat);
+            return;
+          }
+
+          const supplierData = supplierStatsMap.get(stat.supplierId);
+          if (supplierData) {
+            supplierData.totalQuotations++;
+
+            switch (stat.quotationStatus) {
+              case 'pending':
+                supplierData.pendingQuotations++;
+                break;
+              case 'negotiation':
+                supplierData.negotiationQuotations++;
+                break;
+              case 'approved':
+                supplierData.approvedQuotations++;
+                break;
+              default:
+                console.debug(`[getComparisonMatrix] Step 6.${index}: Unknown status: ${stat.quotationStatus}`);
+                break;
+            }
+
+            if (index < 3) { // Log first 3 for debugging
+              console.log(`[getComparisonMatrix] Step 6.${index}: Updated stats for supplier ${stat.supplierId}, total: ${supplierData.totalQuotations}`);
+            }
+          } else {
+            console.warn(`[getComparisonMatrix] Step 6.${index}: No supplier found for stat supplier ID: ${stat.supplierId}`);
+          }
+        } catch (error) {
+          console.error(`[getComparisonMatrix] ERROR in Step 6.${index} - processing stat:`, error, stat);
+        }
+      });
+
+      console.log(`[getComparisonMatrix] Step 6 RESULT: Computed statistics for ${supplierStatsMap.size} suppliers`);
+    } catch (error) {
+      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 6 - computing statistics:', error);
+      throw new Error(`Failed to compute statistics: ${error.message}`);
+    }
+
+    console.log(`[getComparisonMatrix] === HYPER-DEFENSIVE DATA FETCHING COMPLETE ===`);
 
     // STEP 8: Calculate Overview KPIs
     console.log(`[getComparisonMatrix] Calculating overview KPIs...`);
