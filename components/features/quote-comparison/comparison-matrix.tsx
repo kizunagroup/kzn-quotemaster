@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TrendingUpIcon, TrendingDownIcon, ArrowUp, ArrowDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 
 export interface ComparisonMatrixProps {
@@ -57,13 +57,6 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
     return { difference, percentage };
   };
 
-  // Helper function to format price (simplified without currency symbol)
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(price);
-  };
 
   // Helper function to get price styling based on best price only
   const getPriceStyle = (isBestPrice: boolean) => {
@@ -184,7 +177,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       {/* Column 3: Base Quantity */}
                       <TableCell className="text-center text-sm font-jakarta">
                         <div className="font-medium text-gray-600">
-                          {product.baseQuantity?.toLocaleString('vi-VN') || product.quantity.toLocaleString('vi-VN')}
+                          {formatNumber(product.baseQuantity || product.quantity)}
                         </div>
                       </TableCell>
 
@@ -192,7 +185,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       <TableCell className="text-center text-sm font-jakarta">
                         {basePrice ? (
                           <div className="font-medium text-gray-600">
-                            {formatPrice(basePrice)}
+                            {formatNumber(basePrice)}
                           </div>
                         ) : (
                           <div className="text-gray-400 text-sm">N/A</div>
@@ -203,7 +196,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       <TableCell className="text-center text-sm font-jakarta">
                         {product.previousApprovedPrice ? (
                           <div className="font-medium text-blue-600">
-                            {formatPrice(product.previousApprovedPrice)}
+                            {formatNumber(product.previousApprovedPrice)}
                           </div>
                         ) : (
                           <div className="text-gray-400 text-sm">Chưa có</div>
@@ -246,7 +239,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                       "text-sm px-2 py-1 rounded font-jakarta",
                                       getPriceStyle(isBestPrice)
                                     )}>
-                                      {formatPrice(currentPrice)}
+                                      {formatNumber(currentPrice)}
                                     </div>
 
                                     {/* Variance Arrow Icon */}
@@ -276,7 +269,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                   )}
                                 </div>
                               </TooltipTrigger>
-                              <TooltipContent>
+                              <TooltipContent className="bg-background border">
                                 <div className="space-y-2 text-sm">
                                   {/* Comparison vs Base Price */}
                                   {baseVariance && (
@@ -286,7 +279,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                         baseVariance.percentage > 0 ? "text-red-600" : "text-green-600"
                                       )}>
                                         {baseVariance.difference > 0 ? '+' : ''}
-                                        {formatPrice(baseVariance.difference)} ({baseVariance.percentage > 0 ? '+' : ''}
+                                        {formatNumber(baseVariance.difference)} ({baseVariance.percentage > 0 ? '+' : ''}
                                         {baseVariance.percentage.toFixed(1)}%)
                                       </div>
                                     </div>
@@ -300,7 +293,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                         variance.percentage > 0 ? "text-red-600" : "text-green-600"
                                       )}>
                                         {variance.difference > 0 ? '+' : ''}
-                                        {formatPrice(variance.difference)} ({variance.percentage > 0 ? '+' : ''}
+                                        {formatNumber(variance.difference)} ({variance.percentage > 0 ? '+' : ''}
                                         {variance.percentage.toFixed(1)}%)
                                       </div>
                                     </div>
