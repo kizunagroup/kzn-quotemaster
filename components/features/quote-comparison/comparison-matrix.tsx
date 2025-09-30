@@ -57,6 +57,13 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
 
   // Action handlers
   const handleNegotiate = async (quotationId: number, supplierName: string) => {
+    // Defensive check for valid quotation ID
+    if (!quotationId || quotationId <= 0) {
+      console.error('Error: Không thể xác định báo giá', { quotationId, supplierName });
+      // TODO: Show error toast message
+      return;
+    }
+
     const actionKey = `negotiate_${quotationId}`;
     setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
@@ -71,6 +78,13 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
   };
 
   const handleApprove = async (quotationId: number, supplierName: string) => {
+    // Defensive check for valid quotation ID
+    if (!quotationId || quotationId <= 0) {
+      console.error('Error: Không thể xác định báo giá', { quotationId, supplierName });
+      // TODO: Show error toast message
+      return;
+    }
+
     const actionKey = `approve_${quotationId}`;
     setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
     try {
@@ -151,26 +165,6 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                           </div>
                         </div>
 
-                        {/* Action Buttons for each supplier */}
-                        <div className="flex flex-col gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-6"
-                            onClick={() => handleNegotiate(supplier.id, supplier.name)}
-                            disabled={loadingActions[`negotiate_${supplier.id}`]}
-                          >
-                            {loadingActions[`negotiate_${supplier.id}`] ? 'Đang xử lý...' : 'Đàm phán'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="text-xs h-6"
-                            onClick={() => handleApprove(supplier.id, supplier.name)}
-                            disabled={loadingActions[`approve_${supplier.id}`]}
-                          >
-                            {loadingActions[`approve_${supplier.id}`] ? 'Đang xử lý...' : 'Duyệt giá'}
-                          </Button>
-                        </div>
                       </div>
                     </TableHead>
                   ))}
@@ -286,6 +280,27 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                   </TooltipContent>
                                 </Tooltip>
                               )}
+
+                              {/* Action Buttons */}
+                              <div className="flex flex-col gap-1 mt-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-6"
+                                  onClick={() => handleNegotiate(supplierData.id, supplier.name)}
+                                  disabled={loadingActions[`negotiate_${supplierData.id}`]}
+                                >
+                                  {loadingActions[`negotiate_${supplierData.id}`] ? 'Đang xử lý...' : 'Đàm phán'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="text-xs h-6"
+                                  onClick={() => handleApprove(supplierData.id, supplier.name)}
+                                  disabled={loadingActions[`approve_${supplierData.id}`]}
+                                >
+                                  {loadingActions[`approve_${supplierData.id}`] ? 'Đang xử lý...' : 'Duyệt giá'}
+                                </Button>
+                              </div>
                             </div>
                           </TableCell>
                         );
