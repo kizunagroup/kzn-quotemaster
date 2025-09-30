@@ -111,10 +111,10 @@ export async function GET(request: NextRequest) {
     if (params.category && params.category !== "all") {
       conditions.push(
         sql`EXISTS (
-          SELECT 1 FROM ${quoteItems} qi
-          JOIN ${products} p ON qi.${quoteItems.productId} = p.${products.id}
-          WHERE qi.${quoteItems.quotationId} = ${quotations.id}
-          AND p.${products.category} = ${params.category}
+          SELECT 1 FROM quote_items qi
+          JOIN products p ON qi.product_id = p.id
+          WHERE qi.quotation_id = quotations.id
+          AND p.category = ${params.category}
         )`
       );
     }
