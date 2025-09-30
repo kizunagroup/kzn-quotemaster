@@ -786,6 +786,7 @@ export async function getQuotationSummary(period: string, region: string): Promi
 
 /**
  * Get regions that have quotations for a specific period (cascading filter)
+ * Excludes cancelled quotations to show only actionable data
  */
 export async function getRegionsForPeriod(period: string): Promise<string[]> {
   try {
@@ -798,7 +799,12 @@ export async function getRegionsForPeriod(period: string): Promise<string[]> {
     const regions = await db
       .selectDistinct({ region: quotations.region })
       .from(quotations)
-      .where(eq(quotations.period, period))
+      .where(
+        and(
+          eq(quotations.period, period),
+          sql`${quotations.status} != 'cancelled'`
+        )
+      )
       .orderBy(quotations.region);
 
     return regions
@@ -813,6 +819,7 @@ export async function getRegionsForPeriod(period: string): Promise<string[]> {
 
 /**
  * Get product categories that have quotations for a specific period and region (cascading filter)
+ * Excludes cancelled quotations to show only actionable data
  */
 export async function getCategoriesForPeriodAndRegion(
   period: string,
@@ -834,7 +841,8 @@ export async function getCategoriesForPeriodAndRegion(
         and(
           eq(quotations.period, period),
           eq(quotations.region, region),
-          eq(products.status, 'active')
+          eq(products.status, 'active'),
+          sql`${quotations.status} != 'cancelled'`
         )
       )
       .orderBy(products.category);
