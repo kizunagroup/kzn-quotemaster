@@ -169,13 +169,15 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                         </div>
                       </TableCell>
 
-                      {/* Column 2: Product Name (with specification and unit on second line) */}
+                      {/* Column 2: Product Name (with specification only) */}
                       <TableCell>
                         <div className="space-y-1">
                           <div className="font-medium">{product.productName}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {product.specification && `${product.specification} • `}{product.unit}
-                          </div>
+                          {product.specification && (
+                            <div className="text-sm text-muted-foreground">
+                              {product.specification}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
 
@@ -276,28 +278,6 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
             </Table>
           </div>
 
-          {/* Simplified Legend */}
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <div className="space-y-3">
-              <div className="font-medium text-gray-700">Chú thích</div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border rounded font-bold text-green-600 flex items-center justify-center text-xs">G</div>
-                  <span>Giá tốt nhất trong hàng</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <TrendingUpIcon className="h-3 w-3 text-red-600" />
-                    <span>Tăng so với kỳ trước</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <TrendingDownIcon className="h-3 w-3 text-green-600" />
-                    <span>Giảm so với kỳ trước</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </TooltipProvider>
