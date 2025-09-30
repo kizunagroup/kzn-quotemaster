@@ -1533,25 +1533,33 @@ export async function initiateBatchNegotiationAndExport(params: {
 }
 
 /**
- * Approve multiple quotations
+ * Approve multiple quotations - Status update only
+ * Note: Price finalization logic is handled separately to maintain separation of concerns
  */
 export async function approveMultipleQuotations(
   data: z.infer<typeof BatchNegotiationSchema>
 ): Promise<{
   success: string;
   approvedQuotations: number;
-  totalApprovedValue: number;
   affectedSuppliers: string[];
 }> {
   try {
-    // Authorization check
+    console.log("[approveMultipleQuotations] Starting approval process with:", data);
+
+    // Authorization check - ensure user has approval permissions
     const user = await checkApprovalRole();
 
     // Validate input
     const validatedData = BatchNegotiationSchema.parse(data);
     const { quotationIds } = validatedData;
 
-    // Get quotations that can be approved
+    if (quotationIds.length === 0) {
+      throw new Error("Danh sách báo giá không được để trống");
+    }
+
+    console.log(`[approveMultipleQuotations] Processing ${quotationIds.length} quotation IDs`);
+
+    // Get quotations that are eligible for approval
     const quotationsToApprove = await db
       .select({
         id: quotations.id,
@@ -1567,101 +1575,51 @@ export async function approveMultipleQuotations(
       .where(
         and(
           inArray(quotations.id, quotationIds),
-          inArray(quotations.status, ['pending', 'negotiation'])
+          inArray(quotations.status, ['pending', 'negotiation']) // Safety check - only approve quotations in valid statuses
         )
       );
 
     if (quotationsToApprove.length === 0) {
-      throw new Error("Không tìm thấy báo giá hợp lệ để phê duyệt");
+      throw new Error("Không tìm thấy báo giá hợp lệ để phê duyệt (chỉ có thể phê duyệt báo giá ở trạng thái 'pending' hoặc 'negotiation')");
     }
 
-    let totalApprovedValue = 0;
-    let approvedItemsCount = 0;
+    console.log(`[approveMultipleQuotations] Found ${quotationsToApprove.length} valid quotations for approval`);
 
-    // Process each quotation for approval
-    for (const quotation of quotationsToApprove) {
-      const result = await db.transaction(async (tx) => {
-        let quotationApprovedValue = 0;
-        let quotationApprovedItems = 0;
+    // Extract quotation IDs for efficient batch update
+    const validQuotationIds = quotationsToApprove.map(q => q.id);
 
-        // Get all quote items for this quotation
-        const items = await tx
-          .select()
-          .from(quoteItems)
-          .where(eq(quoteItems.quotationId, quotation.id));
+    // Perform single, efficient database UPDATE query
+    const updateResult = await db
+      .update(quotations)
+      .set({
+        status: 'approved',
+        updateDate: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          inArray(quotations.id, validQuotationIds),
+          inArray(quotations.status, ['pending', 'negotiation']) // Additional safety check in WHERE clause
+        )
+      );
 
-        // Process each item for approval
-        for (const item of items) {
-          let finalApprovedPrice: number | null = null;
+    console.log(`[approveMultipleQuotations] Successfully updated ${quotationsToApprove.length} quotations to approved status`);
 
-          // Determine approved price (priority: negotiated > initial)
-          if (item.negotiatedPrice) {
-            finalApprovedPrice = Number(item.negotiatedPrice);
-          } else if (item.initialPrice) {
-            finalApprovedPrice = Number(item.initialPrice);
-          }
-
-          if (finalApprovedPrice !== null && finalApprovedPrice > 0) {
-            // Update quote item with approved price
-            await tx
-              .update(quoteItems)
-              .set({
-                approvedPrice: finalApprovedPrice,
-                approvedAt: new Date(),
-                approvedBy: user.id,
-                updatedAt: new Date(),
-              })
-              .where(eq(quoteItems.id, item.id));
-
-            quotationApprovedItems++;
-            quotationApprovedValue += finalApprovedPrice * (Number(item.quantity) || 1);
-
-            // Log to price history
-            await tx.insert(priceHistory).values({
-              productId: item.productId,
-              supplierId: quotation.supplierId,
-              period: quotation.period,
-              price: finalApprovedPrice,
-              priceType: 'approved',
-              region: quotation.region,
-            });
-          }
-        }
-
-        // Update quotation status
-        await tx
-          .update(quotations)
-          .set({
-            status: 'approved',
-            updateDate: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(quotations.id, quotation.id));
-
-        return {
-          approvedItems: quotationApprovedItems,
-          approvedValue: quotationApprovedValue,
-        };
-      });
-
-      approvedItemsCount += result.approvedItems;
-      totalApprovedValue += result.approvedValue;
-    }
-
-    // Get affected supplier names
+    // Get affected supplier names for response
     const affectedSuppliers = [...new Set(quotationsToApprove.map(q => q.supplierName))];
 
-    // Revalidate relevant pages
+    // Revalidate relevant pages to refresh UI
     revalidatePath('/so-sanh');
     revalidatePath('/bao-gia');
-    revalidatePath('/bang-gia');
 
-    return {
+    const result = {
       success: `Đã phê duyệt ${quotationsToApprove.length} báo giá từ ${affectedSuppliers.length} nhà cung cấp`,
       approvedQuotations: quotationsToApprove.length,
-      totalApprovedValue,
       affectedSuppliers,
     };
+
+    console.log(`[approveMultipleQuotations] Completed successfully:`, result);
+    return result;
 
   } catch (error) {
     console.error("Error in approveMultipleQuotations:", error);
