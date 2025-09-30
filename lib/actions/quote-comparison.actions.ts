@@ -182,6 +182,7 @@ export async function getComparisonMatrix(
         productId: product.id,
         productCode: product.productCode || '',
         productName: product.name || '',
+        specification: product.specification || '',
         unit: product.unit || '',
         quantity,
         quantitySource,
@@ -1473,7 +1474,7 @@ export async function initiateBatchNegotiationAndExport(params: {
       const rowData = [
         product.productCode || '',        // Mã sản phẩm
         product.productName || '',        // Tên sản phẩm
-        '',                               // Quy cách (specification) - not available in current data structure
+        product.specification || '',      // Quy cách (specification)
         product.unit || '',               // Đơn vị
         targetPrice                       // Giá mục tiêu (best price)
       ];

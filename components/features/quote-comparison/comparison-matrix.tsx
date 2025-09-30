@@ -159,8 +159,8 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       <TableCell>
                         <div className="space-y-1">
                           <div className="font-medium">{product.productName}</div>
-                          <div className="text-xs text-muted-foreground">
-                            SL: {product.quantity.toLocaleString('vi-VN')} {product.unit}
+                          <div className="text-sm text-muted-foreground">
+                            {product.specification && `${product.specification} • `}{product.unit}
                           </div>
                         </div>
                       </TableCell>

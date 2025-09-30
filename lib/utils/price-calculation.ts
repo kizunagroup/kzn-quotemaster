@@ -31,6 +31,7 @@ export interface ProductComparison {
   productId: number;
   productCode: string;
   productName: string;
+  specification?: string;
   unit: string;
   quantity: number;
   quantitySource: 'kitchen_demand' | 'base_quantity';
