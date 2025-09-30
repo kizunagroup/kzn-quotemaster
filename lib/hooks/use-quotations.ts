@@ -12,7 +12,7 @@ export interface Quotation {
   supplierName: string | null;
   supplierCode: string | null;
   region: string;
-  category: string;
+  categories: string[];
   status: string;
   quoteDate: Date | null;
   updateDate: Date | null;
@@ -34,6 +34,7 @@ export interface QuotationsResponse {
     period?: string | null;
     supplier?: string | null;
     region?: string | null;
+    category?: string | null;
     status?: string;
     sort?: string;
     order?: string;
@@ -147,6 +148,11 @@ export function useQuotations() {
     // Add region filter
     if (filters.region) {
       params.set("region", filters.region);
+    }
+
+    // Add category filter
+    if (filters.category) {
+      params.set("category", filters.category);
     }
 
 
@@ -295,6 +301,9 @@ export function useQuotations() {
     },
     filterByRegion: (region: string) => {
       setFilter("region", region === "all" ? null : region);
+    },
+    filterByCategory: (category: string) => {
+      setFilter("category", category === "all" ? null : category);
     },
     filterByStatus: (status: string) => {
       setFilter("status", status === "all" ? null : status);

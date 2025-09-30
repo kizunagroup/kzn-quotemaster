@@ -76,6 +76,8 @@ interface QuotationsTableToolbarProps {
   onSupplierChange: (value: string) => void;
   selectedRegion?: string;
   onRegionChange: (value: string) => void;
+  selectedCategory?: string;
+  onCategoryChange: (value: string) => void;
   selectedStatus?: string;
   onStatusChange: (value: string) => void;
 
@@ -93,6 +95,7 @@ interface QuotationsTableToolbarProps {
   // Available filter options
   availablePeriods: string[];
   availableSuppliers: Array<{ id: number; code: string; name: string }>;
+  availableCategories: string[];
 }
 
 export function QuotationsTableToolbar({
@@ -104,6 +107,8 @@ export function QuotationsTableToolbar({
   onSupplierChange,
   selectedRegion = "",
   onRegionChange,
+  selectedCategory = "",
+  onCategoryChange,
   selectedStatus = "",
   onStatusChange,
   onClearFilters,
@@ -113,6 +118,7 @@ export function QuotationsTableToolbar({
   onImportClick,
   availablePeriods,
   availableSuppliers,
+  availableCategories,
 }: QuotationsTableToolbarProps) {
   // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
@@ -233,6 +239,21 @@ export function QuotationsTableToolbar({
         </SelectContent>
       </Select>
 
+      {/* Category Filter */}
+      <Select value={selectedCategory} onValueChange={onCategoryChange}>
+        <SelectTrigger className="h-8 w-[150px]">
+          <SelectValue placeholder="Tất cả nhóm hàng" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Tất cả nhóm hàng</SelectItem>
+          {availableCategories.map((category) => (
+            <SelectItem key={category} value={category}>
+              {category}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
       {/* Status Filter */}
       <Select value={selectedStatus} onValueChange={onStatusChange}>
         <SelectTrigger className="h-8 w-[150px]">
@@ -257,6 +278,7 @@ function getColumnDisplayName(columnId: string): string {
     region: "Khu vực",
     supplierCode: "Mã NCC",
     supplierName: "Tên NCC",
+    categories: "Nhóm hàng",
     status: "Trạng thái",
     itemCount: "Số SP",
     createdAt: "Ngày tạo",

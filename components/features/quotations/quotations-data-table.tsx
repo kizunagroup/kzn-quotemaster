@@ -44,6 +44,7 @@ import {
   getCurrentUserPermissions,
   getAvailablePeriods,
   getAvailableSuppliers,
+  getAvailableCategories,
 } from "@/lib/actions/quotations.actions";
 import { type PermissionSet } from "@/lib/auth/permissions";
 import { ImportExcelModal } from "./import-excel-modal";
@@ -100,6 +101,31 @@ const createColumns = (
         {row.getValue("supplierName")}
       </div>
     ),
+  },
+  {
+    accessorKey: "categories",
+    enableSorting: false,
+    header: "Nhóm hàng",
+    cell: ({ row }) => {
+      const categories = row.getValue("categories") as string[];
+      if (!categories || categories.length === 0) {
+        return <span className="text-muted-foreground text-sm">—</span>;
+      }
+      return (
+        <div className="flex flex-wrap gap-1 max-w-[150px]">
+          {categories.slice(0, 2).map((category, index) => (
+            <Badge key={index} variant="outline" className="text-xs">
+              {category}
+            </Badge>
+          ))}
+          {categories.length > 2 && (
+            <Badge variant="secondary" className="text-xs">
+              +{categories.length - 2}
+            </Badge>
+          )}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "status",
@@ -237,6 +263,7 @@ export function QuotationsDataTable() {
   const [permissions, setPermissions] = React.useState<PermissionSet | null>(null);
   const [availablePeriods, setAvailablePeriods] = React.useState<string[]>([]);
   const [availableSuppliers, setAvailableSuppliers] = React.useState<Array<{ id: number; code: string; name: string }>>([]);
+  const [availableCategories, setAvailableCategories] = React.useState<string[]>([]);
 
   // Use the new useQuotations hook (following Products pattern)
   const {
@@ -290,13 +317,15 @@ export function QuotationsDataTable() {
   React.useEffect(() => {
     const fetchHelperData = async () => {
       try {
-        const [periods, suppliers, permissionsResult] = await Promise.all([
+        const [periods, suppliers, categories, permissionsResult] = await Promise.all([
           getAvailablePeriods(),
           getAvailableSuppliers(),
+          getAvailableCategories(),
           getCurrentUserPermissions(),
         ]);
         setAvailablePeriods(periods);
         setAvailableSuppliers(suppliers);
+        setAvailableCategories(categories);
 
         if (permissionsResult.success && permissionsResult.permissions) {
           setPermissions(permissionsResult.permissions);
@@ -338,6 +367,10 @@ export function QuotationsDataTable() {
 
   const handleRegionChange = (value: string) => {
     setFilter("region", value === "all" ? null : value);
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setFilter("category", value === "all" ? null : value);
   };
 
   const handleStatusChange = (value: string) => {
@@ -426,6 +459,8 @@ export function QuotationsDataTable() {
         onSupplierChange={handleSupplierChange}
         selectedRegion={urlState.filters.region || "all"}
         onRegionChange={handleRegionChange}
+        selectedCategory={urlState.filters.category || "all"}
+        onCategoryChange={handleCategoryChange}
         selectedStatus={urlState.filters.status || "all"}
         onStatusChange={handleStatusChange}
         onClearFilters={clearFilters}
@@ -435,6 +470,7 @@ export function QuotationsDataTable() {
         onImportClick={() => setShowImportModal(true)}
         availablePeriods={availablePeriods}
         availableSuppliers={availableSuppliers}
+        availableCategories={availableCategories}
       />
 
       {/* Data Table */}

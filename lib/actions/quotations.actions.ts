@@ -692,3 +692,20 @@ export async function getCurrentUserPermissions(): Promise<{
     };
   }
 }
+
+/**
+ * Get available categories from products
+ */
+export async function getAvailableCategories(): Promise<string[]> {
+  try {
+    const categories = await db
+      .selectDistinct({ category: products.category })
+      .from(products)
+      .where(eq(products.status, "active"));
+
+    return categories.map(item => item.category).filter(Boolean).sort();
+  } catch (error) {
+    console.error("Error in getAvailableCategories:", error);
+    return [];
+  }
+}

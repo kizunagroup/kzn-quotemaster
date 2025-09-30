@@ -12,7 +12,7 @@ import {
   isNull,
 } from "drizzle-orm";
 import { db } from "@/lib/db/drizzle";
-import { quotations, suppliers, quoteItems } from "@/lib/db/schema";
+import { quotations, suppliers, quoteItems, products } from "@/lib/db/schema";
 import { getUser, getUserWithTeams } from "@/lib/db/queries";
 import { getUserPermissions } from "@/lib/auth/permissions";
 import { quotationQuerySchema } from "@/lib/schemas/quotation.schemas";
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
       period: searchParams.get("period") || undefined,
       supplier: searchParams.get("supplier") || searchParams.get("supplierId") || undefined,
       region: searchParams.get("region") || undefined,
+      category: searchParams.get("category") || undefined,
       status: searchParams.get("status") || "all",
       sort: searchParams.get("sort") || "createdAt",
       order: searchParams.get("order") || "desc",
@@ -106,6 +107,17 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(quotations.region, params.region));
     }
 
+    // Category filter - filter by quotations that have products in the specified category
+    if (params.category) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${quoteItems} qi
+          JOIN ${products} p ON qi.${quoteItems.productId} = p.${products.id}
+          WHERE qi.${quoteItems.quotationId} = ${quotations.id}
+          AND p.${products.category} = ${params.category}
+        )`
+      );
+    }
 
     // Status filter
     if (params.status && params.status !== "all") {
@@ -126,8 +138,6 @@ export async function GET(request: NextRequest) {
           return quotations.period;
         case "region":
           return quotations.region;
-        case "category":
-          return quotations.category;
         case "quoteDate":
           return quotations.quoteDate;
         case "updateDate":
@@ -166,6 +176,13 @@ export async function GET(request: NextRequest) {
         supplierName: suppliers.name,
         supplierCode: suppliers.supplierCode,
         region: quotations.region,
+        // Categories derived from quote items
+        categories: sql<string[]>`COALESCE((
+          SELECT array_agg(DISTINCT ${products.category})
+          FROM ${quoteItems}
+          JOIN ${products} ON ${quoteItems.productId} = ${products.id}
+          WHERE ${quoteItems.quotationId} = ${quotations.id}
+        ), '{}'::text[])`,
         category: quotations.category,
         status: quotations.status,
         quoteDate: quotations.quoteDate,
@@ -215,6 +232,7 @@ export async function GET(request: NextRequest) {
         period: params.period || null,
         supplier: params.supplier || null,
         region: params.region || null,
+        category: params.category || null,
         status: params.status,
         sort: params.sort,
         order: params.order,

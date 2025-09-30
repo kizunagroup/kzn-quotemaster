@@ -231,7 +231,6 @@ export const quotations = pgTable(
       })
       .notNull(),
     region: varchar("region", { length: 50 }).notNull(),
-    category: varchar("category", { length: 100 }).notNull(),
     quoteDate: timestamp("quote_date"),
     updateDate: timestamp("update_date"),
     status: varchar("status", { length: 20 }).default("pending").notNull(),
