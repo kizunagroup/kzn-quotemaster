@@ -432,9 +432,13 @@ export async function getComparisonMatrix(
     const supplierStatsMap = new Map();
 
     // Initialize suppliers with regional quotation data
-    if (Array.isArray(regionalQuotationsQuery)) {
+    if (Array.isArray(regionalQuotationsQuery) && regionalQuotationsQuery.length > 0) {
       regionalQuotationsQuery.forEach(item => {
-        if (!item?.supplierId) return;
+        // Robust null-safety checks for LEFT JOIN results
+        if (!item || typeof item !== 'object' || !item.supplierId) {
+          console.warn(`[getComparisonMatrix] Skipping invalid supplier data:`, item);
+          return;
+        }
 
         if (!supplierStatsMap.has(item.supplierId)) {
           supplierStatsMap.set(item.supplierId, {
@@ -442,12 +446,51 @@ export async function getComparisonMatrix(
             code: item.supplierCode || '',
             name: item.supplierName || '',
             status: item.supplierStatus || 'unknown',
-            // NEW: Add quotation-level data
-            quotationId: item.quotationId,
-            quotationStatus: item.quotationStatus as 'draft' | 'submitted' | 'negotiation' | 'approved' | 'rejected' | null,
-            quotationSubmittedAt: item.quotationSubmittedAt,
-            quotationLastUpdated: item.quotationLastUpdated,
+            // NEW: Add quotation-level data with null-safety checks
+            quotationId: item.quotationId ?? null,
+            quotationStatus: (item.quotationStatus as 'draft' | 'submitted' | 'negotiation' | 'approved' | 'rejected') ?? null,
+            quotationSubmittedAt: item.quotationSubmittedAt ?? null,
+            quotationLastUpdated: item.quotationLastUpdated ?? null,
             // Statistics (will be populated below)
+            totalQuotations: 0,
+            pendingQuotations: 0,
+            negotiationQuotations: 0,
+            approvedQuotations: 0,
+          });
+        }
+      });
+    } else {
+      console.warn(`[getComparisonMatrix] No regional quotation data found for period=${period}, region=${region}, category=${category}`);
+    }
+
+    // Ensure we have at least basic supplier data even if no regional quotations exist
+    if (supplierStatsMap.size === 0) {
+      console.log(`[getComparisonMatrix] No suppliers with regional quotations found, falling back to active suppliers query...`);
+
+      // Fallback: Get all active suppliers without quotation data
+      const activeSuppliers = await db
+        .select({
+          id: suppliers.id,
+          supplierCode: suppliers.supplierCode,
+          name: suppliers.name,
+          status: suppliers.status,
+        })
+        .from(suppliers)
+        .where(eq(suppliers.status, 'active'));
+
+      activeSuppliers.forEach(supplier => {
+        if (supplier.id) {
+          supplierStatsMap.set(supplier.id, {
+            id: supplier.id,
+            code: supplier.supplierCode || '',
+            name: supplier.name || '',
+            status: supplier.status || 'unknown',
+            // No quotation data available
+            quotationId: null,
+            quotationStatus: null,
+            quotationSubmittedAt: null,
+            quotationLastUpdated: null,
+            // Statistics
             totalQuotations: 0,
             pendingQuotations: 0,
             negotiationQuotations: 0,
@@ -458,9 +501,12 @@ export async function getComparisonMatrix(
     }
 
     // Populate statistics from all quotations
-    if (Array.isArray(supplierStatsQuery)) {
+    if (Array.isArray(supplierStatsQuery) && supplierStatsQuery.length > 0) {
       supplierStatsQuery.forEach(quote => {
-        if (!quote?.supplierId) return;
+        if (!quote || typeof quote !== 'object' || !quote.supplierId) {
+          console.warn(`[getComparisonMatrix] Skipping invalid quotation data:`, quote);
+          return;
+        }
 
         const stats = supplierStatsMap.get(quote.supplierId);
         if (stats) {
@@ -475,9 +521,17 @@ export async function getComparisonMatrix(
             case 'approved':
               stats.approvedQuotations++;
               break;
+            default:
+              // Handle unknown statuses gracefully
+              console.debug(`[getComparisonMatrix] Unknown quotation status: ${quote.quotationStatus}`);
+              break;
           }
+        } else {
+          console.warn(`[getComparisonMatrix] No supplier stats found for supplier ID: ${quote.supplierId}`);
         }
       });
+    } else {
+      console.log(`[getComparisonMatrix] No quotation statistics data available`);
     }
 
     // STEP 8: Calculate Overview KPIs
