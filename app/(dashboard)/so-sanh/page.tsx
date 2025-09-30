@@ -17,11 +17,22 @@ import { getAvailablePeriods } from "@/lib/actions/quotations.actions";
 import {
   getComparisonMatrix,
   getRegionsForPeriod,
-  getCategoriesForPeriodAndRegion
+  getCategoriesForPeriodAndRegion,
 } from "@/lib/actions/quote-comparison.actions";
 import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
-import { Loader2, FileSpreadsheet, CheckCircle, TrendingUp, TrendingDown, ChevronUp, ChevronDown } from "lucide-react";
-import { exportTargetPriceFile, initiateBatchNegotiationAndExport } from "@/lib/actions/quote-comparison.actions";
+import {
+  Loader2,
+  FileSpreadsheet,
+  CheckCircle,
+  TrendingUp,
+  TrendingDown,
+  ChevronUp,
+  ChevronDown,
+} from "lucide-react";
+import {
+  exportTargetPriceFile,
+  initiateBatchNegotiationAndExport,
+} from "@/lib/actions/quote-comparison.actions";
 import { ApprovalModal } from "@/components/features/quote-comparison/approval-modal";
 import { toast } from "sonner";
 import { formatNumber } from "@/lib/utils";
@@ -46,7 +57,9 @@ export default function ComparisonPage() {
   const [filtersError, setFiltersError] = useState<string | null>(null);
 
   // Comparison matrix state
-  const [matrixData, setMatrixData] = useState<ComparisonMatrixData | null>(null);
+  const [matrixData, setMatrixData] = useState<ComparisonMatrixData | null>(
+    null
+  );
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
 
@@ -125,7 +138,10 @@ export default function ComparisonPage() {
         setCategoriesLoading(true);
         setFiltersError(null);
 
-        const availableCategories = await getCategoriesForPeriodAndRegion(period, region);
+        const availableCategories = await getCategoriesForPeriodAndRegion(
+          period,
+          region
+        );
         setCategories(availableCategories);
 
         // Clear category selection if current category is not available
@@ -134,7 +150,9 @@ export default function ComparisonPage() {
         }
       } catch (err) {
         console.error("Error fetching categories for period and region:", err);
-        setFiltersError("Không thể tải danh sách nhóm hàng cho kỳ và khu vực này");
+        setFiltersError(
+          "Không thể tải danh sách nhóm hàng cho kỳ và khu vực này"
+        );
         setCategories([]);
         setCategory("");
       } finally {
@@ -199,24 +217,29 @@ export default function ComparisonPage() {
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${category}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${category}_${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
       // Show success message
-      toast.success("Đã xuất file giá mục tiêu và khởi tạo đàm phán thành công!");
+      toast.success(
+        "Đã xuất file giá mục tiêu và khởi tạo đàm phán thành công!"
+      );
 
       // Refresh comparison data after batch action
       await handleCompareClick();
     } catch (err) {
-      console.error('Error in batch negotiation and export:', err);
-      const errorMessage = err instanceof Error
-        ? err.message
-        : "Không thể thực hiện đàm phán hàng loạt và xuất file";
+      console.error("Error in batch negotiation and export:", err);
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Không thể thực hiện đàm phán hàng loạt và xuất file";
 
       setComparisonError(errorMessage);
       toast.error(errorMessage);
@@ -253,19 +276,19 @@ export default function ComparisonPage() {
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `BangGiaMucTieu_${period}_${region}_${category}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `BangGiaMucTieu_${period}_${region}_${category}_${
+        new Date().toISOString().split("T")[0]
+      }.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Error exporting target price file:', err);
+      console.error("Error exporting target price file:", err);
       setComparisonError(
-        err instanceof Error
-          ? err.message
-          : "Không thể xuất bảng giá mục tiêu"
+        err instanceof Error ? err.message : "Không thể xuất bảng giá mục tiêu"
       );
     } finally {
       setExportLoading(false);
@@ -287,9 +310,17 @@ export default function ComparisonPage() {
           {/* Period Filter */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Kỳ báo giá</label>
-            <Select value={period} onValueChange={setPeriod} disabled={periodsLoading}>
+            <Select
+              value={period}
+              onValueChange={setPeriod}
+              disabled={periodsLoading}
+            >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder={periodsLoading ? "Đang tải..." : "Chọn kỳ báo giá..."} />
+                <SelectValue
+                  placeholder={
+                    periodsLoading ? "Đang tải..." : "Chọn kỳ báo giá..."
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {periods.map((p) => (
@@ -311,7 +342,12 @@ export default function ComparisonPage() {
           <div className="space-y-2">
             <label className="text-sm font-medium">
               Khu vực
-              {!period && <span className="text-muted-foreground"> (chọn kỳ báo giá trước)</span>}
+              {!period && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  (chọn kỳ báo giá trước)
+                </span>
+              )}
             </label>
             <Select
               value={region}
@@ -324,10 +360,10 @@ export default function ComparisonPage() {
                     !period
                       ? "Chọn kỳ báo giá trước..."
                       : regionsLoading
-                        ? "Đang tải..."
-                        : regions.length === 0
-                          ? "Không có khu vực nào"
-                          : "Chọn khu vực..."
+                      ? "Đang tải..."
+                      : regions.length === 0
+                      ? "Không có khu vực nào"
+                      : "Chọn khu vực..."
                   }
                 />
               </SelectTrigger>
@@ -357,7 +393,10 @@ export default function ComparisonPage() {
             <label className="text-sm font-medium">
               Nhóm hàng
               {(!period || !region) && (
-                <span className="text-muted-foreground"> (chọn kỳ & khu vực trước)</span>
+                <span className="text-muted-foreground">
+                  {" "}
+                  (chọn kỳ & khu vực trước)
+                </span>
               )}
             </label>
             <Select
@@ -371,10 +410,10 @@ export default function ComparisonPage() {
                     !period || !region
                       ? "Chọn kỳ & khu vực trước..."
                       : categoriesLoading
-                        ? "Đang tải..."
-                        : categories.length === 0
-                          ? "Không có nhóm hàng nào"
-                          : "Chọn nhóm hàng..."
+                      ? "Đang tải..."
+                      : categories.length === 0
+                      ? "Không có nhóm hàng nào"
+                      : "Chọn nhóm hàng..."
                   }
                 />
               </SelectTrigger>
@@ -392,11 +431,14 @@ export default function ComparisonPage() {
                 Đang tải nhóm hàng...
               </div>
             )}
-            {period && region && !categoriesLoading && categories.length === 0 && (
-              <div className="text-xs text-amber-600">
-                Không có nhóm hàng nào có báo giá cho kỳ và khu vực này
-              </div>
-            )}
+            {period &&
+              region &&
+              !categoriesLoading &&
+              categories.length === 0 && (
+                <div className="text-xs text-amber-600">
+                  Không có nhóm hàng nào có báo giá cho kỳ và khu vực này
+                </div>
+              )}
           </div>
         </div>
 
@@ -435,11 +477,15 @@ export default function ComparisonPage() {
             <span>Đã duyệt</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border rounded font-bold text-green-600 flex items-center justify-center text-xs">G</div>
+            <div className="w-4 h-4 border rounded font-bold text-green-600 flex items-center justify-center text-xs">
+              G
+            </div>
             <span>Giá tốt nhất</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 border rounded text-orange-600 flex items-center justify-center text-xs">N</div>
+            <div className="w-4 h-4 border rounded text-orange-600 flex items-center justify-center text-xs">
+              N
+            </div>
             <span>Đàm phán</span>
           </div>
         </div>
@@ -474,7 +520,9 @@ export default function ComparisonPage() {
               </Button>
               <Button
                 onClick={handleOpenApprovalModal}
-                disabled={!matrixData || matrixData.availableSuppliers.length === 0}
+                disabled={
+                  !matrixData || matrixData.availableSuppliers.length === 0
+                }
                 variant="outline"
                 size="sm"
                 className="flex items-center gap-2"
@@ -511,83 +559,137 @@ export default function ComparisonPage() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {/* Total Current Value */}
                 <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">Tổng giá trị hiện tại</p>
+                  <p className="text-sm text-muted-foreground">
+                    Tổng giá trị hiện tại
+                  </p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {formatNumber(matrixData.overviewKPIs.totalCurrentValue)} ₫
+                    {formatNumber(matrixData.overviewKPIs.totalCurrentValue)}
                   </p>
                 </div>
 
                 {/* Comparison vs Initial */}
                 <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">So với giá ban đầu</p>
-                  <p className={`text-2xl font-bold ${
-                    matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
-                      ? 'text-red-600'
-                      : matrixData.overviewKPIs.comparisonVsInitial.percentage < 0
-                        ? 'text-green-600'
-                        : 'text-gray-600'
-                  }`}>
-                    {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0 ? '+' : ''}
-                    {matrixData.overviewKPIs.comparisonVsInitial.percentage.toFixed(1)}%
+                  <p className="text-sm text-muted-foreground">
+                    So với giá ban đầu
+                  </p>
+                  <p
+                    className={`text-2xl font-bold ${
+                      matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
+                        ? "text-red-600"
+                        : matrixData.overviewKPIs.comparisonVsInitial
+                            .percentage < 0
+                        ? "text-green-600"
+                        : "text-gray-600"
+                    }`}
+                  >
+                    {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
+                      ? "+"
+                      : ""}
+                    {matrixData.overviewKPIs.comparisonVsInitial.percentage.toFixed(
+                      1
+                    )}
+                    %
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {matrixData.overviewKPIs.comparisonVsInitial.difference > 0 ? '+' : ''}
-                    {formatNumber(matrixData.overviewKPIs.comparisonVsInitial.difference)} ₫
+                    {matrixData.overviewKPIs.comparisonVsInitial.difference > 0
+                      ? "+"
+                      : ""}
+                    {formatNumber(
+                      matrixData.overviewKPIs.comparisonVsInitial.difference
+                    )}
                   </p>
                 </div>
 
                 {/* Comparison vs Previous */}
                 <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">So với kỳ trước</p>
-                  {matrixData.overviewKPIs.comparisonVsPrevious.hasPreviousData ? (
+                  <p className="text-sm text-muted-foreground">
+                    So với kỳ trước
+                  </p>
+                  {matrixData.overviewKPIs.comparisonVsPrevious
+                    .hasPreviousData ? (
                     <>
-                      <p className={`text-2xl font-bold ${
-                        matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0
-                          ? 'text-red-600'
-                          : matrixData.overviewKPIs.comparisonVsPrevious.percentage < 0
-                            ? 'text-green-600'
-                            : 'text-gray-600'
-                      }`}>
-                        {matrixData.overviewKPIs.comparisonVsPrevious.percentage > 0 ? '+' : ''}
-                        {matrixData.overviewKPIs.comparisonVsPrevious.percentage.toFixed(1)}%
+                      <p
+                        className={`text-2xl font-bold ${
+                          matrixData.overviewKPIs.comparisonVsPrevious
+                            .percentage > 0
+                            ? "text-red-600"
+                            : matrixData.overviewKPIs.comparisonVsPrevious
+                                .percentage < 0
+                            ? "text-green-600"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {matrixData.overviewKPIs.comparisonVsPrevious
+                          .percentage > 0
+                          ? "+"
+                          : ""}
+                        {matrixData.overviewKPIs.comparisonVsPrevious.percentage.toFixed(
+                          1
+                        )}
+                        %
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {matrixData.overviewKPIs.comparisonVsPrevious.difference > 0 ? '+' : ''}
-                        {formatNumber(matrixData.overviewKPIs.comparisonVsPrevious.difference)} ₫
+                        {matrixData.overviewKPIs.comparisonVsPrevious
+                          .difference > 0
+                          ? "+"
+                          : ""}
+                        {formatNumber(
+                          matrixData.overviewKPIs.comparisonVsPrevious
+                            .difference
+                        )}
                       </p>
                     </>
                   ) : (
                     <>
                       <p className="text-2xl font-bold text-gray-400">N/A</p>
-                      <p className="text-xs text-muted-foreground mt-1">Không có dữ liệu kỳ trước</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Không có dữ liệu kỳ trước
+                      </p>
                     </>
                   )}
                 </div>
 
                 {/* Comparison vs Base */}
                 <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">So với nhu cầu cơ bản</p>
+                  <p className="text-sm text-muted-foreground">
+                    So với nhu cầu cơ bản
+                  </p>
                   {matrixData.overviewKPIs.comparisonVsBase.hasBaseData ? (
                     <>
-                      <p className={`text-2xl font-bold ${
-                        matrixData.overviewKPIs.comparisonVsBase.percentage > 0
-                          ? 'text-red-600'
-                          : matrixData.overviewKPIs.comparisonVsBase.percentage < 0
-                            ? 'text-green-600'
-                            : 'text-gray-600'
-                      }`}>
-                        {matrixData.overviewKPIs.comparisonVsBase.percentage > 0 ? '+' : ''}
-                        {matrixData.overviewKPIs.comparisonVsBase.percentage.toFixed(1)}%
+                      <p
+                        className={`text-2xl font-bold ${
+                          matrixData.overviewKPIs.comparisonVsBase.percentage >
+                          0
+                            ? "text-red-600"
+                            : matrixData.overviewKPIs.comparisonVsBase
+                                .percentage < 0
+                            ? "text-green-600"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {matrixData.overviewKPIs.comparisonVsBase.percentage > 0
+                          ? "+"
+                          : ""}
+                        {matrixData.overviewKPIs.comparisonVsBase.percentage.toFixed(
+                          1
+                        )}
+                        %
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {matrixData.overviewKPIs.comparisonVsBase.difference > 0 ? '+' : ''}
-                        {formatNumber(matrixData.overviewKPIs.comparisonVsBase.difference)} ₫
+                        {matrixData.overviewKPIs.comparisonVsBase.difference > 0
+                          ? "+"
+                          : ""}
+                        {formatNumber(
+                          matrixData.overviewKPIs.comparisonVsBase.difference
+                        )}
                       </p>
                     </>
                   ) : (
                     <>
                       <p className="text-2xl font-bold text-gray-400">N/A</p>
-                      <p className="text-xs text-muted-foreground mt-1">Nhu cầu bằng cơ bản</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Nhu cầu bằng cơ bản
+                      </p>
                     </>
                   )}
                 </div>
@@ -597,26 +699,35 @@ export default function ComparisonPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">Tổng sản phẩm</p>
-                  <p className="text-xl font-semibold text-gray-700">{matrixData.overviewKPIs.totalProducts}</p>
+                  <p className="text-xl font-semibold text-gray-700">
+                    {matrixData.overviewKPIs.totalProducts}
+                  </p>
                 </div>
                 <div className="text-center">
                   <p className="text-sm text-muted-foreground">Nhà cung cấp</p>
-                  <p className="text-xl font-semibold text-gray-700">{matrixData.overviewKPIs.totalSuppliers}</p>
+                  <p className="text-xl font-semibold text-gray-700">
+                    {matrixData.overviewKPIs.totalSuppliers}
+                  </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Có giá kỳ trước</p>
-                  <p className="text-xl font-semibold text-gray-700">{matrixData.overviewKPIs.productsWithPrevious} SP</p>
+                  <p className="text-sm text-muted-foreground">
+                    Có giá kỳ trước
+                  </p>
+                  <p className="text-xl font-semibold text-gray-700">
+                    {matrixData.overviewKPIs.productsWithPrevious} SP
+                  </p>
                 </div>
               </div>
             </div>
           ) : (
             <div className="text-center text-gray-500 space-y-2">
-              <p className="text-lg">Vui lòng chọn các tiêu chí và nhấn 'So sánh' để xem tổng quan.</p>
+              <p className="text-lg">
+                Vui lòng chọn các tiêu chí và nhấn 'So sánh' để xem tổng quan.
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
-
 
       {/* Details Section */}
       <Card>
@@ -637,31 +748,37 @@ export default function ComparisonPage() {
         </CardHeader>
         {isDetailsVisible && (
           <CardContent>
-          {comparisonLoading ? (
-            <div className="text-center text-gray-500 space-y-4">
-              <Loader2 className="h-8 w-8 animate-spin mx-auto" />
-              <p className="text-lg">Đang tải ma trận so sánh...</p>
-              <p className="text-sm">
-                Đang xử lý ma trận so sánh báo giá cho kỳ {period}, khu vực {region}, nhóm hàng {category}.
-              </p>
-            </div>
-          ) : comparisonError ? (
-            <div className="text-center space-y-4">
-              <div className="text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
-                <p className="text-lg font-medium">Lỗi tải dữ liệu chi tiết</p>
-                <p className="text-sm mt-2">{comparisonError}</p>
+            {comparisonLoading ? (
+              <div className="text-center text-gray-500 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                <p className="text-lg">Đang tải ma trận so sánh...</p>
+                <p className="text-sm">
+                  Đang xử lý ma trận so sánh báo giá cho kỳ {period}, khu vực{" "}
+                  {region}, nhóm hàng {category}.
+                </p>
               </div>
-            </div>
-          ) : matrixData ? (
-            <ComparisonMatrix matrixData={matrixData} />
-          ) : (
-            <div className="text-center text-gray-500 space-y-2">
-              <p className="text-lg">Chọn các tiêu chí và nhấn 'So sánh' để xem chi tiết ma trận.</p>
-              <p className="text-sm">
-                Ma trận sẽ hiển thị so sánh giá từ các nhà cung cấp cho từng sản phẩm.
-              </p>
-            </div>
-          )}
+            ) : comparisonError ? (
+              <div className="text-center space-y-4">
+                <div className="text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
+                  <p className="text-lg font-medium">
+                    Lỗi tải dữ liệu chi tiết
+                  </p>
+                  <p className="text-sm mt-2">{comparisonError}</p>
+                </div>
+              </div>
+            ) : matrixData ? (
+              <ComparisonMatrix matrixData={matrixData} />
+            ) : (
+              <div className="text-center text-gray-500 space-y-2">
+                <p className="text-lg">
+                  Chọn các tiêu chí và nhấn 'So sánh' để xem chi tiết ma trận.
+                </p>
+                <p className="text-sm">
+                  Ma trận sẽ hiển thị so sánh giá từ các nhà cung cấp cho từng
+                  sản phẩm.
+                </p>
+              </div>
+            )}
           </CardContent>
         )}
       </Card>
