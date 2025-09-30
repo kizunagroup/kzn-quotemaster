@@ -22,6 +22,7 @@ import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 import { Loader2, FileSpreadsheet, CheckCircle } from "lucide-react";
 import { exportTargetPriceFile, initiateBatchNegotiationAndExport } from "@/lib/actions/quote-comparison.actions";
 import { ApprovalModal } from "@/components/features/quote-comparison/approval-modal";
+import { toast } from "sonner";
 
 export default function ComparisonPage() {
   // Filter states
@@ -201,15 +202,19 @@ export default function ComparisonPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
+      // Show success message
+      toast.success("Đã xuất file giá mục tiêu và khởi tạo đàm phán thành công!");
+
       // Refresh comparison data after batch action
       await handleCompareClick();
     } catch (err) {
       console.error('Error in batch negotiation and export:', err);
-      setComparisonError(
-        err instanceof Error
-          ? err.message
-          : "Không thể thực hiện đàm phán hàng loạt và xuất file"
-      );
+      const errorMessage = err instanceof Error
+        ? err.message
+        : "Không thể thực hiện đàm phán hàng loạt và xuất file";
+
+      setComparisonError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setBatchActionLoading(false);
     }
