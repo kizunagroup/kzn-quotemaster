@@ -19,7 +19,8 @@ import {
   getCategoriesForPeriodAndRegion
 } from "@/lib/actions/quote-comparison.actions";
 import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
-import { Loader2 } from "lucide-react";
+import { Loader2, FileSpreadsheet } from "lucide-react";
+import { exportTargetPriceFile } from "@/lib/actions/quote-comparison.actions";
 
 export default function ComparisonPage() {
   // Filter states
@@ -44,6 +45,9 @@ export default function ComparisonPage() {
   const [matrixData, setMatrixData] = useState<ComparisonMatrixData | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
+
+  // Export loading state
+  const [exportLoading, setExportLoading] = useState(false);
 
   // Fetch periods on component mount
   useEffect(() => {
@@ -167,11 +171,71 @@ export default function ComparisonPage() {
   // Check if compare button should be enabled
   const isCompareEnabled = period && region && category && !comparisonLoading;
 
+  // Handle export action
+  const handleExportClick = async () => {
+    if (!period || !region || !category) {
+      setComparisonError("Vui lòng chọn đầy đủ các tiêu chí để xuất file");
+      return;
+    }
+
+    try {
+      setExportLoading(true);
+      setComparisonError(null);
+
+      const blob = await exportTargetPriceFile({
+        period,
+        region,
+        category,
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `BangGiaMucTieu_${period}_${region}_${category}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting target price file:', err);
+      setComparisonError(
+        err instanceof Error
+          ? err.message
+          : "Không thể xuất bảng giá mục tiêu"
+      );
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
       {/* Header */}
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">So sánh Báo giá</h2>
+
+        {/* Global Action Panel */}
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={handleExportClick}
+            disabled={!period || !region || !category || exportLoading}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {exportLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Đang xuất...
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="h-4 w-4" />
+                Xuất bảng giá mục tiêu
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Filter Bar */}

@@ -20,9 +20,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TrendingUpIcon, TrendingDownIcon } from "lucide-react";
+import { TrendingUpIcon, TrendingDownIcon, MessageSquare, CheckCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { negotiateQuotation, approveQuotation } from "@/lib/actions/quote-comparison.actions";
+import { negotiateQuotation, approveQuotation, batchNegotiation } from "@/lib/actions/quote-comparison.actions";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 
 export interface ComparisonMatrixProps {
@@ -32,6 +32,7 @@ export interface ComparisonMatrixProps {
 
 export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProps) {
   const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
+  const [batchLoading, setBatchLoading] = useState<Record<number, boolean>>({});
 
   // Early return if no data
   if (!matrixData || matrixData.products.length === 0) {
@@ -55,7 +56,73 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
   const { period, region, category } = matrixData;
   const suppliers = matrixData.suppliers.sort((a, b) => a.code.localeCompare(b.code));
 
-  // Action handlers
+  // Batch action handlers
+  const handleBatchNegotiate = async (supplierId: number, supplierName: string) => {
+    // Find all quotations for this supplier in the current matrix
+    const supplierQuotationIds: number[] = [];
+
+    matrixData.products.forEach(product => {
+      const supplierData = product.suppliers[supplierId];
+      if (supplierData && supplierData.id && supplierData.id > 0) {
+        supplierQuotationIds.push(supplierData.id);
+      }
+    });
+
+    if (supplierQuotationIds.length === 0) {
+      console.error('Error: Không tìm thấy báo giá nào cho nhà cung cấp', { supplierId, supplierName });
+      // TODO: Show error toast message
+      return;
+    }
+
+    setBatchLoading(prev => ({ ...prev, [supplierId]: true }));
+    try {
+      await batchNegotiation({ quotationIds: supplierQuotationIds });
+      // TODO: Show success message and refresh data
+      console.log(`Successfully negotiated ${supplierQuotationIds.length} quotations for ${supplierName}`);
+    } catch (error) {
+      console.error('Error in batch negotiation:', error);
+      // TODO: Show error message
+    } finally {
+      setBatchLoading(prev => ({ ...prev, [supplierId]: false }));
+    }
+  };
+
+  const handleBatchApprove = async (supplierId: number, supplierName: string) => {
+    // Find all quotations for this supplier in the current matrix
+    const supplierQuotationIds: number[] = [];
+
+    matrixData.products.forEach(product => {
+      const supplierData = product.suppliers[supplierId];
+      if (supplierData && supplierData.id && supplierData.id > 0) {
+        supplierQuotationIds.push(supplierData.id);
+      }
+    });
+
+    if (supplierQuotationIds.length === 0) {
+      console.error('Error: Không tìm thấy báo giá nào cho nhà cung cấp', { supplierId, supplierName });
+      // TODO: Show error toast message
+      return;
+    }
+
+    setBatchLoading(prev => ({ ...prev, [supplierId]: true }));
+    try {
+      // For batch approval, we'll call approve for each quotation individually
+      // since the approval action might need different logic per quotation
+      const approvalPromises = supplierQuotationIds.map(quotationId =>
+        approveQuotation({ id: quotationId })
+      );
+      await Promise.all(approvalPromises);
+      // TODO: Show success message and refresh data
+      console.log(`Successfully approved ${supplierQuotationIds.length} quotations for ${supplierName}`);
+    } catch (error) {
+      console.error('Error in batch approval:', error);
+      // TODO: Show error message
+    } finally {
+      setBatchLoading(prev => ({ ...prev, [supplierId]: false }));
+    }
+  };
+
+  // Individual action handlers
   const handleNegotiate = async (quotationId: number, supplierName: string) => {
     // Defensive check for valid quotation ID
     if (!quotationId || quotationId <= 0) {
@@ -165,6 +232,40 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                           </div>
                         </div>
 
+                        {/* Column Header Action Buttons */}
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-xs h-6 px-2"
+                            onClick={() => handleBatchNegotiate(supplier.id, supplier.name)}
+                            disabled={batchLoading[supplier.id]}
+                          >
+                            {batchLoading[supplier.id] ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                <MessageSquare className="h-3 w-3 mr-1" />
+                                Đàm phán tất cả
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="text-xs h-6 px-2"
+                            onClick={() => handleBatchApprove(supplier.id, supplier.name)}
+                            disabled={batchLoading[supplier.id]}
+                          >
+                            {batchLoading[supplier.id] ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Duyệt tất cả
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </TableHead>
                   ))}

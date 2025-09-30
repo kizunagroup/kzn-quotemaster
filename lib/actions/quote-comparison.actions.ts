@@ -1272,12 +1272,7 @@ export async function exportTargetPriceFile(params: {
   period: string;
   region: string;
   category?: string;
-}): Promise<{
-  success: boolean;
-  downloadUrl?: string;
-  fileName?: string;
-  error?: string;
-}> {
+}): Promise<Blob> {
   try {
     console.log("[exportTargetPriceFile] Starting export with params:", params);
 
@@ -1375,31 +1370,21 @@ export async function exportTargetPriceFile(params: {
       }
     });
 
-    // 3. Generate file buffer
+    // 3. Generate file buffer and return as Blob
     const buffer = await workbook.xlsx.writeBuffer();
-
-    // 4. Create filename
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/[-:]/g, '');
-    const fileName = `target-prices-${period}-${region}${category ? `-${category}` : ''}-${timestamp}.xlsx`;
-
-    // 5. For now, return the buffer as base64 (in a real implementation, save to temp storage)
-    const base64Data = Buffer.from(buffer).toString('base64');
-    const downloadUrl = `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64Data}`;
 
     console.log(`[exportTargetPriceFile] Generated Excel file with ${targetPriceData.length} products`);
 
-    return {
-      success: true,
-      downloadUrl,
-      fileName
-    };
+    // Return as Blob for direct download
+    return new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
 
   } catch (error) {
     console.error("Error in exportTargetPriceFile:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Lỗi khi xuất file giá mục tiêu"
-    };
+    throw new Error(
+      error instanceof Error ? error.message : "Lỗi khi xuất file giá mục tiêu"
+    );
   }
 }
 
