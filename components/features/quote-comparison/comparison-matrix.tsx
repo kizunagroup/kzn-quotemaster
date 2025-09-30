@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TrendingUpIcon, TrendingDownIcon, ArrowUp, ArrowDown } from "lucide-react";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatNumber, formatPercentage } from "@/lib/utils";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 
 export interface ComparisonMatrixProps {
@@ -263,8 +263,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                       "text-xs",
                                       variance.percentage > 0 ? "text-red-600" : "text-green-600"
                                     )}>
-                                      {variance.percentage > 0 ? '+' : ''}
-                                      {variance.percentage.toFixed(1)}%
+                                      {variance.percentage > 0 ? '+' : ''}{formatPercentage(variance.percentage)}
                                     </div>
                                   )}
                                 </div>
@@ -274,13 +273,12 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                   {/* Comparison vs Base Price */}
                                   {baseVariance && (
                                     <div>
-                                      <div className="font-medium">So với Giá cơ sở:</div>
+                                      <div className="font-medium text-foreground">So với Giá cơ sở:</div>
                                       <div className={cn(
                                         baseVariance.percentage > 0 ? "text-red-600" : "text-green-600"
                                       )}>
                                         {baseVariance.difference > 0 ? '+' : ''}
-                                        {formatNumber(baseVariance.difference)} ({baseVariance.percentage > 0 ? '+' : ''}
-                                        {baseVariance.percentage.toFixed(1)}%)
+                                        {formatNumber(baseVariance.difference)} ({baseVariance.percentage > 0 ? '+' : ''}{formatPercentage(baseVariance.percentage)})
                                       </div>
                                     </div>
                                   )}
@@ -288,13 +286,12 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                   {/* Comparison vs Previous Period */}
                                   {variance && (
                                     <div>
-                                      <div className="font-medium">So với Kỳ trước:</div>
+                                      <div className="font-medium text-foreground">So với Kỳ trước:</div>
                                       <div className={cn(
                                         variance.percentage > 0 ? "text-red-600" : "text-green-600"
                                       )}>
                                         {variance.difference > 0 ? '+' : ''}
-                                        {formatNumber(variance.difference)} ({variance.percentage > 0 ? '+' : ''}
-                                        {variance.percentage.toFixed(1)}%)
+                                        {formatNumber(variance.difference)} ({variance.percentage > 0 ? '+' : ''}{formatPercentage(variance.percentage)})
                                       </div>
                                     </div>
                                   )}

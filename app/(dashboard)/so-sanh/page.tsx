@@ -24,6 +24,7 @@ import { Loader2, FileSpreadsheet, CheckCircle, TrendingUp, TrendingDown, Chevro
 import { exportTargetPriceFile, initiateBatchNegotiationAndExport } from "@/lib/actions/quote-comparison.actions";
 import { ApprovalModal } from "@/components/features/quote-comparison/approval-modal";
 import { toast } from "sonner";
+import { formatNumber } from "@/lib/utils";
 
 export default function ComparisonPage() {
   // Filter states
@@ -512,12 +513,7 @@ export default function ComparisonPage() {
                 <div className="text-center p-4 border rounded-lg">
                   <p className="text-sm text-muted-foreground">Tổng giá trị hiện tại</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0
-                    }).format(matrixData.overviewKPIs.totalCurrentValue)}
+                    {formatNumber(matrixData.overviewKPIs.totalCurrentValue)} ₫
                   </p>
                 </div>
 
@@ -536,12 +532,7 @@ export default function ComparisonPage() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {matrixData.overviewKPIs.comparisonVsInitial.difference > 0 ? '+' : ''}
-                    {new Intl.NumberFormat('vi-VN', {
-                      style: 'currency',
-                      currency: 'VND',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0
-                    }).format(matrixData.overviewKPIs.comparisonVsInitial.difference)}
+                    {formatNumber(matrixData.overviewKPIs.comparisonVsInitial.difference)} ₫
                   </p>
                 </div>
 
@@ -562,12 +553,7 @@ export default function ComparisonPage() {
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {matrixData.overviewKPIs.comparisonVsPrevious.difference > 0 ? '+' : ''}
-                        {new Intl.NumberFormat('vi-VN', {
-                          style: 'currency',
-                          currency: 'VND',
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0
-                        }).format(matrixData.overviewKPIs.comparisonVsPrevious.difference)}
+                        {formatNumber(matrixData.overviewKPIs.comparisonVsPrevious.difference)} ₫
                       </p>
                     </>
                   ) : (
@@ -595,12 +581,7 @@ export default function ComparisonPage() {
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {matrixData.overviewKPIs.comparisonVsBase.difference > 0 ? '+' : ''}
-                        {new Intl.NumberFormat('vi-VN', {
-                          style: 'currency',
-                          currency: 'VND',
-                          minimumFractionDigits: 0,
-                          maximumFractionDigits: 0
-                        }).format(matrixData.overviewKPIs.comparisonVsBase.difference)}
+                        {formatNumber(matrixData.overviewKPIs.comparisonVsBase.difference)} ₫
                       </p>
                     </>
                   ) : (

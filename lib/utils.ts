@@ -27,3 +27,33 @@ export function formatNumber(value: number | string | null | undefined): string 
   // Format using Vietnamese locale (dots as thousand separators)
   return new Intl.NumberFormat('vi-VN').format(numberValue);
 }
+
+/**
+ * Centralized percentage formatting utility for Vietnamese locale
+ * @param value - The percentage value to format (number, null, or undefined)
+ * @returns Formatted percentage string with proper Vietnamese locale formatting
+ */
+export function formatPercentage(value: number | null | undefined): string {
+  // Handle null, undefined cases
+  if (value === null || value === undefined) {
+    return "-";
+  }
+
+  // Handle zero case - show as 0%
+  if (value === 0) {
+    return "0%";
+  }
+
+  // Handle NaN case
+  if (isNaN(value)) {
+    return "-";
+  }
+
+  // Format using Vietnamese locale with percent style
+  // Note: value / 100 is important because Intl.NumberFormat expects decimal values for percent style
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'percent',
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  }).format(value / 100);
+}
