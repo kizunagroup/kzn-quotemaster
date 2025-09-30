@@ -49,19 +49,6 @@ async function checkManagerRole() {
   return user;
 }
 
-async function checkApprovalRole() {
-  const user = await getUser();
-
-  if (!user) {
-    throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện hành động này");
-  }
-
-  // TODO: Implement proper role checking for approval operations
-  // This should check for ADMIN_SUPER_ADMIN or PROCUREMENT_MANAGER roles
-  // For now, assume all authenticated users have access
-
-  return user;
-}
 
 // ==================== MAIN ACTIONS ====================
 
@@ -1386,6 +1373,308 @@ export async function exportTargetPriceFile(params: {
       error instanceof Error ? error.message : "Lỗi khi xuất file giá mục tiêu"
     );
   }
+}
+
+/**
+ * Initiate batch negotiation and export target price file
+ * This combines two operations: batch negotiation + export
+ */
+export async function initiateBatchNegotiationAndExport(params: {
+  period: string;
+  region: string;
+  category?: string;
+}): Promise<Blob> {
+  try {
+    console.log("[initiateBatchNegotiationAndExport] Starting with params:", params);
+
+    // Authorization check
+    await checkManagerRole();
+
+    // Validate input
+    const validatedData = ExportTargetPriceSchema.parse(params);
+    const { period, region, category } = validatedData;
+
+    // Step 1: Find all pending quotations for the current view
+    const pendingQuotations = await db
+      .select({
+        id: quotations.id,
+        supplierId: quotations.supplierId,
+        status: quotations.status,
+      })
+      .from(quotations)
+      .innerJoin(quoteItems, eq(quotations.id, quoteItems.quotationId))
+      .innerJoin(products, eq(quoteItems.productId, products.id))
+      .where(
+        and(
+          eq(quotations.period, period),
+          eq(quotations.region, region),
+          category ? eq(products.category, category) : sql`1=1`,
+          eq(quotations.status, 'pending')
+        )
+      );
+
+    console.log(`[initiateBatchNegotiationAndExport] Found ${pendingQuotations.length} pending quotations`);
+
+    // Step 2: Update all pending quotations to negotiation status
+    if (pendingQuotations.length > 0) {
+      const quotationIds = pendingQuotations.map(q => q.id);
+      await db
+        .update(quotations)
+        .set({
+          status: 'negotiation',
+          updateDate: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(inArray(quotations.id, quotationIds));
+
+      console.log(`[initiateBatchNegotiationAndExport] Updated ${quotationIds.length} quotations to negotiation status`);
+    }
+
+    // Step 3: Get comparison matrix data for export
+    const matrixData = await getComparisonMatrix({ period, region, category });
+
+    if (!matrixData || matrixData.products.length === 0) {
+      throw new Error("Không có dữ liệu sản phẩm để xuất file");
+    }
+
+    // Step 4: Generate simplified Excel file with target prices
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Target Prices');
+
+    // Set up column headers - simplified as specified
+    const headers = [
+      'Mã sản phẩm', 'Tên sản phẩm', 'Quy cách', 'Đơn vị', 'Giá mục tiêu'
+    ];
+
+    // Add headers with styling
+    const headerRow = worksheet.addRow(headers);
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE6E6FA' }
+      };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+
+    // Add data rows - only best prices as target prices
+    matrixData.products.forEach(product => {
+      const bestPrice = product.bestPrice || 0;
+
+      const row = worksheet.addRow([
+        product.productCode,
+        product.productName,
+        '', // Quy cách - not available in current data structure
+        product.unit,
+        bestPrice
+      ]);
+
+      // Add borders to data cells
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      });
+    });
+
+    // Auto-fit columns
+    worksheet.columns.forEach((column) => {
+      if (column.header) {
+        const maxLength = Math.max(
+          column.header.toString().length,
+          ...worksheet.getColumn(column.letter).values
+            .slice(1) // Skip header
+            .map(val => val ? val.toString().length : 0)
+        );
+        column.width = Math.min(Math.max(maxLength + 2, 10), 50);
+      }
+    });
+
+    // Step 5: Generate file buffer and return as Blob
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    console.log(`[initiateBatchNegotiationAndExport] Generated Excel file with ${matrixData.products.length} products`);
+
+    // Revalidate relevant pages
+    revalidatePath('/so-sanh');
+    revalidatePath('/bao-gia');
+
+    // Return as Blob for direct download
+    return new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+
+  } catch (error) {
+    console.error("Error in initiateBatchNegotiationAndExport:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Lỗi khi thực hiện đàm phán hàng loạt và xuất file"
+    );
+  }
+}
+
+/**
+ * Approve multiple quotations
+ */
+export async function approveMultipleQuotations(
+  data: z.infer<typeof BatchNegotiationSchema>
+): Promise<{
+  success: string;
+  approvedQuotations: number;
+  totalApprovedValue: number;
+  affectedSuppliers: string[];
+}> {
+  try {
+    // Authorization check
+    const user = await checkApprovalRole();
+
+    // Validate input
+    const validatedData = BatchNegotiationSchema.parse(data);
+    const { quotationIds } = validatedData;
+
+    // Get quotations that can be approved
+    const quotationsToApprove = await db
+      .select({
+        id: quotations.id,
+        supplierId: quotations.supplierId,
+        supplierCode: suppliers.supplierCode,
+        supplierName: suppliers.name,
+        status: quotations.status,
+        period: quotations.period,
+        region: quotations.region,
+      })
+      .from(quotations)
+      .innerJoin(suppliers, eq(quotations.supplierId, suppliers.id))
+      .where(
+        and(
+          inArray(quotations.id, quotationIds),
+          inArray(quotations.status, ['pending', 'negotiation'])
+        )
+      );
+
+    if (quotationsToApprove.length === 0) {
+      throw new Error("Không tìm thấy báo giá hợp lệ để phê duyệt");
+    }
+
+    let totalApprovedValue = 0;
+    let approvedItemsCount = 0;
+
+    // Process each quotation for approval
+    for (const quotation of quotationsToApprove) {
+      const result = await db.transaction(async (tx) => {
+        let quotationApprovedValue = 0;
+        let quotationApprovedItems = 0;
+
+        // Get all quote items for this quotation
+        const items = await tx
+          .select()
+          .from(quoteItems)
+          .where(eq(quoteItems.quotationId, quotation.id));
+
+        // Process each item for approval
+        for (const item of items) {
+          let finalApprovedPrice: number | null = null;
+
+          // Determine approved price (priority: negotiated > initial)
+          if (item.negotiatedPrice) {
+            finalApprovedPrice = Number(item.negotiatedPrice);
+          } else if (item.initialPrice) {
+            finalApprovedPrice = Number(item.initialPrice);
+          }
+
+          if (finalApprovedPrice !== null && finalApprovedPrice > 0) {
+            // Update quote item with approved price
+            await tx
+              .update(quoteItems)
+              .set({
+                approvedPrice: finalApprovedPrice,
+                approvedAt: new Date(),
+                approvedBy: user.id,
+                updatedAt: new Date(),
+              })
+              .where(eq(quoteItems.id, item.id));
+
+            quotationApprovedItems++;
+            quotationApprovedValue += finalApprovedPrice * (Number(item.quantity) || 1);
+
+            // Log to price history
+            await tx.insert(priceHistory).values({
+              productId: item.productId,
+              supplierId: quotation.supplierId,
+              period: quotation.period,
+              price: finalApprovedPrice,
+              priceType: 'approved',
+              region: quotation.region,
+            });
+          }
+        }
+
+        // Update quotation status
+        await tx
+          .update(quotations)
+          .set({
+            status: 'approved',
+            updateDate: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(quotations.id, quotation.id));
+
+        return {
+          approvedItems: quotationApprovedItems,
+          approvedValue: quotationApprovedValue,
+        };
+      });
+
+      approvedItemsCount += result.approvedItems;
+      totalApprovedValue += result.approvedValue;
+    }
+
+    // Get affected supplier names
+    const affectedSuppliers = [...new Set(quotationsToApprove.map(q => q.supplierName))];
+
+    // Revalidate relevant pages
+    revalidatePath('/so-sanh');
+    revalidatePath('/bao-gia');
+    revalidatePath('/bang-gia');
+
+    return {
+      success: `Đã phê duyệt ${quotationsToApprove.length} báo giá từ ${affectedSuppliers.length} nhà cung cấp`,
+      approvedQuotations: quotationsToApprove.length,
+      totalApprovedValue,
+      affectedSuppliers,
+    };
+
+  } catch (error) {
+    console.error("Error in approveMultipleQuotations:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Lỗi khi phê duyệt báo giá hàng loạt"
+    );
+  }
+}
+
+/**
+ * Helper function to check approval role (higher permission than manager)
+ */
+async function checkApprovalRole() {
+  const user = await getUser();
+
+  if (!user) {
+    throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện hành động này");
+  }
+
+  // TODO: Implement proper role checking for approval-level operations
+  // This should check for ADMIN_SUPER_ADMIN or higher roles
+  // For now, assume all authenticated users have access
+
+  return user;
 }
 
 // Helper function placeholder (would save to actual temp storage in production)

@@ -19,8 +19,9 @@ import {
   getCategoriesForPeriodAndRegion
 } from "@/lib/actions/quote-comparison.actions";
 import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
-import { Loader2, FileSpreadsheet } from "lucide-react";
-import { exportTargetPriceFile } from "@/lib/actions/quote-comparison.actions";
+import { Loader2, FileSpreadsheet, CheckCircle } from "lucide-react";
+import { exportTargetPriceFile, initiateBatchNegotiationAndExport } from "@/lib/actions/quote-comparison.actions";
+import { ApprovalModal } from "@/components/features/quote-comparison/approval-modal";
 
 export default function ComparisonPage() {
   // Filter states
@@ -46,8 +47,10 @@ export default function ComparisonPage() {
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
 
-  // Export loading state
+  // Action loading states
   const [exportLoading, setExportLoading] = useState(false);
+  const [batchActionLoading, setBatchActionLoading] = useState(false);
+  const [approvalModalOpen, setApprovalModalOpen] = useState(false);
 
   // Fetch periods on component mount
   useEffect(() => {
@@ -171,6 +174,56 @@ export default function ComparisonPage() {
   // Check if compare button should be enabled
   const isCompareEnabled = period && region && category && !comparisonLoading;
 
+  // Handle batch negotiation and export
+  const handleBatchNegotiationAndExport = async () => {
+    if (!period || !region || !category) {
+      setComparisonError("Vui lòng chọn đầy đủ các tiêu chí để thực hiện");
+      return;
+    }
+
+    try {
+      setBatchActionLoading(true);
+      setComparisonError(null);
+
+      const blob = await initiateBatchNegotiationAndExport({
+        period,
+        region,
+        category,
+      });
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${category}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      // Refresh comparison data after batch action
+      await handleCompareClick();
+    } catch (err) {
+      console.error('Error in batch negotiation and export:', err);
+      setComparisonError(
+        err instanceof Error
+          ? err.message
+          : "Không thể thực hiện đàm phán hàng loạt và xuất file"
+      );
+    } finally {
+      setBatchActionLoading(false);
+    }
+  };
+
+  // Handle approval modal
+  const handleOpenApprovalModal = () => {
+    if (!matrixData || matrixData.availableSuppliers.length === 0) {
+      setComparisonError("Không có dữ liệu nhà cung cấp để phê duyệt");
+      return;
+    }
+    setApprovalModalOpen(true);
+  };
+
   // Handle export action
   const handleExportClick = async () => {
     if (!period || !region || !category) {
@@ -214,28 +267,6 @@ export default function ComparisonPage() {
       {/* Header */}
       <div className="flex items-center justify-between space-y-2">
         <h2 className="text-3xl font-bold tracking-tight">So sánh Báo giá</h2>
-
-        {/* Global Action Panel */}
-        <div className="flex items-center gap-3">
-          <Button
-            onClick={handleExportClick}
-            disabled={!period || !region || !category || exportLoading}
-            variant="outline"
-            className="flex items-center gap-2"
-          >
-            {exportLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Đang xuất...
-              </>
-            ) : (
-              <>
-                <FileSpreadsheet className="h-4 w-4" />
-                Xuất bảng giá mục tiêu
-              </>
-            )}
-          </Button>
-        </div>
       </div>
 
       {/* Filter Bar */}
@@ -542,6 +573,51 @@ export default function ComparisonPage() {
         </CardContent>
       </Card>
 
+      {/* Actions Section */}
+      {matrixData && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Hành động</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <Button
+                onClick={handleBatchNegotiationAndExport}
+                disabled={batchActionLoading}
+                className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700"
+              >
+                {batchActionLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Đang xử lý...
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="h-4 w-4" />
+                    Xuất Giá mục tiêu & Đàm phán
+                  </>
+                )}
+              </Button>
+
+              <Button
+                onClick={handleOpenApprovalModal}
+                disabled={!matrixData || matrixData.availableSuppliers.length === 0}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <CheckCircle className="h-4 w-4" />
+                Duyệt giá...
+              </Button>
+            </div>
+
+            <div className="mt-4 text-sm text-muted-foreground">
+              <p><strong>Xuất Giá mục tiêu & Đàm phán:</strong> Chuyển tất cả báo giá đang chờ sang trạng thái đàm phán và xuất file Excel với giá mục tiêu.</p>
+              <p className="mt-1"><strong>Duyệt giá:</strong> Mở modal để chọn và phê duyệt báo giá từ các nhà cung cấp.</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Details Section */}
       <Card>
         <CardHeader>
@@ -575,6 +651,19 @@ export default function ComparisonPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Approval Modal */}
+      {matrixData && (
+        <ApprovalModal
+          open={approvalModalOpen}
+          onOpenChange={setApprovalModalOpen}
+          suppliers={matrixData.availableSuppliers}
+          onApprovalComplete={() => {
+            setApprovalModalOpen(false);
+            handleCompareClick(); // Refresh data
+          }}
+        />
+      )}
     </div>
   );
 }

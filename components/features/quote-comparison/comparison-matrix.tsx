@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -11,18 +10,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PriceBadge } from "@/components/ui/price-badge";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TrendingUpIcon, TrendingDownIcon, MessageSquare, CheckCircle, Loader2 } from "lucide-react";
+import { TrendingUpIcon, TrendingDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { negotiateQuotation, approveQuotation, batchNegotiation } from "@/lib/actions/quote-comparison.actions";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 
 export interface ComparisonMatrixProps {
@@ -31,9 +27,6 @@ export interface ComparisonMatrixProps {
 }
 
 export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProps) {
-  const [loadingActions, setLoadingActions] = useState<Record<string, boolean>>({});
-  const [batchLoading, setBatchLoading] = useState<Record<number, boolean>>({});
-
   // Early return if no data
   if (!matrixData || matrixData.products.length === 0) {
     return (
@@ -56,115 +49,6 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
   const { period, region, category } = matrixData;
   const suppliers = matrixData.suppliers.sort((a, b) => a.code.localeCompare(b.code));
 
-  // Batch action handlers
-  const handleBatchNegotiate = async (supplierId: number, supplierName: string) => {
-    // Find all quotations for this supplier in the current matrix
-    const supplierQuotationIds: number[] = [];
-
-    matrixData.products.forEach(product => {
-      const supplierData = product.suppliers[supplierId];
-      if (supplierData && supplierData.id && supplierData.id > 0) {
-        supplierQuotationIds.push(supplierData.id);
-      }
-    });
-
-    if (supplierQuotationIds.length === 0) {
-      console.error('Error: Không tìm thấy báo giá nào cho nhà cung cấp', { supplierId, supplierName });
-      // TODO: Show error toast message
-      return;
-    }
-
-    setBatchLoading(prev => ({ ...prev, [supplierId]: true }));
-    try {
-      await batchNegotiation({ quotationIds: supplierQuotationIds });
-      // TODO: Show success message and refresh data
-      console.log(`Successfully negotiated ${supplierQuotationIds.length} quotations for ${supplierName}`);
-    } catch (error) {
-      console.error('Error in batch negotiation:', error);
-      // TODO: Show error message
-    } finally {
-      setBatchLoading(prev => ({ ...prev, [supplierId]: false }));
-    }
-  };
-
-  const handleBatchApprove = async (supplierId: number, supplierName: string) => {
-    // Find all quotations for this supplier in the current matrix
-    const supplierQuotationIds: number[] = [];
-
-    matrixData.products.forEach(product => {
-      const supplierData = product.suppliers[supplierId];
-      if (supplierData && supplierData.id && supplierData.id > 0) {
-        supplierQuotationIds.push(supplierData.id);
-      }
-    });
-
-    if (supplierQuotationIds.length === 0) {
-      console.error('Error: Không tìm thấy báo giá nào cho nhà cung cấp', { supplierId, supplierName });
-      // TODO: Show error toast message
-      return;
-    }
-
-    setBatchLoading(prev => ({ ...prev, [supplierId]: true }));
-    try {
-      // For batch approval, we'll call approve for each quotation individually
-      // since the approval action might need different logic per quotation
-      const approvalPromises = supplierQuotationIds.map(quotationId =>
-        approveQuotation({ id: quotationId })
-      );
-      await Promise.all(approvalPromises);
-      // TODO: Show success message and refresh data
-      console.log(`Successfully approved ${supplierQuotationIds.length} quotations for ${supplierName}`);
-    } catch (error) {
-      console.error('Error in batch approval:', error);
-      // TODO: Show error message
-    } finally {
-      setBatchLoading(prev => ({ ...prev, [supplierId]: false }));
-    }
-  };
-
-  // Individual action handlers
-  const handleNegotiate = async (quotationId: number, supplierName: string) => {
-    // Defensive check for valid quotation ID
-    if (!quotationId || quotationId <= 0) {
-      console.error('Error: Không thể xác định báo giá', { quotationId, supplierName });
-      // TODO: Show error toast message
-      return;
-    }
-
-    const actionKey = `negotiate_${quotationId}`;
-    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
-    try {
-      await negotiateQuotation({ id: quotationId });
-      // TODO: Show success message and refresh data
-    } catch (error) {
-      console.error('Error negotiating quotation:', error);
-      // TODO: Show error message
-    } finally {
-      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
-    }
-  };
-
-  const handleApprove = async (quotationId: number, supplierName: string) => {
-    // Defensive check for valid quotation ID
-    if (!quotationId || quotationId <= 0) {
-      console.error('Error: Không thể xác định báo giá', { quotationId, supplierName });
-      // TODO: Show error toast message
-      return;
-    }
-
-    const actionKey = `approve_${quotationId}`;
-    setLoadingActions(prev => ({ ...prev, [actionKey]: true }));
-    try {
-      await approveQuotation({ id: quotationId });
-      // TODO: Show success message and refresh data
-    } catch (error) {
-      console.error('Error approving quotation:', error);
-      // TODO: Show error message
-    } finally {
-      setLoadingActions(prev => ({ ...prev, [actionKey]: false }));
-    }
-  };
-
   // Helper function to calculate price variance
   const calculateVariance = (currentPrice: number, previousPrice?: number) => {
     if (!previousPrice || previousPrice === 0) return null;
@@ -181,17 +65,24 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
     }).format(price);
   };
 
-  // Helper function to get price styling based on status
+  // Helper function to get price styling based on status and best price
   const getPriceStyle = (supplierData: any, isBestPrice: boolean) => {
+    // Approved prices get light green background
     if (supplierData.approvedPrice) {
       return "bg-green-100 text-green-800 font-medium";
     }
+
+    // Best price gets green bold text
     if (isBestPrice) {
       return "text-green-600 font-bold";
     }
+
+    // Negotiated prices get orange text
     if (supplierData.negotiatedPrice) {
-      return "text-orange-600";
+      return "text-orange-600 font-medium";
     }
+
+    // Default for initial prices
     return "text-gray-900";
   };
 
@@ -212,59 +103,31 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
             <Table>
               <TableHeader>
                 <TableRow>
-                  {/* Fixed product information columns */}
+                  {/* Column 1: Mã SP */}
                   <TableHead className="min-w-[100px]">Mã SP</TableHead>
+
+                  {/* Column 2: Tên SP (with specification and unit) */}
                   <TableHead className="min-w-[200px]">Tên sản phẩm</TableHead>
+
+                  {/* Column 3: Số lượng cơ sở */}
+                  <TableHead className="min-w-[120px] text-center">Số lượng cơ sở</TableHead>
+
+                  {/* Column 4: Giá cơ sở */}
                   <TableHead className="min-w-[120px] text-center">Giá cơ sở</TableHead>
+
+                  {/* Column 5: Giá duyệt kỳ trước */}
                   <TableHead className="min-w-[120px] text-center">Giá duyệt kỳ trước</TableHead>
 
-                  {/* Dynamic supplier columns */}
+                  {/* Dynamic supplier columns - simplified headers */}
                   {suppliers.map((supplier) => (
                     <TableHead
                       key={supplier.id}
-                      className="min-w-[180px] text-center"
+                      className="min-w-[150px] text-center"
                     >
-                      <div className="space-y-2">
-                        <div className="space-y-1">
-                          <div className="font-medium">{supplier.code}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {supplier.name}
-                          </div>
-                        </div>
-
-                        {/* Column Header Action Buttons */}
-                        <div className="flex flex-col gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="text-xs h-6 px-2"
-                            onClick={() => handleBatchNegotiate(supplier.id, supplier.name)}
-                            disabled={batchLoading[supplier.id]}
-                          >
-                            {batchLoading[supplier.id] ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <>
-                                <MessageSquare className="h-3 w-3 mr-1" />
-                                Đàm phán tất cả
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            className="text-xs h-6 px-2"
-                            onClick={() => handleBatchApprove(supplier.id, supplier.name)}
-                            disabled={batchLoading[supplier.id]}
-                          >
-                            {batchLoading[supplier.id] ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <>
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Duyệt tất cả
-                              </>
-                            )}
-                          </Button>
+                      <div className="space-y-1">
+                        <div className="font-medium">{supplier.code}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {supplier.name}
                         </div>
                       </div>
                     </TableHead>
@@ -282,7 +145,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
 
                   return (
                     <TableRow key={product.productId}>
-                      {/* Product Code */}
+                      {/* Column 1: Product Code */}
                       <TableCell className="font-medium">
                         <div className="space-y-1">
                           <div>{product.productCode}</div>
@@ -292,17 +155,24 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                         </div>
                       </TableCell>
 
-                      {/* Product Name */}
+                      {/* Column 2: Product Name (with specification and unit on second line) */}
                       <TableCell>
                         <div className="space-y-1">
                           <div className="font-medium">{product.productName}</div>
                           <div className="text-xs text-muted-foreground">
-                            SL: {product.quantity.toLocaleString('vi-VN')}
+                            SL: {product.quantity.toLocaleString('vi-VN')} {product.unit}
                           </div>
                         </div>
                       </TableCell>
 
-                      {/* Base Price */}
+                      {/* Column 3: Base Quantity */}
+                      <TableCell className="text-center font-mono">
+                        <div className="font-medium text-gray-600">
+                          {product.baseQuantity?.toLocaleString('vi-VN') || product.quantity.toLocaleString('vi-VN')}
+                        </div>
+                      </TableCell>
+
+                      {/* Column 4: Base Price */}
                       <TableCell className="text-center font-mono">
                         {basePrice ? (
                           <div className="font-medium text-gray-600">
@@ -313,7 +183,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                         )}
                       </TableCell>
 
-                      {/* Previous Approved Price */}
+                      {/* Column 5: Previous Approved Price */}
                       <TableCell className="text-center font-mono">
                         {product.previousApprovedPrice ? (
                           <div className="font-medium text-blue-600">
@@ -351,7 +221,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                 {formatPrice(currentPrice)}
                               </div>
 
-                              {/* Variance Display */}
+                              {/* Variance Display with Arrow Icons */}
                               {variance && (
                                 <Tooltip>
                                   <TooltipTrigger>
@@ -381,27 +251,6 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                                   </TooltipContent>
                                 </Tooltip>
                               )}
-
-                              {/* Action Buttons */}
-                              <div className="flex flex-col gap-1 mt-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="text-xs h-6"
-                                  onClick={() => handleNegotiate(supplierData.id, supplier.name)}
-                                  disabled={loadingActions[`negotiate_${supplierData.id}`]}
-                                >
-                                  {loadingActions[`negotiate_${supplierData.id}`] ? 'Đang xử lý...' : 'Đàm phán'}
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  className="text-xs h-6"
-                                  onClick={() => handleApprove(supplierData.id, supplier.name)}
-                                  disabled={loadingActions[`approve_${supplierData.id}`]}
-                                >
-                                  {loadingActions[`approve_${supplierData.id}`] ? 'Đang xử lý...' : 'Duyệt giá'}
-                                </Button>
-                              </div>
                             </div>
                           </TableCell>
                         );
@@ -413,7 +262,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
             </Table>
           </div>
 
-          {/* Legend for Color System */}
+          {/* Updated Legend for Color System */}
           <div className="mt-6 p-4 bg-gray-50 rounded-lg">
             <div className="space-y-3">
               <div className="font-medium text-gray-700">Hệ thống màu sắc giá cả</div>
@@ -433,6 +282,18 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border rounded text-gray-900 flex items-center justify-center text-xs">B</div>
                   <span>Ban đầu</span>
+                </div>
+              </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1">
+                    <TrendingUpIcon className="h-3 w-3 text-red-600" />
+                    <span>Tăng so với kỳ trước</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <TrendingDownIcon className="h-3 w-3 text-green-600" />
+                    <span>Giảm so với kỳ trước</span>
+                  </div>
                 </div>
               </div>
             </div>
