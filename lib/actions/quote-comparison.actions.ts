@@ -446,7 +446,7 @@ export async function getComparisonMatrix(
         quotationWhere.push(eq(quotations.category, category));
       }
 
-      regionalQuotations = await db
+      const quotationsQuery = db
         .select({
           id: quotations.id,
           supplierId: quotations.supplierId,
@@ -460,12 +460,27 @@ export async function getComparisonMatrix(
         .from(quotations)
         .where(and(...quotationWhere));
 
+      // LOG THE GENERATED SQL QUERY
+      try {
+        console.log('[getComparisonMatrix] Step 2 SQL Query:', quotationsQuery.toSQL());
+      } catch (sqlError) {
+        console.error('[getComparisonMatrix] CRITICAL ERROR generating SQL for Step 2:', sqlError);
+        console.error('[getComparisonMatrix] Period type:', typeof period, 'Value:', period);
+        console.error('[getComparisonMatrix] Region type:', typeof region, 'Value:', region);
+        console.error('[getComparisonMatrix] Category type:', typeof category, 'Value:', category);
+        console.error('[getComparisonMatrix] QuotationWhere array:', quotationWhere);
+      }
+
+      regionalQuotations = await quotationsQuery;
+
       console.log(`[getComparisonMatrix] Step 2 RESULT: Found ${regionalQuotations.length} regional quotations`);
       if (regionalQuotations.length > 0) {
         console.log(`[getComparisonMatrix] Step 2 SAMPLE:`, regionalQuotations[0]);
       }
     } catch (error) {
       console.error('[getComparisonMatrix] CRITICAL ERROR in Step 2 - fetching quotations:', error);
+      console.error('[getComparisonMatrix] Error stack:', error.stack);
+      console.error('[getComparisonMatrix] Query parameters - period:', period, 'region:', region, 'category:', category);
       throw new Error(`Failed to fetch quotations: ${error.message}`);
     }
 
