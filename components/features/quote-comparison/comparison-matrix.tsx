@@ -185,27 +185,36 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
         </div>
 
         {/* Matrix summary information */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="space-y-1">
-            <div className="font-medium">Thông tin tổng quan</div>
-            <div>Tổng sản phẩm: {matrixData.products.length}</div>
-            <div>Tổng nhà cung cấp: {suppliers.length}</div>
-          </div>
+        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+            <div className="space-y-1">
+              <div className="font-medium text-gray-700">Thống kê</div>
+              <div>Sản phẩm: {matrixData.products.length}</div>
+              <div>Nhà cung cấp: {suppliers.length}</div>
+            </div>
 
-          <div className="space-y-1">
-            <div className="font-medium">Phạm vi so sánh</div>
-            <div>Kỳ: {period}</div>
-            <div>Khu vực: {region}</div>
-            {category && <div>Nhóm hàng: {category}</div>}
-          </div>
+            <div className="space-y-1">
+              <div className="font-medium text-gray-700">Phạm vi</div>
+              <div>Kỳ: {period}</div>
+              <div>Khu vực: {region}</div>
+            </div>
 
-          <div className="space-y-1">
-            <div className="font-medium">Cập nhật cuối</div>
-            <div>{matrixData.lastUpdated.toLocaleString('vi-VN')}</div>
+            <div className="space-y-1">
+              <div className="font-medium text-gray-700">Dữ liệu trước</div>
+              <div>
+                Có giá kỳ trước: {matrixData.products.filter(p => p.previousApprovedPrice).length} SP
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <div className="font-medium text-gray-700">Cập nhật</div>
+              <div>{matrixData.lastUpdated.toLocaleString('vi-VN')}</div>
+            </div>
           </div>
         </div>
       </CardContent>
     </Card>
+  </TooltipProvider>
   );
 }
 

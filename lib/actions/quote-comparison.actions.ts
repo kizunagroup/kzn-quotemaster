@@ -188,9 +188,11 @@ export async function getComparisonMatrix(
         unit: product.unit || '',
         quantity,
         quantitySource,
+        baseQuantity: Number(product.baseQuantity) || 1,
         suppliers: {}, // Will be populated with supplier data
         bestSupplierId: undefined,
         bestPrice: undefined,
+        previousApprovedPrice: undefined, // Will be populated later
       });
     });
 
@@ -447,6 +449,12 @@ export async function getComparisonMatrix(
     let productsWithBase = 0;
 
     matrixProducts.forEach(product => {
+      // Add previous approved price to product data
+      const previousPrice = previousApprovedPrices.get(product.productId);
+      if (previousPrice) {
+        product.previousApprovedPrice = previousPrice.price;
+      }
+
       // Find the best current price (effective price from any supplier)
       let bestCurrentPrice = 0;
       let bestInitialPrice = 0;
@@ -474,16 +482,14 @@ export async function getComparisonMatrix(
       totalInitialValue += productTotalInitial;
 
       // Previous period comparison
-      const previousPrice = previousApprovedPrices.get(product.productId);
       if (previousPrice) {
         totalPreviousValue += previousPrice.price * product.quantity;
         productsWithPrevious++;
       }
 
       // Base quantity comparison (use product's base quantity if different from current)
-      const baseQuantity = allProducts.find(p => p.id === product.productId)?.baseQuantity || 1;
-      if (baseQuantity !== product.quantity && bestCurrentPrice > 0) {
-        totalBaseValue += bestCurrentPrice * baseQuantity;
+      if (product.baseQuantity !== product.quantity && bestCurrentPrice > 0) {
+        totalBaseValue += bestCurrentPrice * product.baseQuantity;
         productsWithBase++;
       }
     });

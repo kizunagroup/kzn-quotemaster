@@ -34,9 +34,11 @@ export interface ProductComparison {
   unit: string;
   quantity: number;
   quantitySource: 'kitchen_demand' | 'base_quantity';
+  baseQuantity: number;
   suppliers: Record<number, PriceItem & ComparisonMetrics>;
   bestSupplierId?: number;
   bestPrice?: number;
+  previousApprovedPrice?: number;
 }
 
 export interface ComparisonMatrix {
