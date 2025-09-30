@@ -530,6 +530,18 @@ export default function ComparisonPage() {
                 <CheckCircle className="h-4 w-4" />
                 Duyệt giá
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDetailsVisible(!isDetailsVisible)}
+                className="h-8 w-8 p-0"
+              >
+                {isDetailsVisible ? (
+                  <ChevronUp className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
             </div>
           )}
         </CardHeader>
@@ -721,23 +733,11 @@ export default function ComparisonPage() {
       </Card>
 
       {/* Details Section */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle>Chi tiết so sánh</CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsDetailsVisible(!isDetailsVisible)}
-            className="h-8 w-8"
-          >
-            {isDetailsVisible ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
-          </Button>
-        </CardHeader>
-        {isDetailsVisible && (
+      {isDetailsVisible && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Chi tiết so sánh</CardTitle>
+          </CardHeader>
           <CardContent>
             {comparisonLoading ? (
               <div className="text-center text-gray-500 space-y-4">
@@ -771,8 +771,8 @@ export default function ComparisonPage() {
               </div>
             )}
           </CardContent>
-        )}
-      </Card>
+        </Card>
+      )}
 
       {/* Approval Modal */}
       {matrixData && (
