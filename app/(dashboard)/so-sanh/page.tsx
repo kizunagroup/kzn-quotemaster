@@ -20,7 +20,7 @@ import {
   getCategoriesForPeriodAndRegion
 } from "@/lib/actions/quote-comparison.actions";
 import { type ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
-import { Loader2, FileSpreadsheet, CheckCircle, TrendingUp, TrendingDown } from "lucide-react";
+import { Loader2, FileSpreadsheet, CheckCircle, TrendingUp, TrendingDown, ChevronUp, ChevronDown } from "lucide-react";
 import { exportTargetPriceFile, initiateBatchNegotiationAndExport } from "@/lib/actions/quote-comparison.actions";
 import { ApprovalModal } from "@/components/features/quote-comparison/approval-modal";
 import { toast } from "sonner";
@@ -53,6 +53,9 @@ export default function ComparisonPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [batchActionLoading, setBatchActionLoading] = useState(false);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
+
+  // UI state
+  const [isDetailsVisible, setIsDetailsVisible] = useState(true);
 
   // Fetch periods on component mount
   useEffect(() => {
@@ -636,10 +639,23 @@ export default function ComparisonPage() {
 
       {/* Details Section */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle>Chi tiết so sánh</CardTitle>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsDetailsVisible(!isDetailsVisible)}
+            className="h-8 w-8"
+          >
+            {isDetailsVisible ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
+            )}
+          </Button>
         </CardHeader>
-        <CardContent>
+        {isDetailsVisible && (
+          <CardContent>
           {comparisonLoading ? (
             <div className="text-center text-gray-500 space-y-4">
               <Loader2 className="h-8 w-8 animate-spin mx-auto" />
@@ -665,7 +681,8 @@ export default function ComparisonPage() {
               </p>
             </div>
           )}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
       {/* Approval Modal */}

@@ -17,7 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TrendingUpIcon, TrendingDownIcon } from "lucide-react";
+import { TrendingUpIcon, TrendingDownIcon, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 
@@ -226,48 +226,88 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                         const variance = calculateVariance(currentPrice, product.previousApprovedPrice);
                         const isBestPrice = product.bestSupplierId === supplier.id;
 
+                        // Calculate base price (lowest initial price) for comparison
+                        const supplierPrices = Object.values(product.suppliers).filter(s => s.initialPrice);
+                        const basePrice = supplierPrices.length > 0
+                          ? Math.min(...supplierPrices.map(s => s.initialPrice || Infinity))
+                          : undefined;
+
+                        // Calculate variance vs base price
+                        const baseVariance = basePrice ? calculateVariance(currentPrice, basePrice) : null;
+
                         return (
                           <TableCell key={supplier.id} className="text-center text-sm font-jakarta">
-                            <div className="space-y-2">
-                              {/* Current Price Display with Color Coding */}
-                              <div className={cn(
-                                "text-sm px-2 py-1 rounded font-jakarta",
-                                getPriceStyle(isBestPrice)
-                              )}>
-                                {formatPrice(currentPrice)}
-                              </div>
-
-                              {/* Variance Display with Arrow Icons */}
-                              {variance && (
-                                <Tooltip>
-                                  <TooltipTrigger>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="space-y-2 cursor-pointer">
+                                  {/* Current Price Display with Variance Icon */}
+                                  <div className="flex items-center justify-center gap-2">
                                     <div className={cn(
-                                      "flex items-center justify-center gap-1 text-sm",
+                                      "text-sm px-2 py-1 rounded font-jakarta",
+                                      getPriceStyle(isBestPrice)
+                                    )}>
+                                      {formatPrice(currentPrice)}
+                                    </div>
+
+                                    {/* Variance Arrow Icon */}
+                                    {variance && (
+                                      <div className={cn(
+                                        "flex items-center",
+                                        variance.percentage > 0 ? "text-red-500" : "text-green-500"
+                                      )}>
+                                        {variance.percentage > 0 ? (
+                                          <ArrowUp className="h-3 w-3" />
+                                        ) : (
+                                          <ArrowDown className="h-3 w-3" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Small percentage display */}
+                                  {variance && (
+                                    <div className={cn(
+                                      "text-xs",
                                       variance.percentage > 0 ? "text-red-600" : "text-green-600"
                                     )}>
-                                      {variance.percentage > 0 ? (
-                                        <TrendingUpIcon className="h-3 w-3" />
-                                      ) : (
-                                        <TrendingDownIcon className="h-3 w-3" />
-                                      )}
-                                      <span>
-                                        {variance.percentage > 0 ? '+' : ''}
-                                        {variance.percentage.toFixed(1)}%
-                                      </span>
+                                      {variance.percentage > 0 ? '+' : ''}
+                                      {variance.percentage.toFixed(1)}%
                                     </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <div className="space-y-1">
-                                      <div>So với kỳ trước:</div>
-                                      <div>
-                                        {variance.difference > 0 ? '+' : ''}
-                                        {formatPrice(variance.difference)}
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="space-y-2 text-sm">
+                                  {/* Comparison vs Base Price */}
+                                  {baseVariance && (
+                                    <div>
+                                      <div className="font-medium">So với Giá cơ sở:</div>
+                                      <div className={cn(
+                                        baseVariance.percentage > 0 ? "text-red-600" : "text-green-600"
+                                      )}>
+                                        {baseVariance.difference > 0 ? '+' : ''}
+                                        {formatPrice(baseVariance.difference)} ({baseVariance.percentage > 0 ? '+' : ''}
+                                        {baseVariance.percentage.toFixed(1)}%)
                                       </div>
                                     </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              )}
-                            </div>
+                                  )}
+
+                                  {/* Comparison vs Previous Period */}
+                                  {variance && (
+                                    <div>
+                                      <div className="font-medium">So với Kỳ trước:</div>
+                                      <div className={cn(
+                                        variance.percentage > 0 ? "text-red-600" : "text-green-600"
+                                      )}>
+                                        {variance.difference > 0 ? '+' : ''}
+                                        {formatPrice(variance.difference)} ({variance.percentage > 0 ? '+' : ''}
+                                        {variance.percentage.toFixed(1)}%)
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
                           </TableCell>
                         );
                       })}
