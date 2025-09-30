@@ -48,49 +48,9 @@ import {
 import { type PermissionSet } from "@/lib/auth/permissions";
 import { ImportExcelModal } from "./import-excel-modal";
 import { QuoteDetailsModal } from "./quote-details-modal";
-import { QuotationsTableToolbar } from "./quotations-table-toolbar";
+import { QuotationsTableToolbar, getStatusLabel, getStatusVariant } from "./quotations-table-toolbar";
 
-// Status badge styling
-const statusConfig = {
-  pending: { label: "Chờ duyệt", variant: "secondary" as const },
-  negotiation: { label: "Đàm phán", variant: "default" as const },
-  approved: { label: "Đã duyệt", variant: "default" as const },
-  cancelled: { label: "Đã hủy", variant: "destructive" as const },
-};
-
-// Get status variant for badges (matching Products pattern)
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "approved":
-      return "default";
-    case "pending":
-      return "secondary";
-    case "negotiation":
-      return "outline";
-    case "cancelled":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
-
-// Get status label (matching Products pattern)
-const getStatusLabel = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case "approved":
-      return "Đã duyệt";
-    case "pending":
-      return "Chờ duyệt";
-    case "negotiation":
-      return "Đàm phán";
-    case "cancelled":
-      return "Đã hủy";
-    default:
-      return status;
-  }
-};
+// Status helpers are now imported from the toolbar for consistency
 
 // Table columns definition (matching Products pattern)
 const createColumns = (
@@ -100,6 +60,7 @@ const createColumns = (
 ): ColumnDef<Quotation>[] => [
   {
     accessorKey: "period",
+    enableSorting: true,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Kỳ báo giá" />
     ),
@@ -109,21 +70,30 @@ const createColumns = (
   },
   {
     accessorKey: "region",
-    header: "Khu vực",
+    enableSorting: true,
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Khu vực" />
+    ),
     cell: ({ row }) => (
       <div className="max-w-[100px] truncate">{row.getValue("region")}</div>
     ),
   },
   {
     accessorKey: "supplierCode",
-    header: "Mã NCC",
+    enableSorting: true,
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Mã NCC" />
+    ),
     cell: ({ row }) => (
       <div className="font-mono text-sm">{row.getValue("supplierCode")}</div>
     ),
   },
   {
     accessorKey: "supplierName",
-    header: "Tên NCC",
+    enableSorting: true,
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Tên NCC" />
+    ),
     cell: ({ row }) => (
       <div className="max-w-[200px] truncate" title={row.getValue("supplierName") as string}>
         {row.getValue("supplierName")}
@@ -132,7 +102,10 @@ const createColumns = (
   },
   {
     accessorKey: "status",
-    header: "Trạng thái",
+    enableSorting: true,
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Trạng thái" />
+    ),
     cell: ({ row }) => {
       const status = row.getValue("status") as string;
       return (
@@ -144,7 +117,10 @@ const createColumns = (
   },
   {
     accessorKey: "itemCount",
-    header: "Số SP",
+    enableSorting: true,
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Số SP" />
+    ),
     cell: ({ row }) => (
       <div className="text-center">{row.getValue("itemCount")}</div>
     ),

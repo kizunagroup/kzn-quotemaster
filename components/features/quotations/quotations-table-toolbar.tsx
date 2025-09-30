@@ -30,14 +30,38 @@ import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
 import { FileSpreadsheet } from "lucide-react";
 import type { Quotation } from "@/lib/hooks/use-quotations";
 
-// Static status options (these don't change)
-const statusOptions = [
+// Single source of truth for status options - used in both filters and data display
+export const statusOptions = [
   { value: "all", label: "Tất cả trạng thái" },
   { value: "pending", label: "Chờ Duyệt" },
   { value: "approved", label: "Đã Duyệt" },
   { value: "negotiation", label: "Đang Thương Lượng" },
   { value: "cancelled", label: "Đã Hủy" },
 ] as const;
+
+// Helper function to get status label from value - ensures consistency
+export const getStatusLabel = (status: string): string => {
+  const option = statusOptions.find(opt => opt.value === status);
+  return option?.label || status;
+};
+
+// Helper function to get status variant for Badge component
+export const getStatusVariant = (
+  status: string
+): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status.toLowerCase()) {
+    case "approved":
+      return "default";
+    case "pending":
+      return "secondary";
+    case "negotiation":
+      return "outline";
+    case "cancelled":
+      return "destructive";
+    default:
+      return "outline";
+  }
+};
 
 
 interface QuotationsTableToolbarProps {
@@ -182,9 +206,10 @@ export function QuotationsTableToolbar({
       {/* Period Filter */}
       <Select value={selectedPeriod} onValueChange={onPeriodChange}>
         <SelectTrigger className="h-8 w-[150px]">
-          <SelectValue placeholder="Kỳ báo giá" />
+          <SelectValue placeholder="Tất cả kỳ báo giá" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="all">Tất cả kỳ báo giá</SelectItem>
           {availablePeriods.map((period) => (
             <SelectItem key={period} value={period}>
               {period}
@@ -196,9 +221,10 @@ export function QuotationsTableToolbar({
       {/* Supplier Filter */}
       <Select value={selectedSupplier} onValueChange={onSupplierChange}>
         <SelectTrigger className="h-8 w-[200px]">
-          <SelectValue placeholder="Nhà cung cấp" />
+          <SelectValue placeholder="Tất cả nhà cung cấp" />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="all">Tất cả nhà cung cấp</SelectItem>
           {availableSuppliers.map((supplier) => (
             <SelectItem key={supplier.id} value={supplier.id.toString()}>
               {supplier.code} - {supplier.name}
@@ -224,21 +250,20 @@ export function QuotationsTableToolbar({
   );
 }
 
-// Helper function to get display names for columns
+// Helper function to get display names for columns - matches table headers exactly
 function getColumnDisplayName(columnId: string): string {
   const columnNames: Record<string, string> = {
     period: "Kỳ báo giá",
     region: "Khu vực",
-    "supplier.supplierCode": "Mã NCC",
-    "supplier.name": "Tên NCC",
+    supplierCode: "Mã NCC",
+    supplierName: "Tên NCC",
     status: "Trạng thái",
     itemCount: "Số SP",
     createdAt: "Ngày tạo",
-    "creator.name": "Người tạo",
   };
 
   return columnNames[columnId] || columnId;
 }
 
-// Export static options for use in other components
-export { statusOptions };
+// Export helpers for use in other components
+export { statusOptions, getStatusLabel, getStatusVariant };

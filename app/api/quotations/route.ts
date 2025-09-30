@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
 
     // V3.2: No team-based filtering needed - centralized purchasing model
 
-    // 6. Safe column mapping for sorting - only use main table columns to avoid undefined references
+    // 6. Safe column mapping for sorting - supports all table columns
     const getSortColumn = (sortField: string) => {
       // Ensure sortField is defined and is a string
       const field = sortField || "createdAt";
@@ -134,6 +134,17 @@ export async function GET(request: NextRequest) {
           return quotations.updateDate;
         case "status":
           return quotations.status;
+        case "supplierCode":
+          return suppliers.supplierCode;
+        case "supplierName":
+          return suppliers.name;
+        case "itemCount":
+          // For itemCount, we'll sort by the subquery result
+          return sql`COALESCE((
+            SELECT COUNT(*)::integer
+            FROM ${quoteItems}
+            WHERE ${quoteItems.quotationId} = ${quotations.id}
+          ), 0)`;
         case "createdAt":
         default:
           return quotations.createdAt;
