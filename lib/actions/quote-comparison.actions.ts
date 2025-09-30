@@ -1394,47 +1394,48 @@ export async function initiateBatchNegotiationAndExport(params: {
     const validatedData = ExportTargetPriceSchema.parse(params);
     const { period, region, category } = validatedData;
 
-    // Step 1: Find all pending quotations for the current view
-    const pendingQuotations = await db
-      .select({
-        id: quotations.id,
-        supplierId: quotations.supplierId,
-        status: quotations.status,
-      })
-      .from(quotations)
-      .innerJoin(quoteItems, eq(quotations.id, quoteItems.quotationId))
-      .innerJoin(products, eq(quoteItems.productId, products.id))
-      .where(
-        and(
-          eq(quotations.period, period),
-          eq(quotations.region, region),
-          category ? eq(products.category, category) : sql`1=1`,
-          eq(quotations.status, 'pending')
-        )
-      );
+    // Step 1: Get comparison matrix data first to identify quotations in current view
+    const matrixData = await getComparisonMatrix({ period, region, category });
 
-    console.log(`[initiateBatchNegotiationAndExport] Found ${pendingQuotations.length} pending quotations`);
+    if (!matrixData || matrixData.availableSuppliers.length === 0) {
+      throw new Error("Không có dữ liệu nhà cung cấp để thực hiện");
+    }
 
-    // Step 2: Update all pending quotations to negotiation status
-    if (pendingQuotations.length > 0) {
-      const quotationIds = pendingQuotations.map(q => q.id);
-      await db
+    if (!matrixData.products || matrixData.products.length === 0) {
+      throw new Error("Không có dữ liệu sản phẩm để xuất file");
+    }
+
+    // Step 2: Extract pending quotation IDs from matrixData
+    const pendingQuotationIds = matrixData.availableSuppliers
+      .filter(supplier =>
+        supplier.quotationId &&
+        supplier.quotationId > 0 &&
+        supplier.quotationStatus === 'pending'
+      )
+      .map(supplier => supplier.quotationId!)
+      .filter((id, index, array) => array.indexOf(id) === index); // Remove duplicates
+
+    console.log(`[initiateBatchNegotiationAndExport] Found ${pendingQuotationIds.length} pending quotations from matrix data`);
+
+    // Step 3: Perform efficient batch status update using single UPDATE query
+    if (pendingQuotationIds.length > 0) {
+      const updateResult = await db
         .update(quotations)
         .set({
           status: 'negotiation',
           updateDate: new Date(),
           updatedAt: new Date(),
         })
-        .where(inArray(quotations.id, quotationIds));
+        .where(
+          and(
+            inArray(quotations.id, pendingQuotationIds),
+            eq(quotations.status, 'pending') // Additional safety check
+          )
+        );
 
-      console.log(`[initiateBatchNegotiationAndExport] Updated ${quotationIds.length} quotations to negotiation status`);
-    }
-
-    // Step 3: Get comparison matrix data for export
-    const matrixData = await getComparisonMatrix({ period, region, category });
-
-    if (!matrixData || matrixData.products.length === 0) {
-      throw new Error("Không có dữ liệu sản phẩm để xuất file");
+      console.log(`[initiateBatchNegotiationAndExport] Updated ${pendingQuotationIds.length} quotations to negotiation status`);
+    } else {
+      console.log(`[initiateBatchNegotiationAndExport] No pending quotations found to update`);
     }
 
     // Step 4: Generate simplified Excel file with target prices
@@ -1465,24 +1466,34 @@ export async function initiateBatchNegotiationAndExport(params: {
 
     // Add data rows - only best prices as target prices
     matrixData.products.forEach(product => {
-      const bestPrice = product.bestPrice || 0;
+      // Use bestPrice from product, defaulting to 0 if not available
+      const targetPrice = product.bestPrice || 0;
 
-      const row = worksheet.addRow([
-        product.productCode,
-        product.productName,
-        '', // Quy cách - not available in current data structure
-        product.unit,
-        bestPrice
-      ]);
+      // Ensure we have valid data for each required column
+      const rowData = [
+        product.productCode || '',        // Mã sản phẩm
+        product.productName || '',        // Tên sản phẩm
+        '',                               // Quy cách (specification) - not available in current data structure
+        product.unit || '',               // Đơn vị
+        targetPrice                       // Giá mục tiêu (best price)
+      ];
 
-      // Add borders to data cells
-      row.eachCell((cell) => {
+      const row = worksheet.addRow(rowData);
+
+      // Apply formatting to data cells
+      row.eachCell((cell, colNumber) => {
+        // Add borders to all cells
         cell.border = {
           top: { style: 'thin' },
           left: { style: 'thin' },
           bottom: { style: 'thin' },
           right: { style: 'thin' }
         };
+
+        // Format price column (column 5) as number with thousand separators
+        if (colNumber === 5 && typeof cell.value === 'number') {
+          cell.numFmt = '#,##0';
+        }
       });
     });
 
