@@ -182,14 +182,14 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       </TableCell>
 
                       {/* Column 3: Base Quantity */}
-                      <TableCell className="text-center font-mono">
+                      <TableCell className="text-center text-sm font-jakarta">
                         <div className="font-medium text-gray-600">
                           {product.baseQuantity?.toLocaleString('vi-VN') || product.quantity.toLocaleString('vi-VN')}
                         </div>
                       </TableCell>
 
                       {/* Column 4: Base Price */}
-                      <TableCell className="text-center font-mono">
+                      <TableCell className="text-center text-sm font-jakarta">
                         {basePrice ? (
                           <div className="font-medium text-gray-600">
                             {formatPrice(basePrice)}
@@ -200,7 +200,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       </TableCell>
 
                       {/* Column 5: Previous Approved Price */}
-                      <TableCell className="text-center font-mono">
+                      <TableCell className="text-center text-sm font-jakarta">
                         {product.previousApprovedPrice ? (
                           <div className="font-medium text-blue-600">
                             {formatPrice(product.previousApprovedPrice)}
@@ -227,11 +227,11 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                         const isBestPrice = product.bestSupplierId === supplier.id;
 
                         return (
-                          <TableCell key={supplier.id} className="text-center font-mono">
+                          <TableCell key={supplier.id} className="text-center text-sm font-jakarta">
                             <div className="space-y-2">
                               {/* Current Price Display with Color Coding */}
                               <div className={cn(
-                                "text-lg px-2 py-1 rounded",
+                                "text-sm px-2 py-1 rounded font-jakarta",
                                 getPriceStyle(isBestPrice)
                               )}>
                                 {formatPrice(currentPrice)}
