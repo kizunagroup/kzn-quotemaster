@@ -33,6 +33,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Separator } from "@/components/ui/separator";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
 import { getAvailablePeriods } from "@/lib/actions/quotations.actions";
 import {
@@ -579,20 +580,21 @@ export default function ComparisonPage() {
               {matrixData.groupedOverview && matrixData.groupedOverview.regions.length > 0 ? (
                 <div className="space-y-4">
                   {matrixData.groupedOverview.regions.map((regionData) => (
-                    <div key={regionData.region} className="space-y-2">
-                      {regionData.categories.map((categoryData) => (
-                        <Accordion key={`${regionData.region}-${categoryData.category}`} type="single" collapsible>
-                          <AccordionItem value={categoryData.category}>
-                            <AccordionTrigger className="text-left hover:no-underline">
-                              <div className="flex items-center gap-3">
-                                <span className="font-semibold text-base">
-                                  {regionData.region} - {categoryData.category}
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {categoryData.supplierPerformances.length} NCC
-                                </Badge>
-                              </div>
-                            </AccordionTrigger>
+                    <div key={regionData.region} className="space-y-3">
+                      {regionData.categories.map((categoryData, categoryIndex) => (
+                        <div key={`${regionData.region}-${categoryData.category}`}>
+                          <Accordion type="single" collapsible>
+                            <AccordionItem value={categoryData.category} className="border-none">
+                              <AccordionTrigger className="text-left hover:no-underline py-3">
+                                <div className="flex items-center gap-3">
+                                  <span className="font-semibold text-base">
+                                    {regionData.region} - {categoryData.category}
+                                  </span>
+                                  <Badge variant="outline" className="text-xs">
+                                    {categoryData.supplierPerformances.length} NCC
+                                  </Badge>
+                                </div>
+                              </AccordionTrigger>
                             <AccordionContent>
                               <div className="rounded-md border overflow-x-auto">
                                 <Table>
@@ -699,8 +701,13 @@ export default function ComparisonPage() {
                                 </Table>
                               </div>
                             </AccordionContent>
-                          </AccordionItem>
-                        </Accordion>
+                            </AccordionItem>
+                          </Accordion>
+                          {/* Add separator between groups, but not after the last one */}
+                          {categoryIndex < regionData.categories.length - 1 && (
+                            <Separator className="my-4" />
+                          )}
+                        </div>
                       ))}
                     </div>
                   ))}
