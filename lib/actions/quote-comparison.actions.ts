@@ -114,23 +114,7 @@ export async function getComparisonMatrix(
         region,
         category: categories.join(", "),
         lastUpdated: new Date(),
-        overviewKPIs: {
-          totalCurrentValue: 0,
-          comparisonVsInitial: { difference: 0, percentage: 0 },
-          comparisonVsPrevious: {
-            difference: 0,
-            percentage: 0,
-            hasPreviousData: false,
-          },
-          comparisonVsBase: {
-            difference: 0,
-            percentage: 0,
-            hasBaseData: false,
-          },
-          totalProducts: 0,
-          totalSuppliers: 0,
-          productsWithPrevious: 0,
-        },
+        groupedOverview: { regions: [] },
         availableSuppliers: [],
       };
     }
@@ -785,8 +769,8 @@ export async function getComparisonMatrix(
       `[getComparisonMatrix] === HYPER-DEFENSIVE DATA FETCHING COMPLETE ===`
     );
 
-    // STEP 8: Calculate Overview KPIs
-    console.log(`[getComparisonMatrix] Calculating overview KPIs...`);
+    // STEP 8: Get previous approved prices and enhance product data with variance
+    console.log(`[getComparisonMatrix] Fetching previous approved prices and calculating variance...`);
 
     // Get previous approved prices for comparison
     const previousApprovedPrices = await getPreviousApprovedPrices(
@@ -795,122 +779,185 @@ export async function getComparisonMatrix(
       categories
     );
 
-    // Calculate KPIs
-    let totalCurrentValue = 0;
-    let totalInitialValue = 0;
-    let totalPreviousValue = 0;
-    let totalBaseValue = 0;
-
-    let productsWithPrevious = 0;
-    let productsWithBase = 0;
-
+    // Add previous approved price to each product and calculate variance for each supplier
     matrixProducts.forEach((product) => {
-      // Add previous approved price to product data
       const previousPrice = previousApprovedPrices.get(product.productId);
       if (previousPrice) {
         product.previousApprovedPrice = previousPrice.price;
       }
 
-      // Find the best current price (effective price from any supplier)
-      let bestCurrentPrice = 0;
-      let bestInitialPrice = 0;
+      // Calculate variance percentage for each supplier
+      Object.keys(product.suppliers).forEach((supplierIdStr) => {
+        const supplierId = parseInt(supplierIdStr);
+        const supplierData = product.suppliers[supplierId];
 
-      Object.values(product.suppliers).forEach((supplierData) => {
-        if (supplierData.hasPrice) {
+        if (supplierData.hasPrice && previousPrice && previousPrice.price > 0) {
           const currentPrice = supplierData.pricePerUnit;
-          const initialPrice = supplierData.initialPrice || 0;
+          const prevPrice = previousPrice.price;
 
-          if (
-            bestCurrentPrice === 0 ||
-            (currentPrice > 0 && currentPrice < bestCurrentPrice)
-          ) {
-            bestCurrentPrice = currentPrice;
+          // Calculate percentage variance
+          const variancePercentage = ((currentPrice - prevPrice) / prevPrice) * 100;
+
+          // Determine trend (considering 0.5% as stable threshold)
+          let varianceTrend: 'up' | 'down' | 'stable' = 'stable';
+          if (variancePercentage > 0.5) {
+            varianceTrend = 'up';
+          } else if (variancePercentage < -0.5) {
+            varianceTrend = 'down';
           }
 
-          if (
-            bestInitialPrice === 0 ||
-            (initialPrice > 0 && initialPrice < bestInitialPrice)
-          ) {
-            bestInitialPrice = initialPrice;
-          }
+          // Add variance data to supplier
+          supplierData.variancePercentage = variancePercentage;
+          supplierData.varianceTrend = varianceTrend;
         }
       });
+    });
 
-      // Calculate values for this product
-      const productTotalCurrent = bestCurrentPrice * product.quantity;
-      const productTotalInitial = bestInitialPrice * product.quantity;
+    // STEP 9: Calculate Grouped Overview (Region > Category > Supplier)
+    console.log(`[getComparisonMatrix] Calculating grouped overview metrics (Region > Category > Supplier)...`);
 
-      totalCurrentValue += productTotalCurrent;
-      totalInitialValue += productTotalInitial;
+    // Create nested map: Region -> Category -> Supplier -> Data
+    const regionCategorySupplierMap = new Map<string, Map<string, Map<number, any>>>();
 
-      // Previous period comparison
-      if (previousPrice) {
-        totalPreviousValue += previousPrice.price * product.quantity;
-        productsWithPrevious++;
-      }
+    matrixProducts.forEach((product) => {
+      // For each product, loop through its suppliers
+      Object.keys(product.suppliers).forEach((supplierIdStr) => {
+        const supplierId = parseInt(supplierIdStr);
+        const supplierData = product.suppliers[supplierId];
 
-      // Base quantity comparison (always include for comparison with base quantities)
-      if (bestCurrentPrice > 0) {
-        const baseTotal = bestCurrentPrice * product.baseQuantity;
-        totalBaseValue += baseTotal;
-        // Only count as having "base data" if base quantity differs from current
-        if (product.baseQuantity !== product.quantity) {
-          productsWithBase++;
+        // Skip suppliers without prices
+        if (!supplierData.hasPrice) return;
+
+        // Initialize nested structure if needed
+        if (!regionCategorySupplierMap.has(region)) {
+          regionCategorySupplierMap.set(region, new Map());
         }
-      }
+        const categoryMap = regionCategorySupplierMap.get(region)!;
+
+        if (!categoryMap.has(product.category)) {
+          categoryMap.set(product.category, new Map());
+        }
+        const supplierMap = categoryMap.get(product.category)!;
+
+        if (!supplierMap.has(supplierId)) {
+          // Get quotation status for this supplier
+          const supplierInfo = supplierStatsMap.get(supplierId);
+          const quotationStatus = supplierInfo?.quotationStatus || null;
+
+          supplierMap.set(supplierId, {
+            supplierId,
+            supplierCode: supplierData.supplierCode,
+            supplierName: supplierData.supplierName,
+            productCount: 0,
+            totalBaseValue: 0,
+            totalPreviousValue: 0,
+            totalInitialValue: 0,
+            totalCurrentValue: 0,
+            hasAnyPreviousData: false,
+            quotationStatus,
+          });
+        }
+
+        const supplierAgg = supplierMap.get(supplierId)!;
+
+        // Increment product count
+        supplierAgg.productCount++;
+
+        // Calculate base price (lowest initial price for this product across all suppliers)
+        const allSupplierPrices = Object.values(product.suppliers)
+          .filter((s: any) => s.initialPrice && s.initialPrice > 0)
+          .map((s: any) => s.initialPrice);
+        const basePrice = allSupplierPrices.length > 0 ? Math.min(...allSupplierPrices) : 0;
+
+        // Current effective price for this supplier
+        const currentPrice = supplierData.pricePerUnit;
+        const initialPrice = supplierData.initialPrice || 0;
+
+        // Use base_quantity consistently for all calculations
+        supplierAgg.totalBaseValue += basePrice * product.baseQuantity;
+        supplierAgg.totalInitialValue += initialPrice * product.baseQuantity;
+        supplierAgg.totalCurrentValue += currentPrice * product.baseQuantity;
+
+        if (product.previousApprovedPrice && product.previousApprovedPrice > 0) {
+          supplierAgg.totalPreviousValue += product.previousApprovedPrice * product.baseQuantity;
+          supplierAgg.hasAnyPreviousData = true;
+        }
+      });
     });
 
-    // Calculate comparison metrics
-    const comparisonVsInitial = {
-      difference: totalCurrentValue - totalInitialValue,
-      percentage:
-        totalInitialValue > 0
-          ? ((totalCurrentValue - totalInitialValue) / totalInitialValue) * 100
-          : 0,
+    // Convert nested maps to GroupedOverview structure
+    const groupedOverview: any = {
+      regions: []
     };
 
-    const comparisonVsPrevious = {
-      difference:
-        productsWithPrevious > 0 ? totalCurrentValue - totalPreviousValue : 0,
-      percentage:
-        productsWithPrevious > 0 && totalPreviousValue > 0
-          ? ((totalCurrentValue - totalPreviousValue) / totalPreviousValue) *
-            100
-          : 0,
-      hasPreviousData: productsWithPrevious > 0,
-    };
+    regionCategorySupplierMap.forEach((categoryMap, regionName) => {
+      const regionOverview: any = {
+        region: regionName,
+        categories: []
+      };
 
-    const comparisonVsBase = {
-      difference: productsWithBase > 0 ? totalCurrentValue - totalBaseValue : 0,
-      percentage:
-        productsWithBase > 0 && totalBaseValue > 0
-          ? ((totalCurrentValue - totalBaseValue) / totalBaseValue) * 100
-          : 0,
-      hasBaseData: productsWithBase > 0,
-    };
+      categoryMap.forEach((supplierMap, categoryName) => {
+        const categoryOverview: any = {
+          category: categoryName,
+          supplierPerformances: []
+        };
 
-    const overviewKPIs = {
-      totalCurrentValue,
-      comparisonVsInitial,
-      comparisonVsPrevious,
-      comparisonVsBase,
-      totalProducts: matrixProducts.length,
-      totalSuppliers: matrixSuppliers.length,
-      productsWithPrevious,
-    };
+        supplierMap.forEach((supplierAgg) => {
+          // Calculate variances
+          const varianceVsBase = {
+            difference: supplierAgg.totalCurrentValue - supplierAgg.totalBaseValue,
+            percentage: supplierAgg.totalBaseValue > 0
+              ? ((supplierAgg.totalCurrentValue - supplierAgg.totalBaseValue) / supplierAgg.totalBaseValue) * 100
+              : 0,
+          };
 
-    console.log(`[getComparisonMatrix] KPIs calculated:`, {
-      totalCurrentValue: totalCurrentValue.toFixed(0),
-      vsInitial: `${comparisonVsInitial.percentage.toFixed(1)}%`,
-      vsPrevious: comparisonVsPrevious.hasPreviousData
-        ? `${comparisonVsPrevious.percentage.toFixed(1)}%`
-        : "No data",
-      vsBase: comparisonVsBase.hasBaseData
-        ? `${comparisonVsBase.percentage.toFixed(1)}%`
-        : "No data",
-      productsWithPrevious,
-      productsWithBase,
+          const varianceVsPrevious = supplierAgg.hasAnyPreviousData ? {
+            difference: supplierAgg.totalCurrentValue - supplierAgg.totalPreviousValue,
+            percentage: supplierAgg.totalPreviousValue > 0
+              ? ((supplierAgg.totalCurrentValue - supplierAgg.totalPreviousValue) / supplierAgg.totalPreviousValue) * 100
+              : 0,
+          } : null;
+
+          const varianceVsInitial = {
+            difference: supplierAgg.totalCurrentValue - supplierAgg.totalInitialValue,
+            percentage: supplierAgg.totalInitialValue > 0
+              ? ((supplierAgg.totalCurrentValue - supplierAgg.totalInitialValue) / supplierAgg.totalInitialValue) * 100
+              : 0,
+          };
+
+          categoryOverview.supplierPerformances.push({
+            supplierId: supplierAgg.supplierId,
+            supplierCode: supplierAgg.supplierCode,
+            supplierName: supplierAgg.supplierName,
+            productCount: supplierAgg.productCount,
+            totalBaseValue: supplierAgg.totalBaseValue,
+            totalPreviousValue: supplierAgg.hasAnyPreviousData ? supplierAgg.totalPreviousValue : null,
+            totalInitialValue: supplierAgg.totalInitialValue,
+            totalCurrentValue: supplierAgg.totalCurrentValue,
+            varianceVsBase,
+            varianceVsPrevious,
+            varianceVsInitial,
+            quotationStatus: supplierAgg.quotationStatus,
+          });
+        });
+
+        // Sort suppliers by code
+        categoryOverview.supplierPerformances.sort((a: any, b: any) =>
+          a.supplierCode.localeCompare(b.supplierCode)
+        );
+
+        regionOverview.categories.push(categoryOverview);
+      });
+
+      // Sort categories alphabetically
+      regionOverview.categories.sort((a: any, b: any) =>
+        a.category.localeCompare(b.category)
+      );
+
+      groupedOverview.regions.push(regionOverview);
     });
+
+    console.log(`[getComparisonMatrix] Grouped overview calculated: ${groupedOverview.regions.length} regions, ${groupedOverview.regions.reduce((sum: number, r: any) => sum + r.categories.length, 0)} categories`);
 
     const finalMatrix = {
       products: matrixProducts,
@@ -919,7 +966,7 @@ export async function getComparisonMatrix(
       region,
       category: categories.join(", "),
       lastUpdated: new Date(),
-      overviewKPIs,
+      groupedOverview,
       availableSuppliers: Array.from(supplierStatsMap.values()),
     };
 
@@ -927,6 +974,7 @@ export async function getComparisonMatrix(
       productsCount: finalMatrix.products.length,
       suppliersCount: finalMatrix.suppliers.length,
       availableSuppliersCount: finalMatrix.availableSuppliers.length,
+      groupedOverviewRegions: finalMatrix.groupedOverview.regions.length,
       sampleProduct: finalMatrix.products[0]
         ? {
             productId: finalMatrix.products[0].productId,

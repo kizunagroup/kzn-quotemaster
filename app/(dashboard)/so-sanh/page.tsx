@@ -19,6 +19,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
 import { getAvailablePeriods } from "@/lib/actions/quotations.actions";
 import {
@@ -560,168 +574,142 @@ export default function ComparisonPage() {
               </Button>
             </div>
           ) : matrixData ? (
-            <div className="space-y-6">
-              {/* Main KPI Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                {/* Total Current Value */}
-                <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Tổng giá trị hiện tại
-                  </p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {formatNumber(matrixData.overviewKPIs.totalCurrentValue)}
-                  </p>
-                </div>
+            <div className="space-y-4">
+              {/* New Grouped Overview: Region > Category > Supplier Performance */}
+              {matrixData.groupedOverview && matrixData.groupedOverview.regions.length > 0 ? (
+                <div className="space-y-4">
+                  {matrixData.groupedOverview.regions.map((regionData) => (
+                    <div key={regionData.region} className="space-y-2">
+                      {regionData.categories.map((categoryData) => (
+                        <Accordion key={`${regionData.region}-${categoryData.category}`} type="single" collapsible>
+                          <AccordionItem value={categoryData.category}>
+                            <AccordionTrigger className="text-left hover:no-underline">
+                              <div className="flex items-center gap-3">
+                                <span className="font-semibold text-base">
+                                  {regionData.region} - {categoryData.category}
+                                </span>
+                                <Badge variant="outline" className="text-xs">
+                                  {categoryData.supplierPerformances.length} NCC
+                                </Badge>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <div className="rounded-md border overflow-x-auto">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead className="min-w-[180px]">Nhà cung cấp</TableHead>
+                                      <TableHead className="text-center min-w-[60px]">SP</TableHead>
+                                      <TableHead className="text-right min-w-[120px]">Giá trị cơ sở</TableHead>
+                                      <TableHead className="text-right min-w-[120px]">Giá trị kỳ trước</TableHead>
+                                      <TableHead className="text-right min-w-[120px]">Giá trị báo giá</TableHead>
+                                      <TableHead className="text-right min-w-[140px]">Giá trị hiện tại</TableHead>
+                                      <TableHead className="text-center min-w-[120px]">So với cơ sở</TableHead>
+                                      <TableHead className="text-center min-w-[120px]">So với kỳ trước</TableHead>
+                                      <TableHead className="text-center min-w-[120px]">So với báo giá</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {categoryData.supplierPerformances.map((supplier) => {
+                                      // Color for "Giá trị hiện tại" based on quotation status
+                                      const getCurrentValueColor = () => {
+                                        if (supplier.quotationStatus === 'approved') {
+                                          return "bg-green-50 text-green-700 font-semibold";
+                                        }
+                                        if (supplier.quotationStatus === 'negotiation') {
+                                          return "bg-orange-50 text-orange-700 font-medium";
+                                        }
+                                        return "text-gray-900";
+                                      };
 
-                {/* Comparison vs Initial */}
-                <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    So với giá ban đầu
-                  </p>
-                  <p
-                    className={`text-2xl font-bold ${
-                      matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
-                        ? "text-red-600"
-                        : matrixData.overviewKPIs.comparisonVsInitial
-                            .percentage < 0
-                        ? "text-green-600"
-                        : "text-gray-600"
-                    }`}
-                  >
-                    {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
-                      ? "+"
-                      : ""}
-                    {formatPercentage(
-                      matrixData.overviewKPIs.comparisonVsInitial.percentage
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {matrixData.overviewKPIs.comparisonVsInitial.difference > 0
-                      ? "+"
-                      : ""}
-                    {formatNumber(
-                      matrixData.overviewKPIs.comparisonVsInitial.difference
-                    )}
-                  </p>
-                </div>
+                                      // Helper to render variance cell
+                                      const renderVarianceCell = (variance: { difference: number; percentage: number } | null) => {
+                                        if (!variance) {
+                                          return <span className="text-gray-400 text-sm">N/A</span>;
+                                        }
+                                        return (
+                                          <div className="flex flex-col items-center gap-1">
+                                            <div className="flex items-center gap-1">
+                                              {variance.percentage > 0.5 ? (
+                                                <TrendingUp className="h-3 w-3 text-red-600" />
+                                              ) : variance.percentage < -0.5 ? (
+                                                <TrendingDown className="h-3 w-3 text-green-600" />
+                                              ) : null}
+                                              <span
+                                                className={
+                                                  variance.percentage > 0.5
+                                                    ? "text-red-600 font-medium"
+                                                    : variance.percentage < -0.5
+                                                    ? "text-green-600 font-medium"
+                                                    : "text-gray-600"
+                                                }
+                                              >
+                                                {variance.difference > 0 ? "+" : ""}
+                                                {formatNumber(variance.difference)}
+                                              </span>
+                                            </div>
+                                            <span
+                                              className={`text-xs ${
+                                                variance.percentage > 0.5
+                                                  ? "text-red-600"
+                                                  : variance.percentage < -0.5
+                                                  ? "text-green-600"
+                                                  : "text-gray-600"
+                                              }`}
+                                            >
+                                              ({variance.percentage > 0 ? "+" : ""}
+                                              {formatPercentage(variance.percentage)})
+                                            </span>
+                                          </div>
+                                        );
+                                      };
 
-                {/* Comparison vs Previous */}
-                <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    So với kỳ trước
-                  </p>
-                  {matrixData.overviewKPIs.comparisonVsPrevious
-                    .hasPreviousData ? (
-                    <>
-                      <p
-                        className={`text-2xl font-bold ${
-                          matrixData.overviewKPIs.comparisonVsPrevious
-                            .percentage > 0
-                            ? "text-red-600"
-                            : matrixData.overviewKPIs.comparisonVsPrevious
-                                .percentage < 0
-                            ? "text-green-600"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {matrixData.overviewKPIs.comparisonVsPrevious
-                          .percentage > 0
-                          ? "+"
-                          : ""}
-                        {formatPercentage(
-                          matrixData.overviewKPIs.comparisonVsPrevious
-                            .percentage
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {matrixData.overviewKPIs.comparisonVsPrevious
-                          .difference > 0
-                          ? "+"
-                          : ""}
-                        {formatNumber(
-                          matrixData.overviewKPIs.comparisonVsPrevious
-                            .difference
-                        )}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold text-gray-400">N/A</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Không có dữ liệu kỳ trước
-                      </p>
-                    </>
-                  )}
+                                      return (
+                                        <TableRow key={supplier.supplierId}>
+                                          <TableCell>
+                                            <div>
+                                              <div className="font-medium">{supplier.supplierCode}</div>
+                                              <div className="text-xs text-muted-foreground">{supplier.supplierName}</div>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="text-center">{supplier.productCount}</TableCell>
+                                          <TableCell className="text-right">{formatNumber(supplier.totalBaseValue)}</TableCell>
+                                          <TableCell className="text-right">
+                                            {supplier.totalPreviousValue !== null
+                                              ? formatNumber(supplier.totalPreviousValue)
+                                              : <span className="text-gray-400 text-sm">N/A</span>}
+                                          </TableCell>
+                                          <TableCell className="text-right">{formatNumber(supplier.totalInitialValue)}</TableCell>
+                                          <TableCell className={`text-right ${getCurrentValueColor()}`}>
+                                            {formatNumber(supplier.totalCurrentValue)}
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            {renderVarianceCell(supplier.varianceVsBase)}
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            {renderVarianceCell(supplier.varianceVsPrevious)}
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            {renderVarianceCell(supplier.varianceVsInitial)}
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+                      ))}
+                    </div>
+                  ))}
                 </div>
-
-                {/* Comparison vs Base */}
-                <div className="text-center p-4 border rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    So với nhu cầu cơ bản
-                  </p>
-                  {matrixData.overviewKPIs.comparisonVsBase.hasBaseData ? (
-                    <>
-                      <p
-                        className={`text-2xl font-bold ${
-                          matrixData.overviewKPIs.comparisonVsBase.percentage >
-                          0
-                            ? "text-red-600"
-                            : matrixData.overviewKPIs.comparisonVsBase
-                                .percentage < 0
-                            ? "text-green-600"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {matrixData.overviewKPIs.comparisonVsBase.percentage > 0
-                          ? "+"
-                          : ""}
-                        {formatPercentage(
-                          matrixData.overviewKPIs.comparisonVsBase.percentage
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {matrixData.overviewKPIs.comparisonVsBase.difference > 0
-                          ? "+"
-                          : ""}
-                        {formatNumber(
-                          matrixData.overviewKPIs.comparisonVsBase.difference
-                        )}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-2xl font-bold text-gray-400">N/A</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Nhu cầu bằng cơ bản
-                      </p>
-                    </>
-                  )}
+              ) : (
+                <div className="text-center text-gray-500 py-8">
+                  <p>Không có dữ liệu tổng quan theo nhóm.</p>
                 </div>
-              </div>
-
-              {/* Statistics Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Tổng sản phẩm</p>
-                  <p className="text-xl font-semibold text-gray-700">
-                    {matrixData.overviewKPIs.totalProducts}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">Nhà cung cấp</p>
-                  <p className="text-xl font-semibold text-gray-700">
-                    {matrixData.overviewKPIs.totalSuppliers}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Có giá kỳ trước
-                  </p>
-                  <p className="text-xl font-semibold text-gray-700">
-                    {matrixData.overviewKPIs.productsWithPrevious} SP
-                  </p>
-                </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="text-center text-gray-500 space-y-2">

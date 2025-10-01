@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -32,6 +33,10 @@ export interface ComparisonMatrixProps {
 }
 
 export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProps) {
+  // Quick View filter state
+  type QuickViewFilter = 'all' | 'price_increase' | 'price_decrease' | 'no_quotes';
+  const [activeFilter, setActiveFilter] = React.useState<QuickViewFilter>('all');
+
   // Early return if no data
   if (!matrixData || matrixData.products.length === 0) {
     return (
@@ -50,7 +55,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
   // Group products by category
   const productsByCategory = matrixData.products.reduce((acc, product) => {
     // Use product.category field that should now be included from backend
-    const category = (product as any).category || 'Unknown';
+    const category = product.category || 'Unknown';
     if (!acc[category]) {
       acc[category] = [];
     }
@@ -60,6 +65,82 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
 
   // Check if we have multiple categories to decide on display mode
   const hasMultipleCategories = Object.keys(productsByCategory).length > 1;
+
+  // Apply Quick View filtering and sorting
+  const applyQuickViewFilter = (products: typeof matrixData.products): typeof matrixData.products => {
+    let filtered = [...products];
+
+    switch (activeFilter) {
+      case 'price_increase': {
+        // Filter products with price increases and sort by highest increase percentage
+        filtered = filtered.filter(product => {
+          // Check if any supplier has a positive variance
+          return Object.values(product.suppliers).some(supplier => {
+            return supplier.variancePercentage && supplier.variancePercentage > 0.5;
+          });
+        });
+        // Sort by maximum variance percentage (descending)
+        filtered.sort((a, b) => {
+          const maxVarianceA = Math.max(
+            ...Object.values(a.suppliers)
+              .map(s => s.variancePercentage || 0)
+          );
+          const maxVarianceB = Math.max(
+            ...Object.values(b.suppliers)
+              .map(s => s.variancePercentage || 0)
+          );
+          return maxVarianceB - maxVarianceA;
+        });
+        break;
+      }
+      case 'price_decrease': {
+        // Filter products with price decreases and sort by highest decrease percentage
+        filtered = filtered.filter(product => {
+          // Check if any supplier has a negative variance
+          return Object.values(product.suppliers).some(supplier => {
+            return supplier.variancePercentage && supplier.variancePercentage < -0.5;
+          });
+        });
+        // Sort by minimum variance percentage (ascending - most negative first)
+        filtered.sort((a, b) => {
+          const minVarianceA = Math.min(
+            ...Object.values(a.suppliers)
+              .map(s => s.variancePercentage || 0)
+          );
+          const minVarianceB = Math.min(
+            ...Object.values(b.suppliers)
+              .map(s => s.variancePercentage || 0)
+          );
+          return minVarianceA - minVarianceB;
+        });
+        break;
+      }
+      case 'no_quotes': {
+        // Filter products with at least one supplier missing quotes
+        filtered = filtered.filter(product => {
+          const totalSuppliers = suppliers.length;
+          const suppliersWithQuotes = Object.keys(product.suppliers).length;
+          return suppliersWithQuotes < totalSuppliers;
+        });
+        break;
+      }
+      case 'all':
+      default:
+        // No filtering, keep original order
+        break;
+    }
+
+    return filtered;
+  };
+
+  // Apply filter to each category
+  const filteredProductsByCategory = Object.entries(productsByCategory).reduce((acc, [category, products]) => {
+    const filtered = applyQuickViewFilter(products);
+    if (filtered.length > 0) {
+      acc[category] = filtered;
+    }
+    return acc;
+  }, {} as Record<string, typeof matrixData.products>);
 
   // Helper function to calculate price variance
   const calculateVariance = (currentPrice: number, previousPrice?: number) => {
@@ -312,32 +393,101 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
 
   return (
     <TooltipProvider>
-      <div className={cn("w-full overflow-x-auto", className)}>
-        {hasMultipleCategories ? (
-          // Multiple categories: use accordion grouping
-          <Accordion type="multiple" defaultValue={Object.keys(productsByCategory)} className="w-full">
-            {Object.entries(productsByCategory).map(([categoryName, products]) => (
-              <AccordionItem key={categoryName} value={categoryName}>
-                <AccordionTrigger className="text-left">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">Nhóm hàng: {categoryName}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {products.length} sản phẩm
-                    </Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="overflow-x-auto">
-                    {renderCategoryTable(categoryName, products)}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        ) : (
-          // Single category: render table directly
-          renderCategoryTable(Object.keys(productsByCategory)[0] || 'All', matrixData.products)
-        )}
+      <div className={cn("w-full space-y-4", className)}>
+        {/* Quick View Filters */}
+        <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
+          <span className="text-sm font-medium text-gray-700">Lọc nhanh:</span>
+          <Button
+            variant={activeFilter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveFilter('all')}
+            className="flex items-center gap-1"
+          >
+            Tất cả
+            {activeFilter === 'all' && (
+              <Badge variant="secondary" className="ml-1">
+                {Object.values(filteredProductsByCategory).flat().length}
+              </Badge>
+            )}
+          </Button>
+          <Button
+            variant={activeFilter === 'price_increase' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveFilter('price_increase')}
+            className="flex items-center gap-1"
+          >
+            <TrendingUpIcon className="h-4 w-4" />
+            Tăng giá mạnh nhất
+            {activeFilter === 'price_increase' && (
+              <Badge variant="secondary" className="ml-1">
+                {Object.values(filteredProductsByCategory).flat().length}
+              </Badge>
+            )}
+          </Button>
+          <Button
+            variant={activeFilter === 'price_decrease' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveFilter('price_decrease')}
+            className="flex items-center gap-1"
+          >
+            <TrendingDownIcon className="h-4 w-4" />
+            Giảm giá mạnh nhất
+            {activeFilter === 'price_decrease' && (
+              <Badge variant="secondary" className="ml-1">
+                {Object.values(filteredProductsByCategory).flat().length}
+              </Badge>
+            )}
+          </Button>
+          <Button
+            variant={activeFilter === 'no_quotes' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveFilter('no_quotes')}
+            className="flex items-center gap-1"
+          >
+            ⚠️ Chưa có báo giá
+            {activeFilter === 'no_quotes' && (
+              <Badge variant="secondary" className="ml-1">
+                {Object.values(filteredProductsByCategory).flat().length}
+              </Badge>
+            )}
+          </Button>
+        </div>
+
+        {/* Main Table Content */}
+        <div className="overflow-x-auto">
+          {Object.keys(filteredProductsByCategory).length === 0 ? (
+            <div className="text-center text-gray-500 py-8">
+              <p>Không tìm thấy sản phẩm phù hợp với bộ lọc đã chọn.</p>
+            </div>
+          ) : hasMultipleCategories ? (
+            // Multiple categories: use accordion grouping
+            <Accordion type="multiple" defaultValue={Object.keys(filteredProductsByCategory)} className="w-full">
+              {Object.entries(filteredProductsByCategory).map(([categoryName, products]) => (
+                <AccordionItem key={categoryName} value={categoryName}>
+                  <AccordionTrigger className="text-left">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">Nhóm hàng: {categoryName}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {products.length} sản phẩm
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="overflow-x-auto">
+                      {renderCategoryTable(categoryName, products)}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          ) : (
+            // Single category: render table directly
+            renderCategoryTable(
+              Object.keys(filteredProductsByCategory)[0] || 'All',
+              Object.values(filteredProductsByCategory)[0] || []
+            )
+          )}
+        </div>
       </div>
     </TooltipProvider>
   );

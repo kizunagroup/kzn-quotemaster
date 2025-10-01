@@ -25,6 +25,9 @@ export interface ComparisonMetrics {
   totalPriceWithVAT: number;
   hasBestPrice: boolean;
   hasPrice: boolean;
+  // Variance vs previous period
+  variancePercentage?: number; // Percentage change compared to previous approved price
+  varianceTrend?: 'up' | 'down' | 'stable'; // Price trend indicator
 }
 
 export interface ProductComparison {
@@ -33,6 +36,7 @@ export interface ProductComparison {
   productName: string;
   specification?: string;
   unit: string;
+  category: string; // Product category for grouping
   quantity: number;
   quantitySource: 'kitchen_demand' | 'base_quantity';
   baseQuantity: number;

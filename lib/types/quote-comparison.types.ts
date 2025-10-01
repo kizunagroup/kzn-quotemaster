@@ -31,31 +31,57 @@ export const ApproveQuotationSchema = z.object({
 
 // ==================== TYPES ====================
 
-// Overview KPIs for the comparison page
-export interface OverviewKPIs {
-  totalCurrentValue: number; // Total value using effective prices (approved > negotiated > initial)
-  comparisonVsInitial: {
+// Supplier Performance - Detailed metrics for one supplier in one category
+export interface SupplierPerformance {
+  supplierId: number;
+  supplierCode: string;
+  supplierName: string;
+  productCount: number; // Number of products this supplier quoted in this category
+
+  // Total values (all using base quantity for consistency)
+  totalBaseValue: number; // Sum of (base_quantity * lowest_initial_price)
+  totalPreviousValue: number | null; // Sum of (base_quantity * previous_approved_price) - null if no previous data
+  totalInitialValue: number; // Sum of (base_quantity * initial_price from this supplier)
+  totalCurrentValue: number; // Sum of (base_quantity * current_effective_price from this supplier)
+
+  // Variance calculations
+  varianceVsBase: {
     difference: number;
     percentage: number;
   };
-  comparisonVsPrevious: {
+  varianceVsPrevious: {
     difference: number;
     percentage: number;
-    hasPreviousData: boolean;
-  };
-  comparisonVsBase: {
+  } | null; // null if no previous data
+  varianceVsInitial: {
     difference: number;
     percentage: number;
-    hasBaseData: boolean;
   };
-  totalProducts: number;
-  totalSuppliers: number;
-  productsWithPrevious: number;
+
+  // Quotation status for color coding
+  quotationStatus: 'pending' | 'negotiation' | 'approved' | null;
+}
+
+// Category Overview - All suppliers' performance in one category
+export interface CategoryOverview {
+  category: string;
+  supplierPerformances: SupplierPerformance[];
+}
+
+// Region Overview - All categories in one region
+export interface RegionOverview {
+  region: string;
+  categories: CategoryOverview[];
+}
+
+// Grouped Overview - Complete hierarchical structure
+export interface GroupedOverview {
+  regions: RegionOverview[];
 }
 
 export interface ComparisonMatrixData extends ComparisonMatrix {
   lastUpdated: Date;
-  overviewKPIs: OverviewKPIs;
+  groupedOverview: GroupedOverview; // New multi-dimensional analytical structure
   availableSuppliers: Array<{
     id: number;
     code: string;
