@@ -1770,7 +1770,7 @@ export async function initiateBatchNegotiationAndExport(params: {
 
     // Step 7: Save zip to temporary directory
     const timestamp = Date.now();
-    const zipFileName = `GiaMucTieu_DamPhan_${period}_${region}_${timestamp}.zip`;
+    const zipFileName = `GiaMucTieu_${period}_${region}_${timestamp}.zip`;
     const zipFilePath = join(
       process.cwd(),
       "public",
