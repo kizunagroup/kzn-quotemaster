@@ -3,6 +3,9 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import ExcelJS from "exceljs";
+import archiver from "archiver";
+import { writeFile } from "fs/promises";
+import { join } from "path";
 import { db } from "@/lib/db/drizzle";
 import {
   quotations,
@@ -1576,14 +1579,14 @@ export async function exportTargetPriceFile(params: {
 }
 
 /**
- * Initiate batch negotiation and export target price file
- * This combines two operations: batch negotiation + export
+ * Initiate batch negotiation and export target price files (one per supplier, zipped)
+ * This combines two operations: batch negotiation + export separate Excel files per supplier
  */
 export async function initiateBatchNegotiationAndExport(params: {
   period: string;
   region: string;
   categories?: string[];
-}): Promise<Blob> {
+}): Promise<{ success: true; downloadPath: string }> {
   try {
     console.log(
       "[initiateBatchNegotiationAndExport] Starting with params:",
@@ -1629,7 +1632,7 @@ export async function initiateBatchNegotiationAndExport(params: {
 
     // Step 3: Perform efficient batch status update using single UPDATE query
     if (pendingQuotationIds.length > 0) {
-      const updateResult = await db
+      await db
         .update(quotations)
         .set({
           status: "negotiation",
@@ -1652,98 +1655,156 @@ export async function initiateBatchNegotiationAndExport(params: {
       );
     }
 
-    // Step 4: Generate simplified Excel file with target prices
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Target Prices");
-
-    // Set up column headers - simplified as specified
-    const headers = [
-      "Mã sản phẩm",
-      "Tên sản phẩm",
-      "Quy cách",
-      "Đơn vị",
-      "Giá mục tiêu",
-    ];
-
-    // Add headers with styling
-    const headerRow = worksheet.addRow(headers);
-    headerRow.eachCell((cell) => {
-      cell.font = { bold: true };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFE6E6FA" },
-      };
-      cell.border = {
-        top: { style: "thin" },
-        left: { style: "thin" },
-        bottom: { style: "thin" },
-        right: { style: "thin" },
-      };
+    // Step 4: Create a zip archive using archiver
+    const archive = archiver("zip", {
+      zlib: { level: 9 }, // Maximum compression
     });
 
-    // Add data rows - only best prices as target prices
-    matrixData.products.forEach((product) => {
-      // Use bestPrice from product, defaulting to 0 if not available
-      const targetPrice = product.bestPrice || 0;
+    // Step 5: Generate separate Excel file for each supplier
+    for (const supplier of matrixData.availableSuppliers) {
+      console.log(
+        `[initiateBatchNegotiationAndExport] Generating Excel for supplier: ${supplier.code}`
+      );
 
-      // Ensure we have valid data for each required column
-      const rowData = [
-        product.productCode || "", // Mã sản phẩm
-        product.productName || "", // Tên sản phẩm
-        product.specification || "", // Quy cách (specification)
-        product.unit || "", // Đơn vị
-        targetPrice, // Giá mục tiêu (best price)
+      // Filter products that this supplier has quoted
+      const supplierProducts = matrixData.products.filter(
+        (product) => product.suppliers[supplier.id] !== undefined
+      );
+
+      if (supplierProducts.length === 0) {
+        console.log(
+          `[initiateBatchNegotiationAndExport] Supplier ${supplier.code} has no products, skipping`
+        );
+        continue;
+      }
+
+      // Create a new workbook for this supplier
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Target Prices");
+
+      // Set up column headers
+      const headers = [
+        "Mã sản phẩm",
+        "Tên sản phẩm",
+        "Quy cách",
+        "Đơn vị",
+        "Giá mục tiêu",
       ];
 
-      const row = worksheet.addRow(rowData);
-
-      // Apply formatting to data cells
-      row.eachCell((cell, colNumber) => {
-        // Add borders to all cells
+      // Add headers with styling
+      const headerRow = worksheet.addRow(headers);
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFE6E6FA" },
+        };
         cell.border = {
           top: { style: "thin" },
           left: { style: "thin" },
           bottom: { style: "thin" },
           right: { style: "thin" },
         };
+      });
 
-        // Format price column (column 5) as number with thousand separators
-        if (colNumber === 5 && typeof cell.value === "number") {
-          cell.numFmt = "#,##0";
+      // Add data rows for this supplier's products
+      supplierProducts.forEach((product) => {
+        const supplierData = product.suppliers[supplier.id];
+        const targetPrice = supplierData?.pricePerUnit || product.bestPrice || 0;
+
+        const rowData = [
+          product.productCode || "",
+          product.productName || "",
+          product.specification || "",
+          product.unit || "",
+          targetPrice,
+        ];
+
+        const row = worksheet.addRow(rowData);
+
+        // Apply formatting to data cells
+        row.eachCell((cell, colNumber) => {
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+
+          // Format price column (column 5) as number with thousand separators
+          if (colNumber === 5 && typeof cell.value === "number") {
+            cell.numFmt = "#,##0";
+          }
+        });
+      });
+
+      // Auto-fit columns
+      worksheet.columns.forEach((column) => {
+        if (column.header) {
+          const maxLength = Math.max(
+            column.header.toString().length,
+            ...worksheet
+              .getColumn(column.letter)
+              .values.slice(1)
+              .map((val) => (val ? val.toString().length : 0))
+          );
+          column.width = Math.min(Math.max(maxLength + 2, 10), 50);
         }
       });
-    });
 
-    // Auto-fit columns
-    worksheet.columns.forEach((column) => {
-      if (column.header) {
-        const maxLength = Math.max(
-          column.header.toString().length,
-          ...worksheet
-            .getColumn(column.letter)
-            .values.slice(1) // Skip header
-            .map((val) => (val ? val.toString().length : 0))
-        );
-        column.width = Math.min(Math.max(maxLength + 2, 10), 50);
-      }
-    });
+      // Generate Excel file buffer
+      const buffer = await workbook.xlsx.writeBuffer();
 
-    // Step 5: Generate file buffer and return as Blob
-    const buffer = await workbook.xlsx.writeBuffer();
+      // Add to zip archive with unique filename
+      const fileName = `${period}_${region}_${supplier.code}.xlsx`;
+      archive.append(Buffer.from(buffer), { name: fileName });
+
+      console.log(
+        `[initiateBatchNegotiationAndExport] Added ${fileName} to archive with ${supplierProducts.length} products`
+      );
+    }
+
+    // Step 6: Finalize the archive
+    archive.finalize();
+
+    // Step 7: Save zip to temporary directory
+    const timestamp = Date.now();
+    const zipFileName = `GiaMucTieu_DamPhan_${period}_${region}_${timestamp}.zip`;
+    const zipFilePath = join(
+      process.cwd(),
+      "public",
+      "tmp",
+      zipFileName
+    );
+
+    // Collect archive data into buffer
+    const chunks: Buffer[] = [];
+    archive.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+    await new Promise<void>((resolve, reject) => {
+      archive.on("end", () => {
+        const zipBuffer = Buffer.concat(chunks);
+        writeFile(zipFilePath, zipBuffer)
+          .then(() => resolve())
+          .catch(reject);
+      });
+      archive.on("error", reject);
+    });
 
     console.log(
-      `[initiateBatchNegotiationAndExport] Generated Excel file with ${matrixData.products.length} products`
+      `[initiateBatchNegotiationAndExport] Saved zip file to: ${zipFilePath}`
     );
 
     // Revalidate relevant pages
     revalidatePath("/so-sanh");
     revalidatePath("/bao-gia");
 
-    // Return as Blob for direct download
-    return new Blob([buffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
+    // Return download path for client-side download
+    return {
+      success: true,
+      downloadPath: `/tmp/${zipFileName}`,
+    };
   } catch (error) {
     console.error("Error in initiateBatchNegotiationAndExport:", error);
     throw new Error(

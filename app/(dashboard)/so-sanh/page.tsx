@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -233,31 +232,31 @@ export default function ComparisonPage() {
       setBatchActionLoading(true);
       setComparisonError(null);
 
-      const blob = await initiateBatchNegotiationAndExport({
+      const result = await initiateBatchNegotiationAndExport({
         period,
         region,
         categories,
       });
 
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${categories.join(
-        "+"
-      )}_${new Date().toISOString().split("T")[0]}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      // Trigger download from the server-generated file
+      if (result.success && result.downloadPath) {
+        const link = document.createElement("a");
+        link.href = result.downloadPath;
+        link.download = result.downloadPath.split("/").pop() || "export.zip";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
 
-      // Show success message
-      toast.success(
-        "Đã xuất file giá mục tiêu và khởi tạo đàm phán thành công!"
-      );
+        // Show success message
+        toast.success(
+          "Đã xuất file giá mục tiêu và khởi tạo đàm phán thành công!"
+        );
 
-      // Refresh comparison data after batch action
-      await handleCompareClick();
+        // Refresh comparison data after batch action
+        await handleCompareClick();
+      } else {
+        throw new Error("Không nhận được đường dẫn tải file");
+      }
     } catch (err) {
       console.error("Error in batch negotiation and export:", err);
       const errorMessage =
