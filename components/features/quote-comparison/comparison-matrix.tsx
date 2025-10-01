@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -36,19 +35,12 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
   // Early return if no data
   if (!matrixData || matrixData.products.length === 0) {
     return (
-      <Card className={cn("w-full", className)}>
-        <CardHeader>
-          <CardTitle>Chi tiết So sánh Báo giá</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-gray-500 py-8">
-            <p>Không có dữ liệu sản phẩm để hiển thị.</p>
-            <p className="text-sm mt-2">
-              Vui lòng kiểm tra lại các tiêu chí lọc hoặc đảm bảo có báo giá trong kỳ này.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className={cn("w-full text-center text-gray-500 py-8", className)}>
+        <p>Không có dữ liệu sản phẩm để hiển thị.</p>
+        <p className="text-sm mt-2">
+          Vui lòng kiểm tra lại các tiêu chí lọc hoặc đảm bảo có báo giá trong kỳ này.
+        </p>
+      </div>
     );
   }
 
@@ -320,50 +312,33 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
 
   return (
     <TooltipProvider>
-      <Card className={cn("w-full", className)}>
-        <CardHeader>
-          <CardTitle>Chi tiết so sánh</CardTitle>
-          <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-            <Badge variant="outline">Kỳ: {period}</Badge>
-            <Badge variant="outline">Khu vực: {region}</Badge>
-            {categories && categories.length > 0 && (
-              <Badge variant="outline">
-                Nhóm hàng: {categories.length === 1 ? categories[0] : `${categories.length} nhóm`}
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-
-        <CardContent>
-          <div className="overflow-x-auto">
-            {hasMultipleCategories ? (
-              // Multiple categories: use accordion grouping
-              <Accordion type="multiple" defaultValue={Object.keys(productsByCategory)} className="w-full">
-                {Object.entries(productsByCategory).map(([categoryName, products]) => (
-                  <AccordionItem key={categoryName} value={categoryName}>
-                    <AccordionTrigger className="text-left">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Nhóm hàng: {categoryName}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {products.length} sản phẩm
-                        </Badge>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="overflow-x-auto">
-                        {renderCategoryTable(categoryName, products)}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            ) : (
-              // Single category: render table directly
-              renderCategoryTable(Object.keys(productsByCategory)[0] || 'All', matrixData.products)
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <div className={cn("w-full overflow-x-auto", className)}>
+        {hasMultipleCategories ? (
+          // Multiple categories: use accordion grouping
+          <Accordion type="multiple" defaultValue={Object.keys(productsByCategory)} className="w-full">
+            {Object.entries(productsByCategory).map(([categoryName, products]) => (
+              <AccordionItem key={categoryName} value={categoryName}>
+                <AccordionTrigger className="text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Nhóm hàng: {categoryName}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {products.length} sản phẩm
+                    </Badge>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="overflow-x-auto">
+                    {renderCategoryTable(categoryName, products)}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        ) : (
+          // Single category: render table directly
+          renderCategoryTable(Object.keys(productsByCategory)[0] || 'All', matrixData.products)
+        )}
+      </div>
     </TooltipProvider>
   );
 }
