@@ -10,6 +10,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
@@ -28,6 +41,9 @@ import {
   TrendingDown,
   ChevronUp,
   ChevronDown,
+  Check,
+  ChevronsUpDown,
+  X,
 } from "lucide-react";
 import {
   exportTargetPriceFile,
@@ -41,12 +57,15 @@ export default function ComparisonPage() {
   // Filter states
   const [period, setPeriod] = useState<string>("");
   const [region, setRegion] = useState<string>("");
-  const [category, setCategory] = useState<string>("");
+  const [categories, setCategories] = useState<string[]>([]);
 
   // Data for select options
   const [periods, setPeriods] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+
+  // Multi-select UI state
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   // Loading states for cascading filters
   const [periodsLoading, setPeriodsLoading] = useState(true);
@@ -70,6 +89,23 @@ export default function ComparisonPage() {
 
   // UI state
   const [isDetailsVisible, setIsDetailsVisible] = useState(true);
+
+  // Helper functions for multi-select categories
+  const handleCategoryToggle = (category: string) => {
+    setCategories(prev =>
+      prev.includes(category)
+        ? prev.filter(c => c !== category)
+        : [...prev, category]
+    );
+  };
+
+  const handleCategoryRemove = (category: string) => {
+    setCategories(prev => prev.filter(c => c !== category));
+  };
+
+  const handleClearAllCategories = () => {
+    setCategories([]);
+  };
 
   // Fetch periods on component mount
   useEffect(() => {
@@ -128,8 +164,8 @@ export default function ComparisonPage() {
   // Fetch categories when period or region changes (cascading filter)
   useEffect(() => {
     if (!period || !region) {
+      setAvailableCategories([]);
       setCategories([]);
-      setCategory("");
       return;
     }
 
@@ -138,23 +174,21 @@ export default function ComparisonPage() {
         setCategoriesLoading(true);
         setFiltersError(null);
 
-        const availableCategories = await getCategoriesForPeriodAndRegion(
+        const fetchedCategories = await getCategoriesForPeriodAndRegion(
           period,
           region
         );
-        setCategories(availableCategories);
+        setAvailableCategories(fetchedCategories);
 
-        // Clear category selection if current category is not available
-        if (category && !availableCategories.includes(category)) {
-          setCategory("");
-        }
+        // Clear category selections that are no longer available
+        setCategories(prev => prev.filter(cat => fetchedCategories.includes(cat)));
       } catch (err) {
         console.error("Error fetching categories for period and region:", err);
         setFiltersError(
           "Không thể tải danh sách nhóm hàng cho kỳ và khu vực này"
         );
+        setAvailableCategories([]);
         setCategories([]);
-        setCategory("");
       } finally {
         setCategoriesLoading(false);
       }
@@ -165,7 +199,7 @@ export default function ComparisonPage() {
 
   // Handle comparison action
   const handleCompareClick = async () => {
-    if (!period || !region || !category) {
+    if (!period || !region || categories.length === 0) {
       setComparisonError("Vui lòng chọn đầy đủ các tiêu chí lọc");
       return;
     }
@@ -178,7 +212,7 @@ export default function ComparisonPage() {
       const result = await getComparisonMatrix({
         period,
         region,
-        category,
+        categories,
       });
 
       setMatrixData(result);
@@ -196,11 +230,11 @@ export default function ComparisonPage() {
   };
 
   // Check if compare button should be enabled
-  const isCompareEnabled = period && region && category && !comparisonLoading;
+  const isCompareEnabled = period && region && categories.length > 0 && !comparisonLoading;
 
   // Handle batch negotiation and export
   const handleBatchNegotiationAndExport = async () => {
-    if (!period || !region || !category) {
+    if (!period || !region || categories.length === 0) {
       setComparisonError("Vui lòng chọn đầy đủ các tiêu chí để thực hiện");
       return;
     }
@@ -212,14 +246,14 @@ export default function ComparisonPage() {
       const blob = await initiateBatchNegotiationAndExport({
         period,
         region,
-        category,
+        categories,
       });
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${category}_${
+      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${categories.join('+')}_${
         new Date().toISOString().split("T")[0]
       }.xlsx`;
       document.body.appendChild(link);
@@ -259,7 +293,7 @@ export default function ComparisonPage() {
 
   // Handle export action
   const handleExportClick = async () => {
-    if (!period || !region || !category) {
+    if (!period || !region || categories.length === 0) {
       setComparisonError("Vui lòng chọn đầy đủ các tiêu chí để xuất file");
       return;
     }
@@ -271,14 +305,14 @@ export default function ComparisonPage() {
       const blob = await exportTargetPriceFile({
         period,
         region,
-        category,
+        categories,
       });
 
       // Create download link
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `BangGiaMucTieu_${period}_${region}_${category}_${
+      link.download = `BangGiaMucTieu_${period}_${region}_${categories.join('+')}_${
         new Date().toISOString().split("T")[0]
       }.xlsx`;
       document.body.appendChild(link);
@@ -388,7 +422,7 @@ export default function ComparisonPage() {
             )}
           </div>
 
-          {/* Category Filter */}
+          {/* Category Multi-Select Filter */}
           <div className="space-y-2">
             <label className="text-sm font-medium">
               Nhóm hàng
@@ -399,32 +433,95 @@ export default function ComparisonPage() {
                 </span>
               )}
             </label>
-            <Select
-              value={category}
-              onValueChange={setCategory}
-              disabled={!period || !region || categoriesLoading}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    !period || !region
-                      ? "Chọn kỳ & khu vực trước..."
-                      : categoriesLoading
-                      ? "Đang tải..."
-                      : categories.length === 0
-                      ? "Không có nhóm hàng nào"
-                      : "Chọn nhóm hàng..."
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
+
+            <Popover open={categoriesOpen} onOpenChange={setCategoriesOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={categoriesOpen}
+                  className="w-full justify-between text-left font-normal"
+                  disabled={!period || !region || categoriesLoading}
+                >
+                  {categories.length === 0 ? (
+                    <span className="text-muted-foreground">
+                      {!period || !region
+                        ? "Chọn kỳ & khu vực trước..."
+                        : categoriesLoading
+                        ? "Đang tải..."
+                        : availableCategories.length === 0
+                        ? "Không có nhóm hàng nào"
+                        : "Chọn nhóm hàng..."}
+                    </span>
+                  ) : categories.length === 1 ? (
+                    categories[0]
+                  ) : (
+                    `${categories.length} nhóm hàng đã chọn`
+                  )}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput placeholder="Tìm nhóm hàng..." />
+                  <CommandList>
+                    <CommandEmpty>Không tìm thấy nhóm hàng.</CommandEmpty>
+                    <CommandGroup>
+                      {availableCategories.map((category) => (
+                        <CommandItem
+                          key={category}
+                          value={category}
+                          onSelect={() => handleCategoryToggle(category)}
+                        >
+                          <Check
+                            className={`mr-2 h-4 w-4 ${
+                              categories.includes(category)
+                                ? "opacity-100"
+                                : "opacity-0"
+                            }`}
+                          />
+                          {category}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+
+            {/* Selected Categories Display */}
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {categories.map((category) => (
+                  <Badge
+                    key={category}
+                    variant="secondary"
+                    className="text-xs flex items-center gap-1"
+                  >
+                    {category}
+                    <button
+                      type="button"
+                      onClick={() => handleCategoryRemove(category)}
+                      className="ml-1 hover:bg-muted rounded-sm"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
                 ))}
-              </SelectContent>
-            </Select>
+                {categories.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    onClick={handleClearAllCategories}
+                  >
+                    Xóa tất cả
+                  </Button>
+                )}
+              </div>
+            )}
+
             {categoriesLoading && (
               <div className="text-xs text-muted-foreground flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -434,7 +531,7 @@ export default function ComparisonPage() {
             {period &&
               region &&
               !categoriesLoading &&
-              categories.length === 0 && (
+              availableCategories.length === 0 && (
                 <div className="text-xs text-amber-600">
                   Không có nhóm hàng nào có báo giá cho kỳ và khu vực này
                 </div>
@@ -745,7 +842,7 @@ export default function ComparisonPage() {
                 <p className="text-lg">Đang tải ma trận so sánh...</p>
                 <p className="text-sm">
                   Đang xử lý ma trận so sánh báo giá cho kỳ {period}, khu vực{" "}
-                  {region}, nhóm hàng {category}.
+                  {region}, nhóm hàng: {categories.join(', ')}.
                 </p>
               </div>
             ) : comparisonError ? (

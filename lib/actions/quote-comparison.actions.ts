@@ -14,14 +14,14 @@ import {
   type Quotation,
   type QuoteItem,
   type Supplier,
-  type Product
+  type Product,
 } from "@/lib/db/schema";
 import { getUser } from "@/lib/db/queries";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import {
   calculateComparisonMatrix,
   type PriceItem,
-  type ComparisonMatrix
+  type ComparisonMatrix,
 } from "@/lib/utils/price-calculation";
 import {
   ComparisonMatrixSchema,
@@ -39,7 +39,9 @@ async function checkManagerRole() {
   const user = await getUser();
 
   if (!user) {
-    throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện hành động này");
+    throw new Error(
+      "Unauthorized: Bạn cần đăng nhập để thực hiện hành động này"
+    );
   }
 
   // TODO: Implement proper role checking for manager-level operations
@@ -48,7 +50,6 @@ async function checkManagerRole() {
 
   return user;
 }
-
 
 // ==================== MAIN ACTIONS ====================
 
@@ -65,9 +66,13 @@ export async function getComparisonMatrix(
 
     // Validate input
     const validatedFilters = ComparisonMatrixSchema.parse(filters);
-    const { period, region, category } = validatedFilters;
+    const { period, region, categories } = validatedFilters;
 
-    console.log(`[getComparisonMatrix] Starting comparison for period: ${period}, region: ${region}, category: ${category}`);
+    console.log(
+      `[getComparisonMatrix] Starting comparison for period: ${period}, region: ${region}, categories: ${categories.join(
+        ", "
+      )}`
+    );
 
     // STEP 1: Fetch all active products in the given category
     const allProducts = await db
@@ -83,31 +88,45 @@ export async function getComparisonMatrix(
       .from(products)
       .where(
         and(
-          eq(products.category, category),
-          eq(products.status, 'active')
+          inArray(products.category, categories),
+          eq(products.status, "active")
         )
       )
       .orderBy(products.productCode);
 
-    console.log(`[getComparisonMatrix] Found ${allProducts?.length || 0} products in category ${category}`);
+    console.log(
+      `[getComparisonMatrix] Found ${
+        allProducts?.length || 0
+      } products in categories: ${categories.join(", ")}`
+    );
 
     if (!Array.isArray(allProducts) || allProducts.length === 0) {
-      console.log(`[getComparisonMatrix] No products found, returning empty matrix`);
+      console.log(
+        `[getComparisonMatrix] No products found, returning empty matrix`
+      );
       return {
         products: [],
         suppliers: [],
         period,
         region,
-        category,
+        category: categories.join(", "),
         lastUpdated: new Date(),
         overviewKPIs: {
           totalCurrentValue: 0,
           comparisonVsInitial: { difference: 0, percentage: 0 },
-          comparisonVsPrevious: { difference: 0, percentage: 0, hasPreviousData: false },
-          comparisonVsBase: { difference: 0, percentage: 0, hasBaseData: false },
+          comparisonVsPrevious: {
+            difference: 0,
+            percentage: 0,
+            hasPreviousData: false,
+          },
+          comparisonVsBase: {
+            difference: 0,
+            percentage: 0,
+            hasBaseData: false,
+          },
           totalProducts: 0,
           totalSuppliers: 0,
-          productsWithPrevious: 0
+          productsWithPrevious: 0,
         },
         availableSuppliers: [],
       };
@@ -127,12 +146,16 @@ export async function getComparisonMatrix(
         and(
           eq(quotations.period, period),
           eq(quotations.region, region),
-          eq(suppliers.status, 'active')
+          eq(suppliers.status, "active")
         )
       )
       .orderBy(suppliers.supplierCode);
 
-    console.log(`[getComparisonMatrix] Found ${allSuppliers?.length || 0} suppliers with quotations`);
+    console.log(
+      `[getComparisonMatrix] Found ${
+        allSuppliers?.length || 0
+      } suppliers with quotations`
+    );
 
     // STEP 3: Fetch kitchen demands for quantity calculations
     const kitchenDemands = await db
@@ -145,12 +168,16 @@ export async function getComparisonMatrix(
       .where(
         and(
           eq(kitchenPeriodDemands.period, period),
-          eq(products.category, category),
-          eq(kitchenPeriodDemands.status, 'active')
+          inArray(products.category, categories),
+          eq(kitchenPeriodDemands.status, "active")
         )
       );
 
-    console.log(`[getComparisonMatrix] Found ${kitchenDemands?.length || 0} kitchen demands`);
+    console.log(
+      `[getComparisonMatrix] Found ${
+        kitchenDemands?.length || 0
+      } kitchen demands`
+    );
 
     // STEP 4: Initialize the matrix structure (Initialize Phase)
     console.log(`[getComparisonMatrix] Initializing matrix structure...`);
@@ -161,7 +188,7 @@ export async function getComparisonMatrix(
     // Create kitchen demands lookup for efficient access
     const kitchenDemandsMap = new Map();
     if (Array.isArray(kitchenDemands)) {
-      kitchenDemands.forEach(demand => {
+      kitchenDemands.forEach((demand) => {
         if (demand?.productId && demand?.quantity !== undefined) {
           kitchenDemandsMap.set(demand.productId, Number(demand.quantity) || 1);
         }
@@ -169,21 +196,25 @@ export async function getComparisonMatrix(
     }
 
     // Initialize all products with default structure
-    allProducts.forEach(product => {
+    allProducts.forEach((product) => {
       if (!product?.id) {
         console.warn(`[getComparisonMatrix] Invalid product data:`, product);
         return;
       }
 
-      const quantity = kitchenDemandsMap.get(product.id) || Number(product.baseQuantity) || 1;
-      const quantitySource = kitchenDemandsMap.has(product.id) ? 'kitchen_demand' : 'base_quantity';
+      const quantity =
+        kitchenDemandsMap.get(product.id) || Number(product.baseQuantity) || 1;
+      const quantitySource = kitchenDemandsMap.has(product.id)
+        ? "kitchen_demand"
+        : "base_quantity";
 
       matrixProducts.push({
         productId: product.id,
-        productCode: product.productCode || '',
-        productName: product.name || '',
-        specification: product.specification || '',
-        unit: product.unit || '',
+        productCode: product.productCode || "",
+        productName: product.name || "",
+        specification: product.specification || "",
+        unit: product.unit || "",
+        category: product.category || "", // Add category field
         quantity,
         quantitySource,
         baseQuantity: Number(product.baseQuantity) || 1,
@@ -196,16 +227,19 @@ export async function getComparisonMatrix(
 
     // Initialize supplier statistics
     if (Array.isArray(allSuppliers)) {
-      allSuppliers.forEach(supplier => {
+      allSuppliers.forEach((supplier) => {
         if (!supplier?.id) {
-          console.warn(`[getComparisonMatrix] Invalid supplier data:`, supplier);
+          console.warn(
+            `[getComparisonMatrix] Invalid supplier data:`,
+            supplier
+          );
           return;
         }
 
         matrixSuppliers.push({
           id: supplier.id,
-          code: supplier.supplierCode || '',
-          name: supplier.name || '',
+          code: supplier.supplierCode || "",
+          name: supplier.name || "",
           totalProducts: 0,
           quotedProducts: 0,
           coveragePercentage: 0,
@@ -213,7 +247,9 @@ export async function getComparisonMatrix(
       });
     }
 
-    console.log(`[getComparisonMatrix] Initialized matrix with ${matrixProducts.length} products and ${matrixSuppliers.length} suppliers`);
+    console.log(
+      `[getComparisonMatrix] Initialized matrix with ${matrixProducts.length} products and ${matrixSuppliers.length} suppliers`
+    );
 
     // STEP 5: Fetch and populate quotation data (Populate Phase)
     const quotationData = await db
@@ -244,12 +280,16 @@ export async function getComparisonMatrix(
         and(
           eq(quotations.period, period),
           eq(quotations.region, region),
-          eq(products.category, category),
-          eq(suppliers.status, 'active')
+          inArray(products.category, categories),
+          eq(suppliers.status, "active")
         )
       );
 
-    console.log(`[getComparisonMatrix] Found ${quotationData?.length || 0} quotation items to populate`);
+    console.log(
+      `[getComparisonMatrix] Found ${
+        quotationData?.length || 0
+      } quotation items to populate`
+    );
 
     // Create lookup maps for efficient population
     const productMap = new Map();
@@ -258,13 +298,13 @@ export async function getComparisonMatrix(
     });
 
     const supplierMap = new Map();
-    matrixSuppliers.forEach(supplier => {
+    matrixSuppliers.forEach((supplier) => {
       supplierMap.set(supplier.id, supplier);
     });
 
     // Populate the matrix with quotation data
     if (Array.isArray(quotationData)) {
-      quotationData.forEach(row => {
+      quotationData.forEach((row) => {
         if (!row?.productId || !row?.supplierId) {
           console.warn(`[getComparisonMatrix] Invalid quotation row:`, row);
           return;
@@ -272,20 +312,31 @@ export async function getComparisonMatrix(
 
         const productIndex = productMap.get(row.productId);
         if (productIndex === undefined) {
-          console.warn(`[getComparisonMatrix] Product not found in matrix:`, row.productId);
+          console.warn(
+            `[getComparisonMatrix] Product not found in matrix:`,
+            row.productId
+          );
           return;
         }
 
         const product = matrixProducts[productIndex];
         if (!product) {
-          console.warn(`[getComparisonMatrix] Product at index ${productIndex} is undefined`);
+          console.warn(
+            `[getComparisonMatrix] Product at index ${productIndex} is undefined`
+          );
           return;
         }
 
         // Determine the effective price (priority: approved > negotiated > initial)
-        const initialPrice = row.initialPrice ? Number(row.initialPrice) : undefined;
-        const negotiatedPrice = row.negotiatedPrice ? Number(row.negotiatedPrice) : undefined;
-        const approvedPrice = row.approvedPrice ? Number(row.approvedPrice) : undefined;
+        const initialPrice = row.initialPrice
+          ? Number(row.initialPrice)
+          : undefined;
+        const negotiatedPrice = row.negotiatedPrice
+          ? Number(row.negotiatedPrice)
+          : undefined;
+        const approvedPrice = row.approvedPrice
+          ? Number(row.approvedPrice)
+          : undefined;
 
         const effectivePrice = approvedPrice ?? negotiatedPrice ?? initialPrice;
         const vatRate = row.vatPercentage ? Number(row.vatPercentage) : 0;
@@ -311,13 +362,13 @@ export async function getComparisonMatrix(
           productCode: product.productCode,
           productName: product.productName,
           supplierId: row.supplierId,
-          supplierCode: row.supplierCode || '',
-          supplierName: row.supplierName || '',
+          supplierCode: row.supplierCode || "",
+          supplierName: row.supplierName || "",
           initialPrice,
           negotiatedPrice,
           approvedPrice,
           vatRate,
-          currency: row.currency || 'VND',
+          currency: row.currency || "VND",
           quantity: product.quantity,
           unit: product.unit,
           // Calculated metrics
@@ -338,15 +389,17 @@ export async function getComparisonMatrix(
     }
 
     // STEP 6: Calculate best prices and update supplier statistics
-    console.log(`[getComparisonMatrix] Calculating best prices and supplier coverage...`);
+    console.log(
+      `[getComparisonMatrix] Calculating best prices and supplier coverage...`
+    );
 
-    matrixProducts.forEach(product => {
+    matrixProducts.forEach((product) => {
       const supplierIds = Object.keys(product.suppliers).map(Number);
       let bestPrice = Infinity;
       let bestSupplierId = undefined;
 
       // Find best price among suppliers with valid prices
-      supplierIds.forEach(supplierId => {
+      supplierIds.forEach((supplierId) => {
         const supplierData = product.suppliers[supplierId];
         if (supplierData?.hasPrice && supplierData.pricePerUnit > 0) {
           if (supplierData.pricePerUnit < bestPrice) {
@@ -369,11 +422,12 @@ export async function getComparisonMatrix(
     });
 
     // Calculate supplier coverage percentages
-    matrixSuppliers.forEach(supplier => {
+    matrixSuppliers.forEach((supplier) => {
       supplier.totalProducts = matrixProducts.length;
-      supplier.coveragePercentage = matrixProducts.length > 0
-        ? Math.round((supplier.quotedProducts / matrixProducts.length) * 100)
-        : 0;
+      supplier.coveragePercentage =
+        matrixProducts.length > 0
+          ? Math.round((supplier.quotedProducts / matrixProducts.length) * 100)
+          : 0;
     });
 
     // STEP 7: Fetch supplier statistics for available suppliers list
@@ -391,12 +445,14 @@ export async function getComparisonMatrix(
         and(
           eq(quotations.period, period),
           eq(quotations.region, region),
-          eq(suppliers.status, 'active')
+          eq(suppliers.status, "active")
         )
       );
 
     // STEP 7b: HYPER-DEFENSIVE DATABASE QUERIES WITH MANUAL JOINS
-    console.log(`[getComparisonMatrix] === STARTING HYPER-DEFENSIVE DATA FETCHING ===`);
+    console.log(
+      `[getComparisonMatrix] === STARTING HYPER-DEFENSIVE DATA FETCHING ===`
+    );
 
     // Query 1: Get ALL active suppliers first
     let allActiveSuppliers;
@@ -410,26 +466,38 @@ export async function getComparisonMatrix(
           status: suppliers.status,
         })
         .from(suppliers)
-        .where(eq(suppliers.status, 'active'));
+        .where(eq(suppliers.status, "active"));
 
-      console.log(`[getComparisonMatrix] Step 1 RESULT: Found ${allActiveSuppliers.length} active suppliers`);
+      console.log(
+        `[getComparisonMatrix] Step 1 RESULT: Found ${allActiveSuppliers.length} active suppliers`
+      );
       if (allActiveSuppliers.length > 0) {
-        console.log(`[getComparisonMatrix] Step 1 SAMPLE:`, allActiveSuppliers[0]);
+        console.log(
+          `[getComparisonMatrix] Step 1 SAMPLE:`,
+          allActiveSuppliers[0]
+        );
       }
     } catch (error) {
-      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 1 - fetching suppliers:', error);
+      console.error(
+        "[getComparisonMatrix] CRITICAL ERROR in Step 1 - fetching suppliers:",
+        error
+      );
       throw new Error(`Failed to fetch suppliers: ${error.message}`);
     }
 
     // Query 2: Get regional quotations separately
     let regionalQuotations;
     try {
-      console.log(`[getComparisonMatrix] Step 2: Fetching regional quotations for period=${period}, region=${region}, category=${category}...`);
+      console.log(
+        `[getComparisonMatrix] Step 2: Fetching regional quotations for period=${period}, region=${region}, categories=${categories.join(
+          ", "
+        )}...`
+      );
 
       // Build WHERE conditions for quotations (category filtering is handled at product level)
       const quotationConditions = [
         eq(quotations.period, period),
-        eq(quotations.region, region)
+        eq(quotations.region, region),
       ];
 
       regionalQuotations = await db
@@ -444,19 +512,29 @@ export async function getComparisonMatrix(
         .from(quotations)
         .where(and(...quotationConditions));
 
-      console.log(`[getComparisonMatrix] Step 2 RESULT: Found ${regionalQuotations.length} regional quotations`);
+      console.log(
+        `[getComparisonMatrix] Step 2 RESULT: Found ${regionalQuotations.length} regional quotations`
+      );
       if (regionalQuotations.length > 0) {
-        console.log(`[getComparisonMatrix] Step 2 SAMPLE:`, regionalQuotations[0]);
+        console.log(
+          `[getComparisonMatrix] Step 2 SAMPLE:`,
+          regionalQuotations[0]
+        );
       }
     } catch (error) {
-      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 2 - fetching quotations:', error);
+      console.error(
+        "[getComparisonMatrix] CRITICAL ERROR in Step 2 - fetching quotations:",
+        error
+      );
       throw new Error(`Failed to fetch quotations: ${error.message}`);
     }
 
     // Query 3: Get quotation statistics separately
     let allQuotationStats;
     try {
-      console.log(`[getComparisonMatrix] Step 3: Fetching quotation statistics...`);
+      console.log(
+        `[getComparisonMatrix] Step 3: Fetching quotation statistics...`
+      );
       allQuotationStats = await db
         .select({
           quotationId: quotations.id,
@@ -469,18 +547,23 @@ export async function getComparisonMatrix(
         .from(quotations)
         .innerJoin(suppliers, eq(quotations.supplierId, suppliers.id))
         .where(
-          and(
-            eq(quotations.region, region),
-            eq(suppliers.status, 'active')
-          )
+          and(eq(quotations.region, region), eq(suppliers.status, "active"))
         );
 
-      console.log(`[getComparisonMatrix] Step 3 RESULT: Found ${allQuotationStats.length} quotation statistics`);
+      console.log(
+        `[getComparisonMatrix] Step 3 RESULT: Found ${allQuotationStats.length} quotation statistics`
+      );
       if (allQuotationStats.length > 0) {
-        console.log(`[getComparisonMatrix] Step 3 SAMPLE:`, allQuotationStats[0]);
+        console.log(
+          `[getComparisonMatrix] Step 3 SAMPLE:`,
+          allQuotationStats[0]
+        );
       }
     } catch (error) {
-      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 3 - fetching stats:', error);
+      console.error(
+        "[getComparisonMatrix] CRITICAL ERROR in Step 3 - fetching stats:",
+        error
+      );
       throw new Error(`Failed to fetch quotation stats: ${error.message}`);
     }
 
@@ -488,26 +571,34 @@ export async function getComparisonMatrix(
     const supplierStatsMap = new Map();
 
     try {
-      console.log(`[getComparisonMatrix] Step 4: Building supplier stats map from ${allActiveSuppliers.length} suppliers...`);
+      console.log(
+        `[getComparisonMatrix] Step 4: Building supplier stats map from ${allActiveSuppliers.length} suppliers...`
+      );
 
       // Initialize all active suppliers first
       allActiveSuppliers.forEach((supplier, index) => {
         try {
-          if (!supplier || typeof supplier !== 'object') {
-            console.warn(`[getComparisonMatrix] Step 4.${index}: Invalid supplier object:`, supplier);
+          if (!supplier || typeof supplier !== "object") {
+            console.warn(
+              `[getComparisonMatrix] Step 4.${index}: Invalid supplier object:`,
+              supplier
+            );
             return;
           }
 
           if (!supplier.id) {
-            console.warn(`[getComparisonMatrix] Step 4.${index}: Supplier missing ID:`, supplier);
+            console.warn(
+              `[getComparisonMatrix] Step 4.${index}: Supplier missing ID:`,
+              supplier
+            );
             return;
           }
 
           const supplierData = {
             id: supplier.id,
-            code: supplier.supplierCode || '',
-            name: supplier.name || '',
-            status: supplier.status || 'unknown',
+            code: supplier.supplierCode || "",
+            name: supplier.name || "",
+            status: supplier.status || "unknown",
             // Initialize quotation data as null
             quotationId: null,
             quotationStatus: null,
@@ -522,33 +613,53 @@ export async function getComparisonMatrix(
 
           supplierStatsMap.set(supplier.id, supplierData);
 
-          if (index < 3) { // Log first 3 for debugging
-            console.log(`[getComparisonMatrix] Step 4.${index}: Added supplier ${supplier.id} (${supplier.supplierCode})`);
+          if (index < 3) {
+            // Log first 3 for debugging
+            console.log(
+              `[getComparisonMatrix] Step 4.${index}: Added supplier ${supplier.id} (${supplier.supplierCode})`
+            );
           }
         } catch (error) {
-          console.error(`[getComparisonMatrix] ERROR in Step 4.${index} - processing supplier:`, error, supplier);
+          console.error(
+            `[getComparisonMatrix] ERROR in Step 4.${index} - processing supplier:`,
+            error,
+            supplier
+          );
         }
       });
 
-      console.log(`[getComparisonMatrix] Step 4 RESULT: Initialized ${supplierStatsMap.size} suppliers in stats map`);
+      console.log(
+        `[getComparisonMatrix] Step 4 RESULT: Initialized ${supplierStatsMap.size} suppliers in stats map`
+      );
     } catch (error) {
-      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 4 - building supplier map:', error);
+      console.error(
+        "[getComparisonMatrix] CRITICAL ERROR in Step 4 - building supplier map:",
+        error
+      );
       throw new Error(`Failed to build supplier map: ${error.message}`);
     }
 
     try {
-      console.log(`[getComparisonMatrix] Step 5: Overlaying regional quotation data from ${regionalQuotations.length} quotations...`);
+      console.log(
+        `[getComparisonMatrix] Step 5: Overlaying regional quotation data from ${regionalQuotations.length} quotations...`
+      );
 
       // Overlay regional quotation data
       regionalQuotations.forEach((quotation, index) => {
         try {
-          if (!quotation || typeof quotation !== 'object') {
-            console.warn(`[getComparisonMatrix] Step 5.${index}: Invalid quotation object:`, quotation);
+          if (!quotation || typeof quotation !== "object") {
+            console.warn(
+              `[getComparisonMatrix] Step 5.${index}: Invalid quotation object:`,
+              quotation
+            );
             return;
           }
 
           if (!quotation.supplierId) {
-            console.warn(`[getComparisonMatrix] Step 5.${index}: Quotation missing supplierId:`, quotation);
+            console.warn(
+              `[getComparisonMatrix] Step 5.${index}: Quotation missing supplierId:`,
+              quotation
+            );
             return;
           }
 
@@ -560,36 +671,58 @@ export async function getComparisonMatrix(
             supplierData.quotationSubmittedAt = null; // submittedAt field doesn't exist in current schema
             supplierData.quotationLastUpdated = quotation.updatedAt ?? null;
 
-            if (index < 3) { // Log first 3 for debugging
-              console.log(`[getComparisonMatrix] Step 5.${index}: Updated supplier ${quotation.supplierId} with quotation ${quotation.id}`);
+            if (index < 3) {
+              // Log first 3 for debugging
+              console.log(
+                `[getComparisonMatrix] Step 5.${index}: Updated supplier ${quotation.supplierId} with quotation ${quotation.id}`
+              );
             }
           } else {
-            console.warn(`[getComparisonMatrix] Step 5.${index}: No supplier found for quotation supplier ID: ${quotation.supplierId}`);
+            console.warn(
+              `[getComparisonMatrix] Step 5.${index}: No supplier found for quotation supplier ID: ${quotation.supplierId}`
+            );
           }
         } catch (error) {
-          console.error(`[getComparisonMatrix] ERROR in Step 5.${index} - processing quotation:`, error, quotation);
+          console.error(
+            `[getComparisonMatrix] ERROR in Step 5.${index} - processing quotation:`,
+            error,
+            quotation
+          );
         }
       });
 
-      console.log(`[getComparisonMatrix] Step 5 RESULT: Processed ${regionalQuotations.length} regional quotations`);
+      console.log(
+        `[getComparisonMatrix] Step 5 RESULT: Processed ${regionalQuotations.length} regional quotations`
+      );
     } catch (error) {
-      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 5 - overlaying quotations:', error);
+      console.error(
+        "[getComparisonMatrix] CRITICAL ERROR in Step 5 - overlaying quotations:",
+        error
+      );
       throw new Error(`Failed to overlay quotation data: ${error.message}`);
     }
 
     try {
-      console.log(`[getComparisonMatrix] Step 6: Computing statistics from ${allQuotationStats.length} quotation records...`);
+      console.log(
+        `[getComparisonMatrix] Step 6: Computing statistics from ${allQuotationStats.length} quotation records...`
+      );
 
       // Populate statistics from all quotations
       allQuotationStats.forEach((stat, index) => {
         try {
-          if (!stat || typeof stat !== 'object') {
-            console.warn(`[getComparisonMatrix] Step 6.${index}: Invalid stat object:`, stat);
+          if (!stat || typeof stat !== "object") {
+            console.warn(
+              `[getComparisonMatrix] Step 6.${index}: Invalid stat object:`,
+              stat
+            );
             return;
           }
 
           if (!stat.supplierId) {
-            console.warn(`[getComparisonMatrix] Step 6.${index}: Stat missing supplierId:`, stat);
+            console.warn(
+              `[getComparisonMatrix] Step 6.${index}: Stat missing supplierId:`,
+              stat
+            );
             return;
           }
 
@@ -598,44 +731,66 @@ export async function getComparisonMatrix(
             supplierData.totalQuotations++;
 
             switch (stat.quotationStatus) {
-              case 'pending':
+              case "pending":
                 supplierData.pendingQuotations++;
                 break;
-              case 'negotiation':
+              case "negotiation":
                 supplierData.negotiationQuotations++;
                 break;
-              case 'approved':
+              case "approved":
                 supplierData.approvedQuotations++;
                 break;
               default:
-                console.debug(`[getComparisonMatrix] Step 6.${index}: Unknown status: ${stat.quotationStatus}`);
+                console.debug(
+                  `[getComparisonMatrix] Step 6.${index}: Unknown status: ${stat.quotationStatus}`
+                );
                 break;
             }
 
-            if (index < 3) { // Log first 3 for debugging
-              console.log(`[getComparisonMatrix] Step 6.${index}: Updated stats for supplier ${stat.supplierId}, total: ${supplierData.totalQuotations}`);
+            if (index < 3) {
+              // Log first 3 for debugging
+              console.log(
+                `[getComparisonMatrix] Step 6.${index}: Updated stats for supplier ${stat.supplierId}, total: ${supplierData.totalQuotations}`
+              );
             }
           } else {
-            console.warn(`[getComparisonMatrix] Step 6.${index}: No supplier found for stat supplier ID: ${stat.supplierId}`);
+            console.warn(
+              `[getComparisonMatrix] Step 6.${index}: No supplier found for stat supplier ID: ${stat.supplierId}`
+            );
           }
         } catch (error) {
-          console.error(`[getComparisonMatrix] ERROR in Step 6.${index} - processing stat:`, error, stat);
+          console.error(
+            `[getComparisonMatrix] ERROR in Step 6.${index} - processing stat:`,
+            error,
+            stat
+          );
         }
       });
 
-      console.log(`[getComparisonMatrix] Step 6 RESULT: Computed statistics for ${supplierStatsMap.size} suppliers`);
+      console.log(
+        `[getComparisonMatrix] Step 6 RESULT: Computed statistics for ${supplierStatsMap.size} suppliers`
+      );
     } catch (error) {
-      console.error('[getComparisonMatrix] CRITICAL ERROR in Step 6 - computing statistics:', error);
+      console.error(
+        "[getComparisonMatrix] CRITICAL ERROR in Step 6 - computing statistics:",
+        error
+      );
       throw new Error(`Failed to compute statistics: ${error.message}`);
     }
 
-    console.log(`[getComparisonMatrix] === HYPER-DEFENSIVE DATA FETCHING COMPLETE ===`);
+    console.log(
+      `[getComparisonMatrix] === HYPER-DEFENSIVE DATA FETCHING COMPLETE ===`
+    );
 
     // STEP 8: Calculate Overview KPIs
     console.log(`[getComparisonMatrix] Calculating overview KPIs...`);
 
     // Get previous approved prices for comparison
-    const previousApprovedPrices = await getPreviousApprovedPrices(period, region, category);
+    const previousApprovedPrices = await getPreviousApprovedPrices(
+      period,
+      region,
+      categories
+    );
 
     // Calculate KPIs
     let totalCurrentValue = 0;
@@ -646,7 +801,7 @@ export async function getComparisonMatrix(
     let productsWithPrevious = 0;
     let productsWithBase = 0;
 
-    matrixProducts.forEach(product => {
+    matrixProducts.forEach((product) => {
       // Add previous approved price to product data
       const previousPrice = previousApprovedPrices.get(product.productId);
       if (previousPrice) {
@@ -657,16 +812,22 @@ export async function getComparisonMatrix(
       let bestCurrentPrice = 0;
       let bestInitialPrice = 0;
 
-      Object.values(product.suppliers).forEach(supplierData => {
+      Object.values(product.suppliers).forEach((supplierData) => {
         if (supplierData.hasPrice) {
           const currentPrice = supplierData.pricePerUnit;
           const initialPrice = supplierData.initialPrice || 0;
 
-          if (bestCurrentPrice === 0 || (currentPrice > 0 && currentPrice < bestCurrentPrice)) {
+          if (
+            bestCurrentPrice === 0 ||
+            (currentPrice > 0 && currentPrice < bestCurrentPrice)
+          ) {
             bestCurrentPrice = currentPrice;
           }
 
-          if (bestInitialPrice === 0 || (initialPrice > 0 && initialPrice < bestInitialPrice)) {
+          if (
+            bestInitialPrice === 0 ||
+            (initialPrice > 0 && initialPrice < bestInitialPrice)
+          ) {
             bestInitialPrice = initialPrice;
           }
         }
@@ -699,23 +860,30 @@ export async function getComparisonMatrix(
     // Calculate comparison metrics
     const comparisonVsInitial = {
       difference: totalCurrentValue - totalInitialValue,
-      percentage: totalInitialValue > 0 ? ((totalCurrentValue - totalInitialValue) / totalInitialValue) * 100 : 0
+      percentage:
+        totalInitialValue > 0
+          ? ((totalCurrentValue - totalInitialValue) / totalInitialValue) * 100
+          : 0,
     };
 
     const comparisonVsPrevious = {
-      difference: productsWithPrevious > 0 ? totalCurrentValue - totalPreviousValue : 0,
-      percentage: productsWithPrevious > 0 && totalPreviousValue > 0
-        ? ((totalCurrentValue - totalPreviousValue) / totalPreviousValue) * 100
-        : 0,
-      hasPreviousData: productsWithPrevious > 0
+      difference:
+        productsWithPrevious > 0 ? totalCurrentValue - totalPreviousValue : 0,
+      percentage:
+        productsWithPrevious > 0 && totalPreviousValue > 0
+          ? ((totalCurrentValue - totalPreviousValue) / totalPreviousValue) *
+            100
+          : 0,
+      hasPreviousData: productsWithPrevious > 0,
     };
 
     const comparisonVsBase = {
       difference: productsWithBase > 0 ? totalCurrentValue - totalBaseValue : 0,
-      percentage: productsWithBase > 0 && totalBaseValue > 0
-        ? ((totalCurrentValue - totalBaseValue) / totalBaseValue) * 100
-        : 0,
-      hasBaseData: productsWithBase > 0
+      percentage:
+        productsWithBase > 0 && totalBaseValue > 0
+          ? ((totalCurrentValue - totalBaseValue) / totalBaseValue) * 100
+          : 0,
+      hasBaseData: productsWithBase > 0,
     };
 
     const overviewKPIs = {
@@ -725,16 +893,20 @@ export async function getComparisonMatrix(
       comparisonVsBase,
       totalProducts: matrixProducts.length,
       totalSuppliers: matrixSuppliers.length,
-      productsWithPrevious
+      productsWithPrevious,
     };
 
     console.log(`[getComparisonMatrix] KPIs calculated:`, {
       totalCurrentValue: totalCurrentValue.toFixed(0),
       vsInitial: `${comparisonVsInitial.percentage.toFixed(1)}%`,
-      vsPrevious: comparisonVsPrevious.hasPreviousData ? `${comparisonVsPrevious.percentage.toFixed(1)}%` : 'No data',
-      vsBase: comparisonVsBase.hasBaseData ? `${comparisonVsBase.percentage.toFixed(1)}%` : 'No data',
+      vsPrevious: comparisonVsPrevious.hasPreviousData
+        ? `${comparisonVsPrevious.percentage.toFixed(1)}%`
+        : "No data",
+      vsBase: comparisonVsBase.hasBaseData
+        ? `${comparisonVsBase.percentage.toFixed(1)}%`
+        : "No data",
       productsWithPrevious,
-      productsWithBase
+      productsWithBase,
     });
 
     const finalMatrix = {
@@ -742,7 +914,7 @@ export async function getComparisonMatrix(
       suppliers: matrixSuppliers,
       period,
       region,
-      category,
+      category: categories.join(", "),
       lastUpdated: new Date(),
       overviewKPIs,
       availableSuppliers: Array.from(supplierStatsMap.values()),
@@ -752,19 +924,23 @@ export async function getComparisonMatrix(
       productsCount: finalMatrix.products.length,
       suppliersCount: finalMatrix.suppliers.length,
       availableSuppliersCount: finalMatrix.availableSuppliers.length,
-      sampleProduct: finalMatrix.products[0] ? {
-        productId: finalMatrix.products[0].productId,
-        productCode: finalMatrix.products[0].productCode,
-        suppliersWithQuotes: Object.keys(finalMatrix.products[0].suppliers).length,
-      } : 'No products',
+      sampleProduct: finalMatrix.products[0]
+        ? {
+            productId: finalMatrix.products[0].productId,
+            productCode: finalMatrix.products[0].productCode,
+            suppliersWithQuotes: Object.keys(finalMatrix.products[0].suppliers)
+              .length,
+          }
+        : "No products",
     });
 
     return finalMatrix;
-
   } catch (error) {
     console.error("Error in getComparisonMatrix:", error);
     throw new Error(
-      error instanceof Error ? error.message : "Lỗi khi tải ma trận so sánh báo giá"
+      error instanceof Error
+        ? error.message
+        : "Lỗi khi tải ma trận so sánh báo giá"
     );
   }
 }
@@ -797,7 +973,7 @@ export async function batchNegotiation(
       .where(
         and(
           inArray(quotations.id, quotationIds),
-          inArray(quotations.status, ['pending', 'negotiation'])
+          inArray(quotations.status, ["pending", "negotiation"])
         )
       );
 
@@ -806,33 +982,36 @@ export async function batchNegotiation(
     }
 
     // Update quotation statuses
-    const validIds = quotationsToUpdate.map(q => q.id);
+    const validIds = quotationsToUpdate.map((q) => q.id);
     const updateResult = await db
       .update(quotations)
       .set({
-        status: 'negotiation',
+        status: "negotiation",
         updateDate: new Date(),
         updatedAt: new Date(),
       })
       .where(inArray(quotations.id, validIds));
 
     // Get affected supplier names
-    const affectedSuppliers = [...new Set(quotationsToUpdate.map(q => q.supplierName))];
+    const affectedSuppliers = [
+      ...new Set(quotationsToUpdate.map((q) => q.supplierName)),
+    ];
 
     // Revalidate relevant pages
-    revalidatePath('/so-sanh');
-    revalidatePath('/bao-gia');
+    revalidatePath("/so-sanh");
+    revalidatePath("/bao-gia");
 
     return {
       success: `Đã chuyển ${quotationsToUpdate.length} báo giá sang trạng thái đàm phán`,
       updatedQuotations: quotationsToUpdate.length,
       affectedSuppliers,
     };
-
   } catch (error) {
     console.error("Error in batchNegotiation:", error);
     throw new Error(
-      error instanceof Error ? error.message : "Lỗi khi thực hiện đàm phán hàng loạt"
+      error instanceof Error
+        ? error.message
+        : "Lỗi khi thực hiện đàm phán hàng loạt"
     );
   }
 }
@@ -867,7 +1046,7 @@ export async function negotiateQuotation(
       throw new Error("Không tìm thấy báo giá");
     }
 
-    if (!['pending', 'negotiation'].includes(quotation.status)) {
+    if (!["pending", "negotiation"].includes(quotation.status)) {
       throw new Error("Không thể đàm phán báo giá với trạng thái hiện tại");
     }
 
@@ -875,20 +1054,19 @@ export async function negotiateQuotation(
     await db
       .update(quotations)
       .set({
-        status: 'negotiation',
+        status: "negotiation",
         updateDate: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(quotations.id, id));
 
     // Revalidate relevant pages
-    revalidatePath('/so-sanh');
-    revalidatePath('/bao-gia');
+    revalidatePath("/so-sanh");
+    revalidatePath("/bao-gia");
 
     return {
       success: `Đã chuyển báo giá của ${quotation.supplierName} sang trạng thái đàm phán`,
     };
-
   } catch (error) {
     console.error("Error in negotiateQuotation:", error);
     throw new Error(
@@ -930,11 +1108,11 @@ export async function approveQuotation(
       throw new Error("Không tìm thấy báo giá");
     }
 
-    if (quotation.status === 'approved') {
+    if (quotation.status === "approved") {
       throw new Error("Báo giá đã được phê duyệt trước đó");
     }
 
-    if (quotation.status === 'cancelled') {
+    if (quotation.status === "cancelled") {
       throw new Error("Không thể phê duyệt báo giá đã bị hủy");
     }
 
@@ -976,7 +1154,8 @@ export async function approveQuotation(
             .where(eq(quoteItems.id, item.id));
 
           approvedItems++;
-          totalApprovedValue += finalApprovedPrice * (Number(item.quantity) || 1);
+          totalApprovedValue +=
+            finalApprovedPrice * (Number(item.quantity) || 1);
 
           // Log to price history
           await tx.insert(priceHistory).values({
@@ -984,7 +1163,7 @@ export async function approveQuotation(
             supplierId: quotation.supplierId,
             period: quotation.period,
             price: finalApprovedPrice,
-            priceType: 'approved',
+            priceType: "approved",
             region: quotation.region,
           });
 
@@ -996,7 +1175,7 @@ export async function approveQuotation(
       await tx
         .update(quotations)
         .set({
-          status: 'approved',
+          status: "approved",
           updateDate: new Date(),
           updatedAt: new Date(),
         })
@@ -1010,9 +1189,9 @@ export async function approveQuotation(
     });
 
     // Revalidate relevant pages
-    revalidatePath('/so-sanh');
-    revalidatePath('/bao-gia');
-    revalidatePath('/bang-gia');
+    revalidatePath("/so-sanh");
+    revalidatePath("/bao-gia");
+    revalidatePath("/bang-gia");
 
     return {
       success: `Đã phê duyệt báo giá của ${quotation.supplierName} với ${result.approvedItems} sản phẩm`,
@@ -1020,7 +1199,6 @@ export async function approveQuotation(
       totalApprovedValue: result.totalApprovedValue,
       loggedPriceHistory: result.loggedPriceHistory,
     };
-
   } catch (error) {
     console.error("Error in approveQuotation:", error);
     throw new Error(
@@ -1038,11 +1216,11 @@ export async function approveQuotation(
 async function getPreviousApprovedPrices(
   currentPeriod: string,
   region: string,
-  category: string
+  categories: string[]
 ): Promise<Map<number, { price: number; period: string }>> {
   try {
     // Parse current period to find previous periods
-    const [year, month] = currentPeriod.split('-').map(Number);
+    const [year, month] = currentPeriod.split("-").map(Number);
 
     // Generate a list of previous periods to check (up to 12 months back)
     const previousPeriods: string[] = [];
@@ -1057,12 +1235,16 @@ async function getPreviousApprovedPrices(
 
       // Generate all possible period formats for this month (XX can be any number)
       for (let seq = 1; seq <= 31; seq++) {
-        const seqStr = seq.toString().padStart(2, '0');
-        previousPeriods.push(`${prevYear}-${prevMonth.toString().padStart(2, '0')}-${seqStr}`);
+        const seqStr = seq.toString().padStart(2, "0");
+        previousPeriods.push(
+          `${prevYear}-${prevMonth.toString().padStart(2, "0")}-${seqStr}`
+        );
       }
     }
 
-    console.log(`[getPreviousApprovedPrices] Checking ${previousPeriods.length} previous periods for ${currentPeriod}`);
+    console.log(
+      `[getPreviousApprovedPrices] Checking ${previousPeriods.length} previous periods for ${currentPeriod}`
+    );
 
     // Find approved prices from the most recent previous period
     const previousApprovedPrices = await db
@@ -1079,32 +1261,41 @@ async function getPreviousApprovedPrices(
         and(
           inArray(quotations.period, previousPeriods),
           eq(quotations.region, region),
-          eq(products.category, category),
-          eq(quotations.status, 'approved'),
+          inArray(products.category, categories),
+          eq(quotations.status, "approved"),
           sql`${quoteItems.approvedPrice} IS NOT NULL`
         )
       )
       .orderBy(desc(quotations.period), desc(quoteItems.updatedAt));
 
-    console.log(`[getPreviousApprovedPrices] Found ${previousApprovedPrices?.length || 0} previous approved prices`);
+    console.log(
+      `[getPreviousApprovedPrices] Found ${
+        previousApprovedPrices?.length || 0
+      } previous approved prices`
+    );
 
     // Build a map with the most recent approved price per product
     const pricesMap = new Map<number, { price: number; period: string }>();
 
     if (Array.isArray(previousApprovedPrices)) {
-      previousApprovedPrices.forEach(item => {
-        if (item?.productId && item?.approvedPrice && !pricesMap.has(item.productId)) {
+      previousApprovedPrices.forEach((item) => {
+        if (
+          item?.productId &&
+          item?.approvedPrice &&
+          !pricesMap.has(item.productId)
+        ) {
           pricesMap.set(item.productId, {
             price: Number(item.approvedPrice),
-            period: item.period || 'unknown'
+            period: item.period || "unknown",
           });
         }
       });
     }
 
-    console.log(`[getPreviousApprovedPrices] Returning ${pricesMap.size} unique previous approved prices`);
+    console.log(
+      `[getPreviousApprovedPrices] Returning ${pricesMap.size} unique previous approved prices`
+    );
     return pricesMap;
-
   } catch (error) {
     console.error("Error in getPreviousApprovedPrices:", error);
     return new Map();
@@ -1123,11 +1314,10 @@ export async function getAvailableCategories(): Promise<string[]> {
     const categories = await db
       .selectDistinct({ category: products.category })
       .from(products)
-      .where(eq(products.status, 'active'))
+      .where(eq(products.status, "active"))
       .orderBy(products.category);
 
-    return categories.map(c => c.category);
-
+    return categories.map((c) => c.category);
   } catch (error) {
     console.error("Error in getAvailableCategories:", error);
     throw new Error("Lỗi khi tải danh sách nhóm hàng");
@@ -1137,7 +1327,10 @@ export async function getAvailableCategories(): Promise<string[]> {
 /**
  * Get quotation summary for comparison page filters
  */
-export async function getQuotationSummary(period: string, region: string): Promise<{
+export async function getQuotationSummary(
+  period: string,
+  region: string
+): Promise<{
   totalQuotations: number;
   pendingQuotations: number;
   negotiationQuotations: number;
@@ -1158,15 +1351,9 @@ export async function getQuotationSummary(period: string, region: string): Promi
         suppliers: sql<number>`COUNT(DISTINCT supplier_id)`,
       })
       .from(quotations)
-      .where(
-        and(
-          eq(quotations.period, period),
-          eq(quotations.region, region)
-        )
-      );
+      .where(and(eq(quotations.period, period), eq(quotations.region, region)));
 
     return summary;
-
   } catch (error) {
     console.error("Error in getQuotationSummary:", error);
     throw new Error("Lỗi khi tải tổng quan báo giá");
@@ -1197,9 +1384,8 @@ export async function getRegionsForPeriod(period: string): Promise<string[]> {
       .orderBy(quotations.region);
 
     return regions
-      .map(r => r.region)
+      .map((r) => r.region)
       .filter((region): region is string => Boolean(region));
-
   } catch (error) {
     console.error("Error in getRegionsForPeriod:", error);
     throw new Error("Lỗi khi tải danh sách khu vực theo kỳ");
@@ -1230,16 +1416,15 @@ export async function getCategoriesForPeriodAndRegion(
         and(
           eq(quotations.period, period),
           eq(quotations.region, region),
-          eq(products.status, 'active'),
+          eq(products.status, "active"),
           sql`${quotations.status} != 'cancelled'`
         )
       )
       .orderBy(products.category);
 
     return categories
-      .map(c => c.category)
+      .map((c) => c.category)
       .filter((category): category is string => Boolean(category));
-
   } catch (error) {
     console.error("Error in getCategoriesForPeriodAndRegion:", error);
     throw new Error("Lỗi khi tải danh sách nhóm hàng theo kỳ và khu vực");
@@ -1250,7 +1435,7 @@ export async function getCategoriesForPeriodAndRegion(
 const ExportTargetPriceSchema = z.object({
   period: z.string().min(1, "Kỳ báo giá là bắt buộc"),
   region: z.string().min(1, "Khu vực là bắt buộc"),
-  category: z.string().optional(),
+  categories: z.array(z.string()).optional(),
 });
 
 /**
@@ -1259,25 +1444,31 @@ const ExportTargetPriceSchema = z.object({
 export async function exportTargetPriceFile(params: {
   period: string;
   region: string;
-  category?: string;
+  categories?: string[];
 }): Promise<Blob> {
   try {
     console.log("[exportTargetPriceFile] Starting export with params:", params);
 
     // Validate input
     const validatedData = ExportTargetPriceSchema.parse(params);
-    const { period, region, category } = validatedData;
+    const { period, region, categories } = validatedData;
 
     // Get comparison matrix data
-    const matrixData = await getComparisonMatrix({ period, region, category });
+    const matrixData = await getComparisonMatrix({
+      period,
+      region,
+      categories: categories || [],
+    });
 
     if (!matrixData || matrixData.products.length === 0) {
       throw new Error("Không có dữ liệu sản phẩm để xuất file");
     }
 
     // 1. Extract best prices for each product
-    const targetPriceData = matrixData.products.map(product => {
-      const bestSupplier = matrixData.availableSuppliers.find(s => s.id === product.bestSupplierId);
+    const targetPriceData = matrixData.products.map((product) => {
+      const bestSupplier = matrixData.availableSuppliers.find(
+        (s) => s.id === product.bestSupplierId
+      );
 
       return {
         productCode: product.productCode,
@@ -1288,19 +1479,25 @@ export async function exportTargetPriceFile(params: {
         bestSupplier: bestSupplier?.name || null,
         targetPrice: product.bestPrice || 0, // Can be adjusted with business rules
         previousApprovedPrice: product.previousApprovedPrice || 0,
-        notes: '', // For suppliers to add negotiation notes
+        notes: "", // For suppliers to add negotiation notes
       };
     });
 
     // 2. Generate Excel file using ExcelJS
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Target Prices');
+    const worksheet = workbook.addWorksheet("Target Prices");
 
     // Set up column headers
     const headers = [
-      'Mã sản phẩm', 'Tên sản phẩm', 'Đơn vị', 'Số lượng',
-      'Giá tốt nhất hiện tại', 'NCC giá tốt nhất', 'Giá mục tiêu',
-      'Giá đã duyệt kỳ trước', 'Ghi chú của NCC'
+      "Mã sản phẩm",
+      "Tên sản phẩm",
+      "Đơn vị",
+      "Số lượng",
+      "Giá tốt nhất hiện tại",
+      "NCC giá tốt nhất",
+      "Giá mục tiêu",
+      "Giá đã duyệt kỳ trước",
+      "Ghi chú của NCC",
     ];
 
     // Add headers with styling
@@ -1308,20 +1505,20 @@ export async function exportTargetPriceFile(params: {
     headerRow.eachCell((cell) => {
       cell.font = { bold: true };
       cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE6E6FA' }
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE6E6FA" },
       };
       cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
       };
     });
 
     // Add data rows
-    targetPriceData.forEach(item => {
+    targetPriceData.forEach((item) => {
       const row = worksheet.addRow([
         item.productCode,
         item.productName,
@@ -1331,16 +1528,16 @@ export async function exportTargetPriceFile(params: {
         item.bestSupplier,
         item.targetPrice,
         item.previousApprovedPrice,
-        item.notes
+        item.notes,
       ]);
 
       // Add borders to data cells
       row.eachCell((cell) => {
         cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
         };
       });
     });
@@ -1350,9 +1547,10 @@ export async function exportTargetPriceFile(params: {
       if (column.header) {
         const maxLength = Math.max(
           column.header.toString().length,
-          ...worksheet.getColumn(column.letter).values
-            .slice(1) // Skip header
-            .map(val => val ? val.toString().length : 0)
+          ...worksheet
+            .getColumn(column.letter)
+            .values.slice(1) // Skip header
+            .map((val) => (val ? val.toString().length : 0))
         );
         column.width = Math.min(Math.max(maxLength + 2, 10), 50);
       }
@@ -1361,13 +1559,14 @@ export async function exportTargetPriceFile(params: {
     // 3. Generate file buffer and return as Blob
     const buffer = await workbook.xlsx.writeBuffer();
 
-    console.log(`[exportTargetPriceFile] Generated Excel file with ${targetPriceData.length} products`);
+    console.log(
+      `[exportTargetPriceFile] Generated Excel file with ${targetPriceData.length} products`
+    );
 
     // Return as Blob for direct download
     return new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
-
   } catch (error) {
     console.error("Error in exportTargetPriceFile:", error);
     throw new Error(
@@ -1383,20 +1582,27 @@ export async function exportTargetPriceFile(params: {
 export async function initiateBatchNegotiationAndExport(params: {
   period: string;
   region: string;
-  category?: string;
+  categories?: string[];
 }): Promise<Blob> {
   try {
-    console.log("[initiateBatchNegotiationAndExport] Starting with params:", params);
+    console.log(
+      "[initiateBatchNegotiationAndExport] Starting with params:",
+      params
+    );
 
     // Authorization check
     await checkManagerRole();
 
     // Validate input
     const validatedData = ExportTargetPriceSchema.parse(params);
-    const { period, region, category } = validatedData;
+    const { period, region, categories } = validatedData;
 
     // Step 1: Get comparison matrix data first to identify quotations in current view
-    const matrixData = await getComparisonMatrix({ period, region, category });
+    const matrixData = await getComparisonMatrix({
+      period,
+      region,
+      categories: categories || [],
+    });
 
     if (!matrixData || matrixData.availableSuppliers.length === 0) {
       throw new Error("Không có dữ liệu nhà cung cấp để thực hiện");
@@ -1408,44 +1614,55 @@ export async function initiateBatchNegotiationAndExport(params: {
 
     // Step 2: Extract pending quotation IDs from matrixData
     const pendingQuotationIds = matrixData.availableSuppliers
-      .filter(supplier =>
-        supplier.quotationId &&
-        supplier.quotationId > 0 &&
-        supplier.quotationStatus === 'pending'
+      .filter(
+        (supplier) =>
+          supplier.quotationId &&
+          supplier.quotationId > 0 &&
+          supplier.quotationStatus === "pending"
       )
-      .map(supplier => supplier.quotationId!)
+      .map((supplier) => supplier.quotationId!)
       .filter((id, index, array) => array.indexOf(id) === index); // Remove duplicates
 
-    console.log(`[initiateBatchNegotiationAndExport] Found ${pendingQuotationIds.length} pending quotations from matrix data`);
+    console.log(
+      `[initiateBatchNegotiationAndExport] Found ${pendingQuotationIds.length} pending quotations from matrix data`
+    );
 
     // Step 3: Perform efficient batch status update using single UPDATE query
     if (pendingQuotationIds.length > 0) {
       const updateResult = await db
         .update(quotations)
         .set({
-          status: 'negotiation',
+          status: "negotiation",
           updateDate: new Date(),
           updatedAt: new Date(),
         })
         .where(
           and(
             inArray(quotations.id, pendingQuotationIds),
-            eq(quotations.status, 'pending') // Additional safety check
+            eq(quotations.status, "pending") // Additional safety check
           )
         );
 
-      console.log(`[initiateBatchNegotiationAndExport] Updated ${pendingQuotationIds.length} quotations to negotiation status`);
+      console.log(
+        `[initiateBatchNegotiationAndExport] Updated ${pendingQuotationIds.length} quotations to negotiation status`
+      );
     } else {
-      console.log(`[initiateBatchNegotiationAndExport] No pending quotations found to update`);
+      console.log(
+        `[initiateBatchNegotiationAndExport] No pending quotations found to update`
+      );
     }
 
     // Step 4: Generate simplified Excel file with target prices
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Target Prices');
+    const worksheet = workbook.addWorksheet("Target Prices");
 
     // Set up column headers - simplified as specified
     const headers = [
-      'Mã sản phẩm', 'Tên sản phẩm', 'Quy cách', 'Đơn vị', 'Giá mục tiêu'
+      "Mã sản phẩm",
+      "Tên sản phẩm",
+      "Quy cách",
+      "Đơn vị",
+      "Giá mục tiêu",
     ];
 
     // Add headers with styling
@@ -1453,30 +1670,30 @@ export async function initiateBatchNegotiationAndExport(params: {
     headerRow.eachCell((cell) => {
       cell.font = { bold: true };
       cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE6E6FA' }
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE6E6FA" },
       };
       cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
       };
     });
 
     // Add data rows - only best prices as target prices
-    matrixData.products.forEach(product => {
+    matrixData.products.forEach((product) => {
       // Use bestPrice from product, defaulting to 0 if not available
       const targetPrice = product.bestPrice || 0;
 
       // Ensure we have valid data for each required column
       const rowData = [
-        product.productCode || '',        // Mã sản phẩm
-        product.productName || '',        // Tên sản phẩm
-        product.specification || '',      // Quy cách (specification)
-        product.unit || '',               // Đơn vị
-        targetPrice                       // Giá mục tiêu (best price)
+        product.productCode || "", // Mã sản phẩm
+        product.productName || "", // Tên sản phẩm
+        product.specification || "", // Quy cách (specification)
+        product.unit || "", // Đơn vị
+        targetPrice, // Giá mục tiêu (best price)
       ];
 
       const row = worksheet.addRow(rowData);
@@ -1485,15 +1702,15 @@ export async function initiateBatchNegotiationAndExport(params: {
       row.eachCell((cell, colNumber) => {
         // Add borders to all cells
         cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
         };
 
         // Format price column (column 5) as number with thousand separators
-        if (colNumber === 5 && typeof cell.value === 'number') {
-          cell.numFmt = '#,##0';
+        if (colNumber === 5 && typeof cell.value === "number") {
+          cell.numFmt = "#,##0";
         }
       });
     });
@@ -1503,9 +1720,10 @@ export async function initiateBatchNegotiationAndExport(params: {
       if (column.header) {
         const maxLength = Math.max(
           column.header.toString().length,
-          ...worksheet.getColumn(column.letter).values
-            .slice(1) // Skip header
-            .map(val => val ? val.toString().length : 0)
+          ...worksheet
+            .getColumn(column.letter)
+            .values.slice(1) // Skip header
+            .map((val) => (val ? val.toString().length : 0))
         );
         column.width = Math.min(Math.max(maxLength + 2, 10), 50);
       }
@@ -1514,21 +1732,24 @@ export async function initiateBatchNegotiationAndExport(params: {
     // Step 5: Generate file buffer and return as Blob
     const buffer = await workbook.xlsx.writeBuffer();
 
-    console.log(`[initiateBatchNegotiationAndExport] Generated Excel file with ${matrixData.products.length} products`);
+    console.log(
+      `[initiateBatchNegotiationAndExport] Generated Excel file with ${matrixData.products.length} products`
+    );
 
     // Revalidate relevant pages
-    revalidatePath('/so-sanh');
-    revalidatePath('/bao-gia');
+    revalidatePath("/so-sanh");
+    revalidatePath("/bao-gia");
 
     // Return as Blob for direct download
     return new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
-
   } catch (error) {
     console.error("Error in initiateBatchNegotiationAndExport:", error);
     throw new Error(
-      error instanceof Error ? error.message : "Lỗi khi thực hiện đàm phán hàng loạt và xuất file"
+      error instanceof Error
+        ? error.message
+        : "Lỗi khi thực hiện đàm phán hàng loạt và xuất file"
     );
   }
 }
@@ -1545,7 +1766,10 @@ export async function approveMultipleQuotations(
   affectedSuppliers: string[];
 }> {
   try {
-    console.log("[approveMultipleQuotations] Starting approval process with:", data);
+    console.log(
+      "[approveMultipleQuotations] Starting approval process with:",
+      data
+    );
 
     // Authorization check - ensure user has approval permissions
     const user = await checkApprovalRole();
@@ -1558,7 +1782,9 @@ export async function approveMultipleQuotations(
       throw new Error("Danh sách báo giá không được để trống");
     }
 
-    console.log(`[approveMultipleQuotations] Processing ${quotationIds.length} quotation IDs`);
+    console.log(
+      `[approveMultipleQuotations] Processing ${quotationIds.length} quotation IDs`
+    );
 
     // Get quotations that are eligible for approval
     const quotationsToApprove = await db
@@ -1576,42 +1802,50 @@ export async function approveMultipleQuotations(
       .where(
         and(
           inArray(quotations.id, quotationIds),
-          inArray(quotations.status, ['pending', 'negotiation']) // Safety check - only approve quotations in valid statuses
+          inArray(quotations.status, ["pending", "negotiation"]) // Safety check - only approve quotations in valid statuses
         )
       );
 
     if (quotationsToApprove.length === 0) {
-      throw new Error("Không tìm thấy báo giá hợp lệ để phê duyệt (chỉ có thể phê duyệt báo giá ở trạng thái 'pending' hoặc 'negotiation')");
+      throw new Error(
+        "Không tìm thấy báo giá hợp lệ để phê duyệt (chỉ có thể phê duyệt báo giá ở trạng thái 'pending' hoặc 'negotiation')"
+      );
     }
 
-    console.log(`[approveMultipleQuotations] Found ${quotationsToApprove.length} valid quotations for approval`);
+    console.log(
+      `[approveMultipleQuotations] Found ${quotationsToApprove.length} valid quotations for approval`
+    );
 
     // Extract quotation IDs for efficient batch update
-    const validQuotationIds = quotationsToApprove.map(q => q.id);
+    const validQuotationIds = quotationsToApprove.map((q) => q.id);
 
     // Perform single, efficient database UPDATE query
     const updateResult = await db
       .update(quotations)
       .set({
-        status: 'approved',
+        status: "approved",
         updateDate: new Date(),
         updatedAt: new Date(),
       })
       .where(
         and(
           inArray(quotations.id, validQuotationIds),
-          inArray(quotations.status, ['pending', 'negotiation']) // Additional safety check in WHERE clause
+          inArray(quotations.status, ["pending", "negotiation"]) // Additional safety check in WHERE clause
         )
       );
 
-    console.log(`[approveMultipleQuotations] Successfully updated ${quotationsToApprove.length} quotations to approved status`);
+    console.log(
+      `[approveMultipleQuotations] Successfully updated ${quotationsToApprove.length} quotations to approved status`
+    );
 
     // Get affected supplier names for response
-    const affectedSuppliers = [...new Set(quotationsToApprove.map(q => q.supplierName))];
+    const affectedSuppliers = [
+      ...new Set(quotationsToApprove.map((q) => q.supplierName)),
+    ];
 
     // Revalidate relevant pages to refresh UI
-    revalidatePath('/so-sanh');
-    revalidatePath('/bao-gia');
+    revalidatePath("/so-sanh");
+    revalidatePath("/bao-gia");
 
     const result = {
       success: `Đã phê duyệt ${quotationsToApprove.length} báo giá từ ${affectedSuppliers.length} nhà cung cấp`,
@@ -1621,11 +1855,12 @@ export async function approveMultipleQuotations(
 
     console.log(`[approveMultipleQuotations] Completed successfully:`, result);
     return result;
-
   } catch (error) {
     console.error("Error in approveMultipleQuotations:", error);
     throw new Error(
-      error instanceof Error ? error.message : "Lỗi khi phê duyệt báo giá hàng loạt"
+      error instanceof Error
+        ? error.message
+        : "Lỗi khi phê duyệt báo giá hàng loạt"
     );
   }
 }
@@ -1637,7 +1872,9 @@ async function checkApprovalRole() {
   const user = await getUser();
 
   if (!user) {
-    throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện hành động này");
+    throw new Error(
+      "Unauthorized: Bạn cần đăng nhập để thực hiện hành động này"
+    );
   }
 
   // TODO: Implement proper role checking for approval-level operations
@@ -1648,9 +1885,12 @@ async function checkApprovalRole() {
 }
 
 // Helper function placeholder (would save to actual temp storage in production)
-async function saveToTempStorage(buffer: Buffer, fileName: string): Promise<string> {
+async function saveToTempStorage(
+  buffer: Buffer,
+  fileName: string
+): Promise<string> {
   // In a real implementation, this would save to AWS S3, local storage, etc.
   // For now, return a data URL
-  const base64Data = Buffer.from(buffer).toString('base64');
+  const base64Data = Buffer.from(buffer).toString("base64");
   return `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${base64Data}`;
 }

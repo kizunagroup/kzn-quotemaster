@@ -7,7 +7,7 @@ import type { ComparisonMatrix } from "@/lib/utils/price-calculation";
 export const ComparisonMatrixSchema = z.object({
   period: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Kỳ báo giá phải có định dạng YYYY-MM-XX"),
   region: z.string().min(1, "Khu vực là bắt buộc"),
-  category: z.string().min(1, "Nhóm hàng là bắt buộc"),
+  categories: z.array(z.string().min(1, "Nhóm hàng không được rỗng")).min(1, "Phải chọn ít nhất một nhóm hàng"),
 });
 
 // Batch negotiation schema
