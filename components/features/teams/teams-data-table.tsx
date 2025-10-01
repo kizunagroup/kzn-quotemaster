@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { useTeams, type Team } from "@/lib/hooks/use-teams";
 import { getRegions, activateTeam } from "@/lib/actions/team.actions";
+import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -35,25 +36,6 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { TeamsTableToolbar } from "./teams-table-toolbar";
 import { TeamFormModal } from "./team-form-modal";
 import { TeamDeleteDialog } from "./team-delete-dialog";
-
-// Status badge variant mapping
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "active":
-    case "hoạt động":
-      return "default";
-    case "inactive":
-    case "tạm dừng":
-      return "secondary";
-    case "suspended":
-    case "đình chỉ":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
 
 // Team type display mapping
 const getTeamTypeDisplay = (teamType: string): string => {
@@ -78,20 +60,6 @@ const getTeamTypeVariant = (
       return "secondary";
     default:
       return "outline";
-  }
-};
-
-// Status display mapping
-const getStatusDisplay = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "Hoạt Động";
-    case "inactive":
-      return "Tạm Dừng";
-    case "suspended":
-      return "Đình Chỉ";
-    default:
-      return status;
   }
 };
 
@@ -311,7 +279,7 @@ export function TeamsDataTable() {
         const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
-            {getStatusDisplay(status)}
+            {getStatusLabel(status)}
           </Badge>
         );
       },

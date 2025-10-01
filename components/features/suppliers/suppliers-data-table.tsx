@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { useSuppliers, type Supplier } from "@/lib/hooks/use-suppliers";
 import { toggleSupplierStatus } from "@/lib/actions/supplier.actions";
+import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,32 +37,6 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { SuppliersTableToolbar } from "./suppliers-table-toolbar";
 import { SupplierFormModal } from "./supplier-form-modal";
 import { SupplierDeleteDialog } from "./supplier-delete-dialog";
-
-// Status badge variant mapping
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "default";
-    case "inactive":
-      return "secondary";
-    default:
-      return "outline";
-  }
-};
-
-// Status display mapping - STANDARDIZED to match Staff
-const getStatusDisplay = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "Hoạt Động";
-    case "inactive":
-      return "Tạm Dừng";
-    default:
-      return status;
-  }
-};
 
 // Date formatting helper - EXACTLY LIKE TEAMS
 const formatDate = (date: Date | string): string => {
@@ -290,7 +265,7 @@ export function SuppliersDataTable() {
         const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
-            {getStatusDisplay(status)}
+            {getStatusLabel(status)}
           </Badge>
         );
       },

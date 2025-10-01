@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { StaffDataTable } from '@/components/features/staff/staff-data-table';
 
 export const metadata: Metadata = {
-  title: 'Quản lý Nhân viên - QuoteMaster',
+  title: 'Quản lý Nhân viên | Kizuna',
   description: 'Quản lý thông tin nhân viên, phòng ban, và nhóm làm việc trong hệ thống'
 };
 

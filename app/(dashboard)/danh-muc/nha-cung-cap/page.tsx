@@ -3,7 +3,7 @@ import { Metadata } from "next";
 import { SuppliersDataTable } from "@/components/features/suppliers/suppliers-data-table";
 
 export const metadata: Metadata = {
-  title: "Quản lý Nhà cung cấp | QuoteMaster",
+  title: "Quản lý Nhà cung cấp | Kizuna",
   description: "Quản lý danh sách nhà cung cấp trong hệ thống QuoteMaster",
 };
 

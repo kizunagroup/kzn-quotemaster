@@ -27,6 +27,7 @@ import {
   terminateStaff,
   resetPasswordByAdmin,
 } from "@/lib/actions/staff.actions";
+import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -59,36 +60,6 @@ import { StaffTableToolbar } from "./staff-table-toolbar";
 import { StaffFormModal } from "./staff-form-modal";
 import { StaffDeleteDialog } from "./staff-delete-dialog";
 import { TeamAssignmentModal } from "./team-assignment-modal";
-
-// Status badge variant mapping
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "default";
-    case "inactive":
-      return "secondary";
-    case "terminated":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
-
-// Status display mapping
-const getStatusDisplay = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "Hoạt Động";
-    case "inactive":
-      return "Tạm Dừng";
-    case "terminated":
-      return "Đã Nghỉ";
-    default:
-      return status;
-  }
-};
 
 // Department display mapping
 const getDepartmentDisplay = (department: string | null): string => {
@@ -450,7 +421,7 @@ export function StaffDataTable() {
         const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
-            {getStatusDisplay(status)}
+            {getStatusLabel(status)}
           </Badge>
         );
       },

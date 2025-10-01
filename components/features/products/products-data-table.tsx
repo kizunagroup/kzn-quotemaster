@@ -13,6 +13,7 @@ import { toast } from "sonner";
 
 import { useProducts, type Product } from "@/lib/hooks/use-products";
 import { toggleProductStatus } from "@/lib/actions/product.actions";
+import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,32 +37,6 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { ProductsTableToolbar } from "./products-table-toolbar";
 import { ProductFormModal } from "./product-form-modal";
 import { ProductDeleteDialog } from "./product-delete-dialog";
-
-// Status badge variant mapping
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "default";
-    case "inactive":
-      return "secondary";
-    default:
-      return "outline";
-  }
-};
-
-// Status display mapping - STANDARDIZED to match Staff
-const getStatusDisplay = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "Hoạt Động";
-    case "inactive":
-      return "Tạm Dừng";
-    default:
-      return status;
-  }
-};
 
 // Date formatting helper - EXACTLY LIKE TEAMS
 const formatDate = (date: Date | string): string => {
@@ -290,7 +265,7 @@ export function ProductsDataTable() {
       cell: ({ row }) => {
         const price = row.getValue("basePrice") as string;
         return (
-          <div className="text-right font-medium">{formatCurrency(price)}</div>
+          <div className="text-right font-narrow">{formatCurrency(price)}</div>
         );
       },
     },
@@ -307,7 +282,7 @@ export function ProductsDataTable() {
       cell: ({ row }) => {
         const quantity = row.getValue("baseQuantity") as string;
         return (
-          <div className="text-right">
+          <div className="text-right font-narrow">
             {quantity ? Number(quantity).toLocaleString("vi-VN") : "-"}
           </div>
         );
@@ -323,7 +298,7 @@ export function ProductsDataTable() {
         const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
-            {getStatusDisplay(status)}
+            {getStatusLabel(status)}
           </Badge>
         );
       },

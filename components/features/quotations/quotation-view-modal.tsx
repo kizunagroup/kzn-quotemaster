@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
 import type { Quotation } from "@/lib/hooks/use-quotations";
 
 interface QuotationViewModalProps {
@@ -43,38 +44,6 @@ const formatPeriod = (period: string): string => {
     return `${day}/${month}/${year}`;
   } catch {
     return period;
-  }
-};
-
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "approved":
-      return "default";
-    case "pending":
-      return "outline";
-    case "negotiation":
-      return "secondary";
-    case "cancelled":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
-
-const getStatusDisplay = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case "pending":
-      return "Chờ Duyệt";
-    case "approved":
-      return "Đã Duyệt";
-    case "negotiation":
-      return "Đang Thương Lượng";
-    case "cancelled":
-      return "Đã Hủy";
-    default:
-      return status;
   }
 };
 
@@ -157,7 +126,7 @@ export function QuotationViewModal({
           <DialogTitle className="flex items-center gap-3">
             <span>Chi tiết báo giá</span>
             <Badge variant={getStatusVariant(quotation.status)}>
-              {getStatusDisplay(quotation.status)}
+              {getStatusLabel(quotation.status)}
             </Badge>
           </DialogTitle>
           <DialogDescription>

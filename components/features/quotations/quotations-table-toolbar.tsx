@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useDebounce } from "use-debounce";
 import { Settings2 } from "lucide-react";
 import { Table } from "@tanstack/react-table";
+import { getStatusVariant as getStatusVariantCentral, getStatusLabel as getStatusLabelCentral } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -39,29 +40,9 @@ export const statusOptions = [
   { value: "cancelled", label: "Đã Hủy" },
 ] as const;
 
-// Helper function to get status label from value - ensures consistency
-export const getStatusLabel = (status: string): string => {
-  const option = statusOptions.find(opt => opt.value === status);
-  return option?.label || status;
-};
-
-// Helper function to get status variant for Badge component
-export const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "approved":
-      return "default";
-    case "pending":
-      return "secondary";
-    case "negotiation":
-      return "outline";
-    case "cancelled":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
+// Re-export centralized status utilities for backward compatibility
+export const getStatusLabel = getStatusLabelCentral;
+export const getStatusVariant = getStatusVariantCentral;
 
 
 interface QuotationsTableToolbarProps {

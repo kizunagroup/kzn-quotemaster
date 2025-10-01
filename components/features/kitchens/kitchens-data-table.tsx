@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useKitchens, type Kitchen } from "@/lib/hooks/use-kitchens";
 import { useDataTableUrlState } from "@/lib/hooks/use-data-table-url-state";
 import { getRegions, activateKitchen } from "@/lib/actions/kitchen.actions";
+import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,25 +38,6 @@ import { KitchensTableToolbar } from "./kitchens-table-toolbar";
 import { KitchenFormModal } from "./kitchen-form-modal";
 import { KitchenDeleteDialog } from "./kitchen-delete-dialog";
 
-// Status badge variant mapping
-const getStatusVariant = (
-  status: string
-): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status.toLowerCase()) {
-    case "active":
-    case "hoạt động":
-      return "default";
-    case "inactive":
-    case "tạm dừng":
-      return "secondary";
-    case "suspended":
-    case "đình chỉ":
-      return "destructive";
-    default:
-      return "outline";
-  }
-};
-
 // Team type display mapping
 const getTeamTypeDisplay = (teamType: string): string => {
   switch (teamType.toLowerCase()) {
@@ -67,20 +49,6 @@ const getTeamTypeDisplay = (teamType: string): string => {
       return "Cửa Hàng Trực Thuộc";
     default:
       return teamType;
-  }
-};
-
-// Status display mapping
-const getStatusDisplay = (status: string): string => {
-  switch (status.toLowerCase()) {
-    case "active":
-      return "Hoạt Động";
-    case "inactive":
-      return "Tạm Dừng";
-    case "suspended":
-      return "Đình Chỉ";
-    default:
-      return status;
   }
 };
 
@@ -291,7 +259,7 @@ export function KitchensDataTable() {
         const status = row.getValue("status") as string;
         return (
           <Badge variant={getStatusVariant(status)}>
-            {getStatusDisplay(status)}
+            {getStatusLabel(status)}
           </Badge>
         );
       },

@@ -3,7 +3,7 @@ import { Metadata } from "next";
 import { QuotationsDataTable } from "@/components/features/quotations/quotations-data-table";
 
 export const metadata: Metadata = {
-  title: "Quản lý Báo giá | QuoteMaster",
+  title: "Quản lý Báo giá | Kizuna",
   description: "Quản lý báo giá từ nhà cung cấp trong hệ thống QuoteMaster",
 };
 

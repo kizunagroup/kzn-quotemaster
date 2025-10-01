@@ -149,7 +149,7 @@ const createColumns = (
       <DataTableColumnHeader column={column} title="Số SP" />
     ),
     cell: ({ row }) => (
-      <div className="text-center">{row.getValue("itemCount")}</div>
+      <div className="text-center font-narrow">{row.getValue("itemCount")}</div>
     ),
   },
   {
