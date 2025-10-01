@@ -1919,8 +1919,8 @@ export async function initiateBatchNegotiationAndExport(params: {
 }
 
 /**
- * Approve multiple quotations - Status update only
- * Note: Price finalization logic is handled separately to maintain separation of concerns
+ * Approve multiple quotations with price finalization
+ * Uses database transaction to ensure atomicity of status update and price finalization
  */
 export async function approveMultipleQuotations(
   data: z.infer<typeof BatchNegotiationSchema>
@@ -1983,23 +1983,45 @@ export async function approveMultipleQuotations(
     // Extract quotation IDs for efficient batch update
     const validQuotationIds = quotationsToApprove.map((q) => q.id);
 
-    // Perform single, efficient database UPDATE query
-    const updateResult = await db
-      .update(quotations)
-      .set({
-        status: "approved",
-        updateDate: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(
-        and(
-          inArray(quotations.id, validQuotationIds),
-          inArray(quotations.status, ["pending", "negotiation"]) // Additional safety check in WHERE clause
-        )
+    // Execute approval in a transaction to ensure data integrity
+    await db.transaction(async (tx) => {
+      // STEP 1: Update quotations status to 'approved'
+      await tx
+        .update(quotations)
+        .set({
+          status: "approved",
+          updateDate: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            inArray(quotations.id, validQuotationIds),
+            inArray(quotations.status, ["pending", "negotiation"])
+          )
+        );
+
+      console.log(
+        `[approveMultipleQuotations] STEP 1: Updated ${quotationsToApprove.length} quotations to approved status`
       );
 
+      // STEP 2: Finalize prices in quote_items
+      // Set approved_price = COALESCE(negotiated_price, initial_price)
+      await tx
+        .update(quoteItems)
+        .set({
+          approvedPrice: sql`COALESCE(${quoteItems.negotiatedPrice}, ${quoteItems.initialPrice})`,
+          approvedAt: new Date(),
+          approvedBy: user.id,
+        })
+        .where(inArray(quoteItems.quotationId, validQuotationIds));
+
+      console.log(
+        `[approveMultipleQuotations] STEP 2: Finalized approved prices for all quote items in ${quotationsToApprove.length} quotations`
+      );
+    });
+
     console.log(
-      `[approveMultipleQuotations] Successfully updated ${quotationsToApprove.length} quotations to approved status`
+      `[approveMultipleQuotations] Transaction completed successfully`
     );
 
     // Get affected supplier names for response
