@@ -286,14 +286,14 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                 </TableCell>
 
                 {/* Column 3: Base Quantity */}
-                <TableCell className="text-right text-sm font-jakarta">
+                <TableCell className="text-right text-sm font-narrow">
                   <div className="font-medium text-gray-600">
                     {formatNumber(product.baseQuantity || product.quantity)}
                   </div>
                 </TableCell>
 
                 {/* Column 4: Base Price */}
-                <TableCell className="text-right text-sm font-jakarta">
+                <TableCell className="text-right text-sm font-narrow">
                   {basePrice ? (
                     <div className="font-medium text-gray-600">
                       {formatNumber(basePrice)}
@@ -304,7 +304,7 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                 </TableCell>
 
                 {/* Column 5: Previous Approved Price */}
-                <TableCell className="text-right text-sm font-jakarta">
+                <TableCell className="text-right text-sm font-narrow">
                   {product.previousApprovedPrice ? (
                     <div className="font-medium text-blue-600">
                       {formatNumber(product.previousApprovedPrice)}
@@ -340,14 +340,14 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                   const baseVariance = basePrice ? calculateVariance(currentPrice, basePrice) : null;
 
                   return (
-                    <TableCell key={supplier.id} className="text-right text-sm font-jakarta">
+                    <TableCell key={supplier.id} className="text-right text-sm font-narrow">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="space-y-2 cursor-pointer">
                             {/* Current Price Display with Variance Icon */}
                             <div className="flex items-center justify-end gap-2">
                               <div className={cn(
-                                "text-sm px-2 py-1 rounded font-jakarta",
+                                "text-sm px-2 py-1 rounded font-narrow",
                                 getPriceStyle(isBestPrice)
                               )}>
                                 {formatNumber(currentPrice)}

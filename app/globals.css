@@ -52,7 +52,8 @@
   --color-sidebar-border: hsl(var(--sidebar-border));
   --color-sidebar-ring: hsl(var(--sidebar-ring));
 
-  --font-family-jakarta: var(--font-jakarta), sans-serif;
+  --font-family-display: var(--font-aptos-display), sans-serif;
+  --font-family-narrow: var(--font-aptos-narrow), sans-serif;
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -79,7 +80,10 @@
 
 @layer utilities {
   body {
-    font-family: "Manrope", Arial, Helvetica, sans-serif;
+    font-family: var(--font-aptos-display), Arial, Helvetica, sans-serif;
+  }
+  .font-narrow {
+    font-family: var(--font-aptos-narrow), Arial, Helvetica, sans-serif;
   }
 }
 

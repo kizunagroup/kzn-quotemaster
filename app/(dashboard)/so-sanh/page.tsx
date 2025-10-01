@@ -686,15 +686,15 @@ export default function ComparisonPage() {
                                               <div className="text-xs text-muted-foreground">{supplier.supplierName}</div>
                                             </div>
                                           </TableCell>
-                                          <TableCell className="text-center">{supplier.productCount}</TableCell>
-                                          <TableCell className="text-right">{formatNumber(supplier.totalBaseValue)}</TableCell>
-                                          <TableCell className="text-right">
+                                          <TableCell className="text-center font-narrow">{supplier.productCount}</TableCell>
+                                          <TableCell className="text-right font-narrow">{formatNumber(supplier.totalBaseValue)}</TableCell>
+                                          <TableCell className="text-right font-narrow">
                                             {supplier.totalPreviousValue !== null
                                               ? formatNumber(supplier.totalPreviousValue)
                                               : "-"}
                                           </TableCell>
-                                          <TableCell className="text-right">{formatNumber(supplier.totalInitialValue)}</TableCell>
-                                          <TableCell className={`text-right ${getCurrentValueBgColor()}`}>
+                                          <TableCell className="text-right font-narrow">{formatNumber(supplier.totalInitialValue)}</TableCell>
+                                          <TableCell className={`text-right font-narrow ${getCurrentValueBgColor()}`}>
                                             {formatNumber(supplier.totalCurrentValue)}
                                           </TableCell>
                                           <TableCell className="text-center">

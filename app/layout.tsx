@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
-import { Manrope, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import { getUser, getTeamForUser } from '@/lib/db/queries';
 import { SWRConfig } from 'swr';
 import { Toaster } from 'sonner';
@@ -14,11 +14,56 @@ export const viewport: Viewport = {
   maximumScale: 1
 };
 
-const manrope = Manrope({ subsets: ['latin'] });
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  variable: '--font-jakarta',
-  weight: ['300', '400', '500', '600', '700'],
+const aptos_display = localFont({
+  src: [
+    {
+      path: '../public/fonts/Aptos-Display.ttf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/Aptos-Display-Italic.ttf',
+      weight: '400',
+      style: 'italic',
+    },
+    {
+      path: '../public/fonts/Aptos-Display-Bold.ttf',
+      weight: '700',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/Aptos-Display-Bold-Italic.ttf',
+      weight: '700',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-aptos-display',
+});
+
+const aptos_narrow = localFont({
+  src: [
+    {
+      path: '../public/fonts/Aptos-Narrow.ttf',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/Aptos-Narrow-Italic.ttf',
+      weight: '400',
+      style: 'italic',
+    },
+    {
+      path: '../public/fonts/Aptos-Narrow-Bold.ttf',
+      weight: '700',
+      style: 'normal',
+    },
+    {
+      path: '../public/fonts/Aptos-Narrow-Bold-Italic.ttf',
+      weight: '700',
+      style: 'italic',
+    },
+  ],
+  variable: '--font-aptos-narrow',
 });
 
 export default function RootLayout({
@@ -29,7 +74,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`bg-white dark:bg-gray-950 text-black dark:text-white ${manrope.className} ${jakarta.variable}`}
+      className={`bg-white dark:bg-gray-950 text-black dark:text-white ${aptos_display.variable} ${aptos_narrow.variable}`}
     >
       <body className="min-h-[100dvh] bg-gray-50">
         <SWRConfig
