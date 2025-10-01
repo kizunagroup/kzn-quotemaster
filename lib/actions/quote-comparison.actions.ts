@@ -87,6 +87,7 @@ export async function getComparisonMatrix(
         unit: products.unit,
         category: products.category,
         baseQuantity: products.baseQuantity,
+        basePrice: products.basePrice, // Source of truth for "Giá cơ sở"
       })
       .from(products)
       .where(
@@ -205,6 +206,7 @@ export async function getComparisonMatrix(
         quantity,
         quantitySource,
         baseQuantity: Number(product.baseQuantity) || 1,
+        basePrice: product.basePrice ? Number(product.basePrice) : null, // Static reference price from products table
         suppliers: {}, // Will be populated with supplier data
         bestSupplierId: undefined,
         bestPrice: undefined,
@@ -870,11 +872,8 @@ export async function getComparisonMatrix(
         // Increment product count
         supplierAgg.productCount++;
 
-        // Calculate base price (lowest initial price for this product across all suppliers)
-        const allSupplierPrices = Object.values(product.suppliers)
-          .filter((s: any) => s.initialPrice && s.initialPrice > 0)
-          .map((s: any) => s.initialPrice);
-        const basePrice = allSupplierPrices.length > 0 ? Math.min(...allSupplierPrices) : 0;
+        // Use the static base price from products table (source of truth)
+        const basePrice = product.basePrice || 0;
 
         // Current effective price for this supplier
         const currentPrice = supplierData.pricePerUnit;

@@ -270,12 +270,6 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
 
         <TableBody>
           {products.map((product, index) => {
-            // Calculate base price (lowest initial price or first available)
-            const supplierPrices = Object.values(product.suppliers).filter(s => s.initialPrice);
-            const basePrice = supplierPrices.length > 0
-              ? Math.min(...supplierPrices.map(s => s.initialPrice || Infinity))
-              : undefined;
-
             return (
               <TableRow
                 key={product.productId}
@@ -312,9 +306,9 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
 
                 {/* Column 4: Base Price */}
                 <TableCell className="text-right text-sm font-narrow">
-                  {basePrice ? (
+                  {product.basePrice ? (
                     <div className="font-medium text-gray-600">
-                      {formatNumber(basePrice)}
+                      {formatNumber(product.basePrice)}
                     </div>
                   ) : (
                     <div className="text-gray-400 text-sm">N/A</div>
