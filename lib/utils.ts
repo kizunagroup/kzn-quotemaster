@@ -25,7 +25,10 @@ export function formatNumber(value: number | string | null | undefined): string 
   }
 
   // Format using Vietnamese locale (dots as thousand separators)
-  return new Intl.NumberFormat('vi-VN').format(numberValue);
+  // Round to nearest integer for cleaner display
+  return new Intl.NumberFormat('vi-VN', {
+    maximumFractionDigits: 0
+  }).format(numberValue);
 }
 
 /**

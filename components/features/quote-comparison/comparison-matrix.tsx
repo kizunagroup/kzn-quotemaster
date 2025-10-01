@@ -405,7 +405,7 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                             {/* Comparison vs Previous Period Best Price */}
                             {variance && (
                               <div>
-                                <div className="font-medium text-foreground">So với Kỳ trước (giá tốt nhất):</div>
+                                <div className="font-medium text-foreground">So với Giá tốt nhất kỳ trước:</div>
                                 <div className={cn(
                                   "flex items-center gap-1",
                                   variance.percentage > 0 ? "text-red-600" : "text-green-600"
@@ -426,7 +426,7 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                             {/* Comparison vs This Supplier's Previous Price */}
                             {supplierData.previousPriceFromThisSupplier && (
                               <div>
-                                <div className="font-medium text-foreground">So với Kỳ trước (NCC này):</div>
+                                <div className="font-medium text-foreground">So với Giá duyệt kỳ trước NCC này:</div>
                                 {(() => {
                                   const previousSupplierPrice = supplierData.previousPriceFromThisSupplier!;
                                   const supplierVariance = calculateVariance(currentPrice, previousSupplierPrice);

@@ -885,8 +885,9 @@ export async function getComparisonMatrix(
         supplierAgg.totalInitialValue += initialPrice * product.baseQuantity;
         supplierAgg.totalCurrentValue += currentPrice * product.baseQuantity;
 
-        if (product.previousApprovedPrice && product.previousApprovedPrice > 0) {
-          supplierAgg.totalPreviousValue += product.previousApprovedPrice * product.baseQuantity;
+        // Use supplier-specific previous price (not the best price from previous period)
+        if (supplierData.previousPriceFromThisSupplier && supplierData.previousPriceFromThisSupplier > 0) {
+          supplierAgg.totalPreviousValue += supplierData.previousPriceFromThisSupplier * product.baseQuantity;
           supplierAgg.hasAnyPreviousData = true;
         }
       });

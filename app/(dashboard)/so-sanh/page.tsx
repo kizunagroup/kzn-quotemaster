@@ -639,7 +639,7 @@ export default function ComparisonPage() {
                                         const isDecrease = variance.percentage < 0;
 
                                         return (
-                                          <div className="flex flex-col items-center gap-1">
+                                          <div className="flex flex-col items-end gap-1">
                                             <div className="flex items-center gap-1">
                                               {isIncrease && (
                                                 <TrendingUp className="h-3 w-3 text-red-600" />
