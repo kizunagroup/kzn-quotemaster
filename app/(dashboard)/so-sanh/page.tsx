@@ -631,24 +631,29 @@ export default function ComparisonPage() {
                                         return "";
                                       };
 
-                                      // Helper to render variance cell
+                                      // Helper to render variance cell - always show color and icon
                                       const renderVarianceCell = (variance: { difference: number; percentage: number } | null) => {
                                         if (!variance) {
-                                          return <span className="text-gray-400 text-sm">N/A</span>;
+                                          return <span className="text-gray-400 text-sm">-</span>;
                                         }
+
+                                        const isIncrease = variance.percentage > 0;
+                                        const isDecrease = variance.percentage < 0;
+
                                         return (
                                           <div className="flex flex-col items-center gap-1">
                                             <div className="flex items-center gap-1">
-                                              {variance.percentage > 0.5 ? (
+                                              {isIncrease && (
                                                 <TrendingUp className="h-3 w-3 text-red-600" />
-                                              ) : variance.percentage < -0.5 ? (
+                                              )}
+                                              {isDecrease && (
                                                 <TrendingDown className="h-3 w-3 text-green-600" />
-                                              ) : null}
+                                              )}
                                               <span
                                                 className={
-                                                  variance.percentage > 0.5
+                                                  isIncrease
                                                     ? "text-red-600 font-medium"
-                                                    : variance.percentage < -0.5
+                                                    : isDecrease
                                                     ? "text-green-600 font-medium"
                                                     : "text-gray-600"
                                                 }
@@ -659,9 +664,9 @@ export default function ComparisonPage() {
                                             </div>
                                             <span
                                               className={`text-xs ${
-                                                variance.percentage > 0.5
+                                                isIncrease
                                                   ? "text-red-600"
-                                                  : variance.percentage < -0.5
+                                                  : isDecrease
                                                   ? "text-green-600"
                                                   : "text-gray-600"
                                               }`}
@@ -752,35 +757,36 @@ export default function ComparisonPage() {
               {/* Quick View Filters */}
               <div className="flex items-center gap-1">
                 <Button
-                  variant={activeFilter === 'all' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setActiveFilter('all')}
+                  className={activeFilter === 'all' ? 'bg-muted' : ''}
                 >
                   Tất cả
                 </Button>
                 <Button
-                  variant={activeFilter === 'price_increase' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setActiveFilter('price_increase')}
-                  className="flex items-center gap-1"
+                  className={`flex items-center gap-1 ${activeFilter === 'price_increase' ? 'bg-muted' : ''}`}
                 >
-                  <ArrowUp className="h-4 w-4 text-red-600" />
+                  <TrendingUp className="h-4 w-4 text-red-600" />
                   <span className="text-red-600">Tăng giá</span>
                 </Button>
                 <Button
-                  variant={activeFilter === 'price_decrease' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setActiveFilter('price_decrease')}
-                  className="flex items-center gap-1"
+                  className={`flex items-center gap-1 ${activeFilter === 'price_decrease' ? 'bg-muted' : ''}`}
                 >
-                  <ArrowDown className="h-4 w-4 text-green-600" />
+                  <TrendingDown className="h-4 w-4 text-green-600" />
                   <span className="text-green-600">Giảm giá</span>
                 </Button>
                 <Button
-                  variant={activeFilter === 'no_quotes' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setActiveFilter('no_quotes')}
-                  className="flex items-center gap-1"
+                  className={`flex items-center gap-1 ${activeFilter === 'no_quotes' ? 'bg-muted' : ''}`}
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Chưa báo giá

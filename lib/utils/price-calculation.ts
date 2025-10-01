@@ -28,6 +28,7 @@ export interface ComparisonMetrics {
   // Variance vs previous period
   variancePercentage?: number; // Percentage change compared to previous approved price
   varianceTrend?: 'up' | 'down' | 'stable'; // Price trend indicator
+  previousPriceFromThisSupplier?: number; // This supplier's price from previous period
 }
 
 export interface ProductComparison {

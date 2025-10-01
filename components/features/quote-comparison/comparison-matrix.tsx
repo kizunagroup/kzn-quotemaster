@@ -204,13 +204,13 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
             <TableHead className="min-w-[200px]">Tên sản phẩm</TableHead>
 
             {/* Column 3: Số lượng cơ sở */}
-            <TableHead className="min-w-[120px] text-center">Số lượng cơ sở</TableHead>
+            <TableHead className="min-w-[120px] text-right">Số lượng cơ sở</TableHead>
 
             {/* Column 4: Giá cơ sở */}
-            <TableHead className="min-w-[120px] text-center">Giá cơ sở</TableHead>
+            <TableHead className="min-w-[120px] text-right">Giá cơ sở</TableHead>
 
             {/* Column 5: Giá duyệt kỳ trước */}
-            <TableHead className="min-w-[120px] text-center">Giá duyệt kỳ trước</TableHead>
+            <TableHead className="min-w-[120px] text-right">Giá duyệt kỳ trước</TableHead>
 
             {/* Dynamic supplier columns - simplified headers */}
             {suppliers.map((supplier) => {
@@ -234,7 +234,7 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                 <TableHead
                   key={supplier.id}
                   className={cn(
-                    "min-w-[150px] text-center",
+                    "min-w-[150px] text-right",
                     getBorderClass(supplierData?.quotationStatus)
                   )}
                 >
@@ -286,14 +286,14 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                 </TableCell>
 
                 {/* Column 3: Base Quantity */}
-                <TableCell className="text-center text-sm font-jakarta">
+                <TableCell className="text-right text-sm font-jakarta">
                   <div className="font-medium text-gray-600">
                     {formatNumber(product.baseQuantity || product.quantity)}
                   </div>
                 </TableCell>
 
                 {/* Column 4: Base Price */}
-                <TableCell className="text-center text-sm font-jakarta">
+                <TableCell className="text-right text-sm font-jakarta">
                   {basePrice ? (
                     <div className="font-medium text-gray-600">
                       {formatNumber(basePrice)}
@@ -304,7 +304,7 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                 </TableCell>
 
                 {/* Column 5: Previous Approved Price */}
-                <TableCell className="text-center text-sm font-jakarta">
+                <TableCell className="text-right text-sm font-jakarta">
                   {product.previousApprovedPrice ? (
                     <div className="font-medium text-blue-600">
                       {formatNumber(product.previousApprovedPrice)}
@@ -320,7 +320,7 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
 
                   if (!supplierData) {
                     return (
-                      <TableCell key={supplier.id} className="text-center">
+                      <TableCell key={supplier.id} className="text-right">
                         <div className="text-gray-400 text-sm py-4">Chưa báo giá</div>
                       </TableCell>
                     );
@@ -340,12 +340,12 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                   const baseVariance = basePrice ? calculateVariance(currentPrice, basePrice) : null;
 
                   return (
-                    <TableCell key={supplier.id} className="text-center text-sm font-jakarta">
+                    <TableCell key={supplier.id} className="text-right text-sm font-jakarta">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <div className="space-y-2 cursor-pointer">
                             {/* Current Price Display with Variance Icon */}
-                            <div className="flex items-center justify-center gap-2">
+                            <div className="flex items-center justify-end gap-2">
                               <div className={cn(
                                 "text-sm px-2 py-1 rounded font-jakarta",
                                 getPriceStyle(isBestPrice)
@@ -386,24 +386,67 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                               <div>
                                 <div className="font-medium text-foreground">So với Giá cơ sở:</div>
                                 <div className={cn(
+                                  "flex items-center gap-1",
                                   baseVariance.percentage > 0 ? "text-red-600" : "text-green-600"
                                 )}>
-                                  {baseVariance.difference > 0 ? '+' : ''}
-                                  {formatNumber(baseVariance.difference)} ({baseVariance.percentage > 0 ? '+' : ''}{formatPercentage(baseVariance.percentage)})
+                                  {baseVariance.percentage > 0 ? (
+                                    <ArrowUp className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowDown className="h-3 w-3" />
+                                  )}
+                                  <span>
+                                    {baseVariance.difference > 0 ? '+' : ''}
+                                    {formatNumber(baseVariance.difference)} ({baseVariance.percentage > 0 ? '+' : ''}{formatPercentage(baseVariance.percentage)})
+                                  </span>
                                 </div>
                               </div>
                             )}
 
-                            {/* Comparison vs Previous Period */}
+                            {/* Comparison vs Previous Period Best Price */}
                             {variance && (
                               <div>
-                                <div className="font-medium text-foreground">So với Kỳ trước:</div>
+                                <div className="font-medium text-foreground">So với Kỳ trước (giá tốt nhất):</div>
                                 <div className={cn(
+                                  "flex items-center gap-1",
                                   variance.percentage > 0 ? "text-red-600" : "text-green-600"
                                 )}>
-                                  {variance.difference > 0 ? '+' : ''}
-                                  {formatNumber(variance.difference)} ({variance.percentage > 0 ? '+' : ''}{formatPercentage(variance.percentage)})
+                                  {variance.percentage > 0 ? (
+                                    <ArrowUp className="h-3 w-3" />
+                                  ) : (
+                                    <ArrowDown className="h-3 w-3" />
+                                  )}
+                                  <span>
+                                    {variance.difference > 0 ? '+' : ''}
+                                    {formatNumber(variance.difference)} ({variance.percentage > 0 ? '+' : ''}{formatPercentage(variance.percentage)})
+                                  </span>
                                 </div>
+                              </div>
+                            )}
+
+                            {/* Comparison vs This Supplier's Previous Price */}
+                            {supplierData.previousPriceFromThisSupplier && (
+                              <div>
+                                <div className="font-medium text-foreground">So với Kỳ trước (NCC này):</div>
+                                {(() => {
+                                  const previousSupplierPrice = supplierData.previousPriceFromThisSupplier!;
+                                  const supplierVariance = calculateVariance(currentPrice, previousSupplierPrice);
+                                  return supplierVariance ? (
+                                    <div className={cn(
+                                      "flex items-center gap-1",
+                                      supplierVariance.percentage > 0 ? "text-red-600" : "text-green-600"
+                                    )}>
+                                      {supplierVariance.percentage > 0 ? (
+                                        <ArrowUp className="h-3 w-3" />
+                                      ) : (
+                                        <ArrowDown className="h-3 w-3" />
+                                      )}
+                                      <span>
+                                        {supplierVariance.difference > 0 ? '+' : ''}
+                                        {formatNumber(supplierVariance.difference)} ({supplierVariance.percentage > 0 ? '+' : ''}{formatPercentage(supplierVariance.percentage)})
+                                      </span>
+                                    </div>
+                                  ) : null;
+                                })()}
                               </div>
                             )}
                           </div>

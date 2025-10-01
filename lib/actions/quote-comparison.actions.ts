@@ -772,8 +772,8 @@ export async function getComparisonMatrix(
     // STEP 8: Get previous approved prices and enhance product data with variance
     console.log(`[getComparisonMatrix] Fetching previous approved prices and calculating variance...`);
 
-    // Get previous approved prices for comparison
-    const previousApprovedPrices = await getPreviousApprovedPrices(
+    // Get previous approved prices for comparison (now returns both best and per-supplier prices)
+    const { bestPrices, supplierPrices } = await getPreviousApprovedPrices(
       period,
       region,
       categories
@@ -781,7 +781,7 @@ export async function getComparisonMatrix(
 
     // Add previous approved price to each product and calculate variance for each supplier
     matrixProducts.forEach((product) => {
-      const previousPrice = previousApprovedPrices.get(product.productId);
+      const previousPrice = bestPrices.get(product.productId);
       if (previousPrice) {
         product.previousApprovedPrice = previousPrice.price;
       }
@@ -794,6 +794,13 @@ export async function getComparisonMatrix(
         if (supplierData.hasPrice && previousPrice && previousPrice.price > 0) {
           const currentPrice = supplierData.pricePerUnit;
           const prevPrice = previousPrice.price;
+
+          // Add supplier-specific previous price
+          const supplierPriceKey = `${product.productId}-${supplierId}`;
+          const previousSupplierPrice = supplierPrices.get(supplierPriceKey);
+          if (previousSupplierPrice) {
+            supplierData.previousPriceFromThisSupplier = previousSupplierPrice;
+          }
 
           // Calculate percentage variance
           const variancePercentage = ((currentPrice - prevPrice) / prevPrice) * 100;
@@ -1262,13 +1269,16 @@ export async function approveQuotation(
 
 /**
  * Get previous approved prices for a given region and current period
- * This function finds the most recent period before the current one that has approved prices
+ * Returns BOTH the best price per product AND per-supplier prices
  */
 async function getPreviousApprovedPrices(
   currentPeriod: string,
   region: string,
   categories: string[]
-): Promise<Map<number, { price: number; period: string }>> {
+): Promise<{
+  bestPrices: Map<number, { price: number; period: string }>;
+  supplierPrices: Map<string, number>; // Key: "productId-supplierId", Value: price
+}> {
   try {
     // Parse current period to find previous periods
     const [year, month] = currentPeriod.split("-").map(Number);
@@ -1297,10 +1307,11 @@ async function getPreviousApprovedPrices(
       `[getPreviousApprovedPrices] Checking ${previousPeriods.length} previous periods for ${currentPeriod}`
     );
 
-    // Find approved prices from the most recent previous period
+    // Find approved prices from the most recent previous period (now includes supplierId)
     const previousApprovedPrices = await db
       .select({
         productId: quoteItems.productId,
+        supplierId: quotations.supplierId,
         approvedPrice: quoteItems.approvedPrice,
         period: quotations.period,
         updatedAt: quoteItems.updatedAt,
@@ -1325,31 +1336,63 @@ async function getPreviousApprovedPrices(
       } previous approved prices`
     );
 
-    // Build a map with the most recent approved price per product
-    const pricesMap = new Map<number, { price: number; period: string }>();
+    // Build TWO maps: one for best prices, one for per-supplier prices
+    const bestPricesMap = new Map<number, { price: number; period: string }>();
+    const supplierPricesMap = new Map<string, number>();
 
     if (Array.isArray(previousApprovedPrices)) {
+      // First pass: collect all supplier-specific prices
       previousApprovedPrices.forEach((item) => {
-        if (
-          item?.productId &&
-          item?.approvedPrice &&
-          !pricesMap.has(item.productId)
-        ) {
-          pricesMap.set(item.productId, {
-            price: Number(item.approvedPrice),
-            period: item.period || "unknown",
+        if (item?.productId && item?.supplierId && item?.approvedPrice) {
+          const key = `${item.productId}-${item.supplierId}`;
+          const price = Number(item.approvedPrice);
+
+          // Only keep the most recent price for each product-supplier combination
+          if (!supplierPricesMap.has(key)) {
+            supplierPricesMap.set(key, price);
+          }
+        }
+      });
+
+      // Second pass: find best price per product
+      const productPricesMap = new Map<number, number[]>();
+      previousApprovedPrices.forEach((item) => {
+        if (item?.productId && item?.approvedPrice) {
+          if (!productPricesMap.has(item.productId)) {
+            productPricesMap.set(item.productId, []);
+          }
+          productPricesMap.get(item.productId)!.push(Number(item.approvedPrice));
+        }
+      });
+
+      // Find the minimum price for each product
+      productPricesMap.forEach((prices, productId) => {
+        if (prices.length > 0) {
+          const bestPrice = Math.min(...prices);
+          const item = previousApprovedPrices.find(
+            p => p.productId === productId && Number(p.approvedPrice) === bestPrice
+          );
+          bestPricesMap.set(productId, {
+            price: bestPrice,
+            period: item?.period || "unknown",
           });
         }
       });
     }
 
     console.log(
-      `[getPreviousApprovedPrices] Returning ${pricesMap.size} unique previous approved prices`
+      `[getPreviousApprovedPrices] Returning ${bestPricesMap.size} best prices and ${supplierPricesMap.size} supplier-specific prices`
     );
-    return pricesMap;
+    return {
+      bestPrices: bestPricesMap,
+      supplierPrices: supplierPricesMap,
+    };
   } catch (error) {
     console.error("Error in getPreviousApprovedPrices:", error);
-    return new Map();
+    return {
+      bestPrices: new Map(),
+      supplierPrices: new Map(),
+    };
   }
 }
 
