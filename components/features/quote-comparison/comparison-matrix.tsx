@@ -193,6 +193,24 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
 
   // Helper function to render a comparison table for a category
   const renderCategoryTable = (categoryName: string, products: typeof matrixData.products) => {
+    // STEP 1: Filter suppliers to only those relevant to this category
+    // Collect all unique supplier IDs that have quoted at least one product in this category
+    const categorySupplierIds = new Set<number>();
+    products.forEach(product => {
+      Object.keys(product.suppliers).forEach(supplierIdStr => {
+        categorySupplierIds.add(parseInt(supplierIdStr));
+      });
+    });
+
+    // STEP 2: Create filtered supplier list (only suppliers with quotes in this category)
+    const categorySuppliers = suppliers
+      .filter(supplier => categorySupplierIds.has(supplier.id))
+      .sort((a, b) => a.code.localeCompare(b.code));
+
+    console.log(
+      `[ComparisonMatrix] Category "${categoryName}": ${categorySuppliers.length} relevant suppliers out of ${suppliers.length} total`
+    );
+
     return (
       <Table key={categoryName}>
         <TableHeader className="sticky top-0 bg-white z-10">
@@ -212,8 +230,8 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
             {/* Column 5: Giá duyệt kỳ trước */}
             <TableHead className="min-w-[120px] text-right">Giá duyệt kỳ trước</TableHead>
 
-            {/* Dynamic supplier columns - simplified headers */}
-            {suppliers.map((supplier) => {
+            {/* Dynamic supplier columns - CONTEXT-AWARE: Only suppliers with quotes in this category */}
+            {categorySuppliers.map((supplier) => {
               // Get border color based on quotation status from matrixData
               const supplierData = matrixData.availableSuppliers.find(s => s.id === supplier.id);
               const getBorderClass = (status?: string) => {
@@ -314,8 +332,8 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                   )}
                 </TableCell>
 
-                {/* Dynamic supplier price cells */}
-                {suppliers.map((supplier) => {
+                {/* Dynamic supplier price cells - CONTEXT-AWARE: Only relevant suppliers for this category */}
+                {categorySuppliers.map((supplier) => {
                   const supplierData = product.suppliers[supplier.id];
 
                   if (!supplierData) {
