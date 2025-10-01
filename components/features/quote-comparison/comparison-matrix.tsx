@@ -29,13 +29,11 @@ import {
 
 export interface ComparisonMatrixProps {
   matrixData: ComparisonMatrixData;
+  activeFilter?: 'all' | 'price_increase' | 'price_decrease' | 'no_quotes';
   className?: string;
 }
 
-export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProps) {
-  // Quick View filter state
-  type QuickViewFilter = 'all' | 'price_increase' | 'price_decrease' | 'no_quotes';
-  const [activeFilter, setActiveFilter] = React.useState<QuickViewFilter>('all');
+export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }: ComparisonMatrixProps) {
 
   // Early return if no data
   if (!matrixData || matrixData.products.length === 0) {
@@ -66,6 +64,37 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
   // Check if we have multiple categories to decide on display mode
   const hasMultipleCategories = Object.keys(productsByCategory).length > 1;
 
+  // Helper to calculate variance percentage with fallback logic
+  const calculateVariancePercentage = (product: typeof matrixData.products[0], supplierId: number): number | null => {
+    const supplierData = product.suppliers[supplierId];
+    if (!supplierData || !supplierData.hasPrice) return null;
+
+    const currentPrice = supplierData.pricePerUnit;
+
+    // Priority 1: Use variancePercentage if available (calculated from previousApprovedPrice)
+    if (supplierData.variancePercentage !== undefined && supplierData.variancePercentage !== null) {
+      return supplierData.variancePercentage;
+    }
+
+    // Priority 2: Calculate from previousApprovedPrice if available
+    if (product.previousApprovedPrice && product.previousApprovedPrice > 0) {
+      return ((currentPrice - product.previousApprovedPrice) / product.previousApprovedPrice) * 100;
+    }
+
+    // Priority 3: Fallback to basePrice (lowest initial price)
+    const allSupplierPrices = Object.values(product.suppliers)
+      .filter((s: any) => s.initialPrice && s.initialPrice > 0)
+      .map((s: any) => s.initialPrice);
+    if (allSupplierPrices.length > 0) {
+      const basePrice = Math.min(...allSupplierPrices);
+      if (basePrice > 0) {
+        return ((currentPrice - basePrice) / basePrice) * 100;
+      }
+    }
+
+    return null;
+  };
+
   // Apply Quick View filtering and sorting
   const applyQuickViewFilter = (products: typeof matrixData.products): typeof matrixData.products => {
     let filtered = [...products];
@@ -75,19 +104,19 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
         // Filter products with price increases and sort by highest increase percentage
         filtered = filtered.filter(product => {
           // Check if any supplier has a positive variance
-          return Object.values(product.suppliers).some(supplier => {
-            return supplier.variancePercentage && supplier.variancePercentage > 0.5;
+          return Object.keys(product.suppliers).some(supplierIdStr => {
+            const supplierId = parseInt(supplierIdStr);
+            const variance = calculateVariancePercentage(product, supplierId);
+            return variance !== null && variance > 0.5;
           });
         });
         // Sort by maximum variance percentage (descending)
         filtered.sort((a, b) => {
           const maxVarianceA = Math.max(
-            ...Object.values(a.suppliers)
-              .map(s => s.variancePercentage || 0)
+            ...Object.keys(a.suppliers).map(id => calculateVariancePercentage(a, parseInt(id)) || 0)
           );
           const maxVarianceB = Math.max(
-            ...Object.values(b.suppliers)
-              .map(s => s.variancePercentage || 0)
+            ...Object.keys(b.suppliers).map(id => calculateVariancePercentage(b, parseInt(id)) || 0)
           );
           return maxVarianceB - maxVarianceA;
         });
@@ -97,19 +126,19 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
         // Filter products with price decreases and sort by highest decrease percentage
         filtered = filtered.filter(product => {
           // Check if any supplier has a negative variance
-          return Object.values(product.suppliers).some(supplier => {
-            return supplier.variancePercentage && supplier.variancePercentage < -0.5;
+          return Object.keys(product.suppliers).some(supplierIdStr => {
+            const supplierId = parseInt(supplierIdStr);
+            const variance = calculateVariancePercentage(product, supplierId);
+            return variance !== null && variance < -0.5;
           });
         });
         // Sort by minimum variance percentage (ascending - most negative first)
         filtered.sort((a, b) => {
           const minVarianceA = Math.min(
-            ...Object.values(a.suppliers)
-              .map(s => s.variancePercentage || 0)
+            ...Object.keys(a.suppliers).map(id => calculateVariancePercentage(a, parseInt(id)) || 0)
           );
           const minVarianceB = Math.min(
-            ...Object.values(b.suppliers)
-              .map(s => s.variancePercentage || 0)
+            ...Object.keys(b.suppliers).map(id => calculateVariancePercentage(b, parseInt(id)) || 0)
           );
           return minVarianceA - minVarianceB;
         });
@@ -281,7 +310,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
                       {formatNumber(product.previousApprovedPrice)}
                     </div>
                   ) : (
-                    <div className="text-gray-400 text-sm">Chưa có</div>
+                    <div className="text-gray-400 text-sm">-</div>
                   )}
                 </TableCell>
 
@@ -393,66 +422,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
 
   return (
     <TooltipProvider>
-      <div className={cn("w-full space-y-4", className)}>
-        {/* Quick View Filters */}
-        <div className="flex items-center gap-2 p-4 bg-gray-50 rounded-lg">
-          <span className="text-sm font-medium text-gray-700">Lọc nhanh:</span>
-          <Button
-            variant={activeFilter === 'all' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveFilter('all')}
-            className="flex items-center gap-1"
-          >
-            Tất cả
-            {activeFilter === 'all' && (
-              <Badge variant="secondary" className="ml-1">
-                {Object.values(filteredProductsByCategory).flat().length}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={activeFilter === 'price_increase' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveFilter('price_increase')}
-            className="flex items-center gap-1"
-          >
-            <TrendingUpIcon className="h-4 w-4" />
-            Tăng giá mạnh nhất
-            {activeFilter === 'price_increase' && (
-              <Badge variant="secondary" className="ml-1">
-                {Object.values(filteredProductsByCategory).flat().length}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={activeFilter === 'price_decrease' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveFilter('price_decrease')}
-            className="flex items-center gap-1"
-          >
-            <TrendingDownIcon className="h-4 w-4" />
-            Giảm giá mạnh nhất
-            {activeFilter === 'price_decrease' && (
-              <Badge variant="secondary" className="ml-1">
-                {Object.values(filteredProductsByCategory).flat().length}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={activeFilter === 'no_quotes' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveFilter('no_quotes')}
-            className="flex items-center gap-1"
-          >
-            ⚠️ Chưa có báo giá
-            {activeFilter === 'no_quotes' && (
-              <Badge variant="secondary" className="ml-1">
-                {Object.values(filteredProductsByCategory).flat().length}
-              </Badge>
-            )}
-          </Button>
-        </div>
-
+      <div className={cn("w-full", className)}>
         {/* Main Table Content */}
         <div className="overflow-x-auto">
           {Object.keys(filteredProductsByCategory).length === 0 ? (

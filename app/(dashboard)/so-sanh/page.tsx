@@ -48,8 +48,11 @@ import {
   CheckCircle,
   TrendingUp,
   TrendingDown,
+  ArrowUp,
+  ArrowDown,
   List,
   ChevronDown,
+  AlertTriangle,
 } from "lucide-react";
 import {
   exportTargetPriceFile,
@@ -91,7 +94,11 @@ export default function ComparisonPage() {
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
 
   // UI state
-  const [isDetailsVisible, setIsDetailsVisible] = useState(true);
+  const [isDetailsVisible, setIsDetailsVisible] = useState(false);
+
+  // Quick View filter state for details matrix
+  type QuickViewFilter = 'all' | 'price_increase' | 'price_decrease' | 'no_quotes';
+  const [activeFilter, setActiveFilter] = useState<QuickViewFilter>('all');
 
   // Helper functions for multi-select categories
   const handleCategoryToggle = (category: string) => {
@@ -583,11 +590,11 @@ export default function ComparisonPage() {
                     <div key={regionData.region} className="space-y-3">
                       {regionData.categories.map((categoryData, categoryIndex) => (
                         <div key={`${regionData.region}-${categoryData.category}`}>
-                          <Accordion type="single" collapsible>
+                          <Accordion type="single" collapsible defaultValue={categoryData.category}>
                             <AccordionItem value={categoryData.category} className="border-none">
                               <AccordionTrigger className="text-left hover:no-underline py-3">
                                 <div className="flex items-center gap-3">
-                                  <span className="font-semibold text-base">
+                                  <span className="text-base">
                                     {regionData.region} - {categoryData.category}
                                   </span>
                                   <Badge variant="outline" className="text-xs">
@@ -613,15 +620,15 @@ export default function ComparisonPage() {
                                   </TableHeader>
                                   <TableBody>
                                     {categoryData.supplierPerformances.map((supplier) => {
-                                      // Color for "Giá trị hiện tại" based on quotation status
-                                      const getCurrentValueColor = () => {
+                                      // Light background color for "Giá trị hiện tại" based on quotation status
+                                      const getCurrentValueBgColor = () => {
                                         if (supplier.quotationStatus === 'approved') {
-                                          return "bg-green-50 text-green-700 font-semibold";
+                                          return "bg-green-50";
                                         }
                                         if (supplier.quotationStatus === 'negotiation') {
-                                          return "bg-orange-50 text-orange-700 font-medium";
+                                          return "bg-orange-50";
                                         }
-                                        return "text-gray-900";
+                                        return "";
                                       };
 
                                       // Helper to render variance cell
@@ -679,10 +686,10 @@ export default function ComparisonPage() {
                                           <TableCell className="text-right">
                                             {supplier.totalPreviousValue !== null
                                               ? formatNumber(supplier.totalPreviousValue)
-                                              : <span className="text-gray-400 text-sm">N/A</span>}
+                                              : "-"}
                                           </TableCell>
                                           <TableCell className="text-right">{formatNumber(supplier.totalInitialValue)}</TableCell>
-                                          <TableCell className={`text-right ${getCurrentValueColor()}`}>
+                                          <TableCell className={`text-right ${getCurrentValueBgColor()}`}>
                                             {formatNumber(supplier.totalCurrentValue)}
                                           </TableCell>
                                           <TableCell className="text-center">
@@ -732,13 +739,54 @@ export default function ComparisonPage() {
       {isDetailsVisible && (
         <Card>
           <CardHeader>
-            <CardTitle>Chi tiết so sánh</CardTitle>
-            {period && region && categories.length > 0 && (
-              <p className="text-sm text-muted-foreground mt-1">
-                Kỳ: {period} | Khu vực: {region} | Nhóm hàng:{" "}
-                {categories.join(", ")}
-              </p>
-            )}
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Chi tiết so sánh</CardTitle>
+                {period && region && categories.length > 0 && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Kỳ: {period} | Khu vực: {region} | Nhóm hàng:{" "}
+                    {categories.join(", ")}
+                  </p>
+                )}
+              </div>
+              {/* Quick View Filters */}
+              <div className="flex items-center gap-1">
+                <Button
+                  variant={activeFilter === 'all' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveFilter('all')}
+                >
+                  Tất cả
+                </Button>
+                <Button
+                  variant={activeFilter === 'price_increase' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveFilter('price_increase')}
+                  className="flex items-center gap-1"
+                >
+                  <ArrowUp className="h-4 w-4 text-red-600" />
+                  <span className="text-red-600">Tăng giá</span>
+                </Button>
+                <Button
+                  variant={activeFilter === 'price_decrease' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveFilter('price_decrease')}
+                  className="flex items-center gap-1"
+                >
+                  <ArrowDown className="h-4 w-4 text-green-600" />
+                  <span className="text-green-600">Giảm giá</span>
+                </Button>
+                <Button
+                  variant={activeFilter === 'no_quotes' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setActiveFilter('no_quotes')}
+                  className="flex items-center gap-1"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Chưa báo giá
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {comparisonLoading ? (
@@ -756,7 +804,7 @@ export default function ComparisonPage() {
                 </div>
               </div>
             ) : matrixData ? (
-              <ComparisonMatrix matrixData={matrixData} />
+              <ComparisonMatrix matrixData={matrixData} activeFilter={activeFilter} />
             ) : (
               <div className="text-center text-gray-500 space-y-2">
                 <p className="text-lg">
