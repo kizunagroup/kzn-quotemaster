@@ -1270,6 +1270,8 @@ export async function approveQuotation(
 /**
  * Get previous approved prices for a given region and current period
  * Returns BOTH the best price per product AND per-supplier prices
+ *
+ * OPTIMIZED: Uses direct SQL query to find the most recent previous period
  */
 async function getPreviousApprovedPrices(
   currentPeriod: string,
@@ -1280,34 +1282,44 @@ async function getPreviousApprovedPrices(
   supplierPrices: Map<string, number>; // Key: "productId-supplierId", Value: price
 }> {
   try {
-    // Parse current period to find previous periods
-    const [year, month] = currentPeriod.split("-").map(Number);
-
-    // Generate a list of previous periods to check (up to 12 months back)
-    const previousPeriods: string[] = [];
-    for (let i = 1; i <= 12; i++) {
-      let prevYear = year;
-      let prevMonth = month - i;
-
-      while (prevMonth <= 0) {
-        prevMonth += 12;
-        prevYear -= 1;
-      }
-
-      // Generate all possible period formats for this month (XX can be any number)
-      for (let seq = 1; seq <= 31; seq++) {
-        const seqStr = seq.toString().padStart(2, "0");
-        previousPeriods.push(
-          `${prevYear}-${prevMonth.toString().padStart(2, "0")}-${seqStr}`
-        );
-      }
-    }
-
     console.log(
-      `[getPreviousApprovedPrices] Checking ${previousPeriods.length} previous periods for ${currentPeriod}`
+      `[getPreviousApprovedPrices] Finding previous period for current: ${currentPeriod}, region: ${region}`
     );
 
-    // Find approved prices from the most recent previous period (now includes supplierId)
+    // STEP 1: Find the most recent previous period with approved quotations
+    // Uses declarative SQL: SELECT MAX(period) WHERE period < currentPeriod AND status = 'approved'
+    const previousPeriodResult = await db
+      .select({
+        period: quotations.period,
+      })
+      .from(quotations)
+      .where(
+        and(
+          sql`${quotations.period} < ${currentPeriod}`,
+          eq(quotations.region, region),
+          eq(quotations.status, "approved")
+        )
+      )
+      .orderBy(desc(quotations.period))
+      .limit(1);
+
+    // Handle case where no previous period exists
+    if (!previousPeriodResult || previousPeriodResult.length === 0) {
+      console.log(
+        `[getPreviousApprovedPrices] No previous approved period found for ${currentPeriod} in region ${region}`
+      );
+      return {
+        bestPrices: new Map(),
+        supplierPrices: new Map(),
+      };
+    }
+
+    const previousPeriod = previousPeriodResult[0].period;
+    console.log(
+      `[getPreviousApprovedPrices] Found previous period: ${previousPeriod}`
+    );
+
+    // STEP 2: Fetch all approved prices from the identified previous period
     const previousApprovedPrices = await db
       .select({
         productId: quoteItems.productId,
@@ -1321,14 +1333,14 @@ async function getPreviousApprovedPrices(
       .innerJoin(products, eq(quoteItems.productId, products.id))
       .where(
         and(
-          inArray(quotations.period, previousPeriods),
+          eq(quotations.period, previousPeriod),
           eq(quotations.region, region),
           inArray(products.category, categories),
           eq(quotations.status, "approved"),
           sql`${quoteItems.approvedPrice} IS NOT NULL`
         )
       )
-      .orderBy(desc(quotations.period), desc(quoteItems.updatedAt));
+      .orderBy(desc(quoteItems.updatedAt));
 
     console.log(
       `[getPreviousApprovedPrices] Found ${
