@@ -11,18 +11,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonMatrix } from "@/components/features/quote-comparison/comparison-matrix";
@@ -41,9 +36,6 @@ import {
   TrendingDown,
   ChevronUp,
   ChevronDown,
-  Check,
-  ChevronsUpDown,
-  X,
 } from "lucide-react";
 import {
   exportTargetPriceFile,
@@ -63,9 +55,6 @@ export default function ComparisonPage() {
   const [periods, setPeriods] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-
-  // Multi-select UI state
-  const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   // Loading states for cascading filters
   const [periodsLoading, setPeriodsLoading] = useState(true);
@@ -99,11 +88,11 @@ export default function ComparisonPage() {
     );
   };
 
-  const handleCategoryRemove = (category: string) => {
-    setCategories(prev => prev.filter(c => c !== category));
+  const handleSelectAllCategories = () => {
+    setCategories([...availableCategories]);
   };
 
-  const handleClearAllCategories = () => {
+  const handleDeselectAllCategories = () => {
     setCategories([]);
   };
 
@@ -180,8 +169,8 @@ export default function ComparisonPage() {
         );
         setAvailableCategories(fetchedCategories);
 
-        // Clear category selections that are no longer available
-        setCategories(prev => prev.filter(cat => fetchedCategories.includes(cat)));
+        // Default to All: Select all categories by default
+        setCategories(fetchedCategories);
       } catch (err) {
         console.error("Error fetching categories for period and region:", err);
         setFiltersError(
@@ -340,8 +329,7 @@ export default function ComparisonPage() {
       <div className="bg-white rounded-lg border p-6">
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           {/* Period Filter */}
-          <div className="space-y-2 lg:min-w-[200px]">
-            <label className="text-sm font-medium">Kỳ báo giá</label>
+          <div className="lg:min-w-[200px]">
             <Select
               value={period}
               onValueChange={setPeriod}
@@ -350,7 +338,7 @@ export default function ComparisonPage() {
               <SelectTrigger className="w-full">
                 <SelectValue
                   placeholder={
-                    periodsLoading ? "Đang tải..." : "Chọn kỳ báo giá..."
+                    periodsLoading ? "Đang tải..." : "Kỳ báo giá..."
                   }
                 />
               </SelectTrigger>
@@ -362,25 +350,10 @@ export default function ComparisonPage() {
                 ))}
               </SelectContent>
             </Select>
-            {periodsLoading && (
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Đang tải kỳ báo giá...
-              </div>
-            )}
           </div>
 
           {/* Region Filter */}
-          <div className="space-y-2 lg:min-w-[200px]">
-            <label className="text-sm font-medium">
-              Khu vực
-              {!period && (
-                <span className="text-muted-foreground">
-                  {" "}
-                  (chọn kỳ báo giá trước)
-                </span>
-              )}
-            </label>
+          <div className="lg:min-w-[200px]">
             <Select
               value={region}
               onValueChange={setRegion}
@@ -390,12 +363,12 @@ export default function ComparisonPage() {
                 <SelectValue
                   placeholder={
                     !period
-                      ? "Chọn kỳ báo giá trước..."
+                      ? "Khu vực (chọn kỳ trước)..."
                       : regionsLoading
                       ? "Đang tải..."
                       : regions.length === 0
-                      ? "Không có khu vực nào"
-                      : "Chọn khu vực..."
+                      ? "Không có khu vực"
+                      : "Khu vực..."
                   }
                 />
               </SelectTrigger>
@@ -407,136 +380,74 @@ export default function ComparisonPage() {
                 ))}
               </SelectContent>
             </Select>
-            {regionsLoading && (
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Đang tải khu vực...
-              </div>
-            )}
-            {period && !regionsLoading && regions.length === 0 && (
-              <div className="text-xs text-amber-600">
-                Không có khu vực nào có báo giá trong kỳ này
-              </div>
-            )}
           </div>
 
-          {/* Category Multi-Select Filter */}
-          <div className="space-y-2 lg:min-w-[300px] lg:flex-1">
-            <label className="text-sm font-medium">
-              Nhóm hàng
-              {(!period || !region) && (
-                <span className="text-muted-foreground">
-                  {" "}
-                  (chọn kỳ & khu vực trước)
-                </span>
-              )}
-            </label>
-
-            <Popover open={categoriesOpen} onOpenChange={setCategoriesOpen}>
-              <PopoverTrigger asChild>
+          {/* Category Multi-Select Filter - Dropdown with Checkboxes */}
+          <div className="lg:min-w-[300px] lg:flex-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
-                  role="combobox"
-                  aria-expanded={categoriesOpen}
                   className="w-full justify-between text-left font-normal"
                   disabled={!period || !region || categoriesLoading}
                 >
-                  {categories.length === 0 ? (
+                  {categoriesLoading ? (
+                    <span className="text-muted-foreground">Đang tải...</span>
+                  ) : !period || !region ? (
                     <span className="text-muted-foreground">
-                      {!period || !region
-                        ? "Chọn kỳ & khu vực trước..."
-                        : categoriesLoading
-                        ? "Đang tải..."
-                        : availableCategories.length === 0
-                        ? "Không có nhóm hàng nào"
-                        : "Chọn nhóm hàng..."}
+                      Nhóm hàng (chọn kỳ & khu vực)...
                     </span>
-                  ) : categories.length === 1 ? (
-                    categories[0]
+                  ) : availableCategories.length === 0 ? (
+                    <span className="text-muted-foreground">
+                      Không có nhóm hàng
+                    </span>
+                  ) : categories.length === 0 ? (
+                    <span className="text-muted-foreground">Nhóm hàng...</span>
                   ) : (
-                    `${categories.length} nhóm hàng đã chọn`
+                    <span>
+                      Nhóm hàng ({categories.length})
+                    </span>
                   )}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0" align="start">
-                <Command>
-                  <CommandInput placeholder="Tìm nhóm hàng..." />
-                  <CommandList>
-                    <CommandEmpty>Không tìm thấy nhóm hàng.</CommandEmpty>
-                    <CommandGroup>
-                      {availableCategories.map((category) => (
-                        <CommandItem
-                          key={category}
-                          value={category}
-                          onSelect={() => handleCategoryToggle(category)}
-                        >
-                          <Check
-                            className={`mr-2 h-4 w-4 ${
-                              categories.includes(category)
-                                ? "opacity-100"
-                                : "opacity-0"
-                            }`}
-                          />
-                          {category}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-
-            {/* Selected Categories Display */}
-            {categories.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {categories.map((category) => (
-                  <Badge
-                    key={category}
-                    variant="secondary"
-                    className="text-xs flex items-center gap-1"
-                  >
-                    {category}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[300px]">
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>Chọn nhóm hàng</span>
+                  <div className="flex gap-2 text-xs font-normal">
                     <button
                       type="button"
-                      onClick={() => handleCategoryRemove(category)}
-                      className="ml-1 hover:bg-muted rounded-sm"
+                      onClick={handleSelectAllCategories}
+                      className="text-blue-600 hover:underline"
                     >
-                      <X className="h-3 w-3" />
+                      Tất cả
                     </button>
-                  </Badge>
-                ))}
-                {categories.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={handleClearAllCategories}
+                    <span className="text-muted-foreground">|</span>
+                    <button
+                      type="button"
+                      onClick={handleDeselectAllCategories}
+                      className="text-blue-600 hover:underline"
+                    >
+                      Bỏ chọn
+                    </button>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {availableCategories.map((category) => (
+                  <DropdownMenuCheckboxItem
+                    key={category}
+                    checked={categories.includes(category)}
+                    onCheckedChange={() => handleCategoryToggle(category)}
                   >
-                    Xóa tất cả
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {categoriesLoading && (
-              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Đang tải nhóm hàng...
-              </div>
-            )}
-            {period &&
-              region &&
-              !categoriesLoading &&
-              availableCategories.length === 0 && (
-                <div className="text-xs text-amber-600">
-                  Không có nhóm hàng nào có báo giá cho kỳ và khu vực này
-                </div>
-              )}
+                    {category}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
           {/* Compare Button */}
-          <div className="lg:pt-6">
+          <div>
             <Button
               onClick={handleCompareClick}
               disabled={!isCompareEnabled}
