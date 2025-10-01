@@ -17,7 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TrendingUpIcon, TrendingDownIcon, ArrowUp, ArrowDown } from "lucide-react";
+import { TrendingUpIcon, TrendingDownIcon } from "lucide-react";
 import { cn, formatNumber, formatPercentage } from "@/lib/utils";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
 import {
@@ -360,9 +360,9 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                                   variance.percentage > 0 ? "text-red-500" : "text-green-500"
                                 )}>
                                   {variance.percentage > 0 ? (
-                                    <ArrowUp className="h-3 w-3" />
+                                    <TrendingUpIcon className="h-3 w-3 text-red-600" />
                                   ) : (
-                                    <ArrowDown className="h-3 w-3" />
+                                    <TrendingDownIcon className="h-3 w-3 text-green-600" />
                                   )}
                                 </div>
                               )}
@@ -390,9 +390,9 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                                   baseVariance.percentage > 0 ? "text-red-600" : "text-green-600"
                                 )}>
                                   {baseVariance.percentage > 0 ? (
-                                    <ArrowUp className="h-3 w-3" />
+                                    <TrendingUpIcon className="h-3 w-3 text-red-600" />
                                   ) : (
-                                    <ArrowDown className="h-3 w-3" />
+                                    <TrendingDownIcon className="h-3 w-3 text-green-600" />
                                   )}
                                   <span>
                                     {baseVariance.difference > 0 ? '+' : ''}
@@ -411,9 +411,9 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                                   variance.percentage > 0 ? "text-red-600" : "text-green-600"
                                 )}>
                                   {variance.percentage > 0 ? (
-                                    <ArrowUp className="h-3 w-3" />
+                                    <TrendingUpIcon className="h-3 w-3 text-red-600" />
                                   ) : (
-                                    <ArrowDown className="h-3 w-3" />
+                                    <TrendingDownIcon className="h-3 w-3 text-green-600" />
                                   )}
                                   <span>
                                     {variance.difference > 0 ? '+' : ''}
@@ -436,9 +436,9 @@ export function ComparisonMatrix({ matrixData, activeFilter = 'all', className }
                                       supplierVariance.percentage > 0 ? "text-red-600" : "text-green-600"
                                     )}>
                                       {supplierVariance.percentage > 0 ? (
-                                        <ArrowUp className="h-3 w-3" />
+                                        <TrendingUpIcon className="h-3 w-3 text-red-600" />
                                       ) : (
-                                        <ArrowDown className="h-3 w-3" />
+                                        <TrendingDownIcon className="h-3 w-3 text-green-600" />
                                       )}
                                       <span>
                                         {supplierVariance.difference > 0 ? '+' : ''}

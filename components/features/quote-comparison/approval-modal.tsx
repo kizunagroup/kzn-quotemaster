@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -15,6 +16,45 @@ import { Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { approveMultipleQuotations } from "@/lib/actions/quote-comparison.actions";
 import type { ComparisonMatrixData } from "@/lib/types/quote-comparison.types";
+
+// Quotation status utilities
+const getQuotationStatusLabel = (status: string | null): string => {
+  if (!status) return "Không xác định";
+  switch (status.toLowerCase()) {
+    case "pending":
+      return "Chờ duyệt";
+    case "negotiation":
+      return "Đang đàm phán";
+    case "approved":
+      return "Đã duyệt";
+    case "draft":
+      return "Nháp";
+    case "submitted":
+      return "Đã nộp";
+    case "rejected":
+      return "Từ chối";
+    default:
+      return status;
+  }
+};
+
+const getQuotationStatusVariant = (
+  status: string | null
+): "default" | "secondary" | "destructive" | "outline" => {
+  if (!status) return "outline";
+  switch (status.toLowerCase()) {
+    case "approved":
+      return "default"; // Green
+    case "negotiation":
+      return "secondary"; // Orange/Yellow
+    case "pending":
+      return "outline"; // Gray
+    case "rejected":
+      return "destructive"; // Red
+    default:
+      return "outline";
+  }
+};
 
 export interface ApprovalModalProps {
   open: boolean;
@@ -33,9 +73,17 @@ export function ApprovalModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Filter suppliers that have quotations to approve (quotationId exists and not null)
+  // Filter suppliers that have quotations to approve (quotationId exists, not null, and NOT already approved)
   const approvableSuppliers = suppliers.filter(
-    supplier => supplier.quotationId && supplier.quotationId > 0
+    supplier =>
+      supplier.quotationId &&
+      supplier.quotationId > 0 &&
+      supplier.quotationStatus !== 'approved'
+  );
+
+  // Separate list: suppliers that CAN be selected (pending or negotiation)
+  const selectableSuppliers = approvableSuppliers.filter(
+    supplier => supplier.quotationStatus === 'pending' || supplier.quotationStatus === 'negotiation'
   );
 
   const handleSupplierToggle = (supplierId: number, checked: boolean) => {
@@ -49,12 +97,13 @@ export function ApprovalModal({
   };
 
   const handleSelectAll = () => {
-    if (selectedSuppliers.size === approvableSuppliers.length) {
+    // Smart select all: only toggle selectable suppliers (pending/negotiation)
+    if (selectedSuppliers.size === selectableSuppliers.length) {
       // Unselect all
       setSelectedSuppliers(new Set());
     } else {
-      // Select all
-      setSelectedSuppliers(new Set(approvableSuppliers.map(s => s.id)));
+      // Select all selectable suppliers (ignores approved ones)
+      setSelectedSuppliers(new Set(selectableSuppliers.map(s => s.id)));
     }
   };
 
@@ -130,50 +179,64 @@ export function ApprovalModal({
                 <Checkbox
                   id="select-all"
                   checked={
-                    approvableSuppliers.length > 0 &&
-                    selectedSuppliers.size === approvableSuppliers.length
+                    selectableSuppliers.length > 0 &&
+                    selectedSuppliers.size === selectableSuppliers.length
                   }
                   onCheckedChange={handleSelectAll}
+                  disabled={selectableSuppliers.length === 0}
                 />
                 <label htmlFor="select-all" className="text-sm font-medium">
-                  Chọn tất cả ({approvableSuppliers.length} nhà cung cấp)
+                  Chọn tất cả ({selectableSuppliers.length} có thể chọn / {approvableSuppliers.length} NCC)
                 </label>
               </div>
 
               {/* Supplier List */}
               <div className="space-y-2 max-h-60 overflow-y-auto">
-                {approvableSuppliers.map((supplier) => (
-                  <div key={supplier.id} className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50">
-                    <Checkbox
-                      id={`supplier-${supplier.id}`}
-                      checked={selectedSuppliers.has(supplier.id)}
-                      onCheckedChange={(checked) =>
-                        handleSupplierToggle(supplier.id, checked === true)
-                      }
-                    />
-                    <div className="flex-1">
-                      <label
-                        htmlFor={`supplier-${supplier.id}`}
-                        className="text-sm font-medium cursor-pointer"
-                      >
-                        {supplier.code} - {supplier.name}
-                      </label>
-                      <div className="text-xs text-muted-foreground">
-                        Trạng thái: {supplier.quotationStatus || 'Không xác định'}
-                        {supplier.quotationLastUpdated && (
-                          <span className="ml-2">
-                            • Cập nhật: {new Date(supplier.quotationLastUpdated).toLocaleDateString('vi-VN')}
-                          </span>
-                        )}
+                {approvableSuppliers.map((supplier) => {
+                  const isApproved = supplier.quotationStatus === 'approved';
+                  const isSelectable = supplier.quotationStatus === 'pending' || supplier.quotationStatus === 'negotiation';
+
+                  return (
+                    <div
+                      key={supplier.id}
+                      className={`flex items-center space-x-2 p-2 rounded-lg ${
+                        isApproved ? 'bg-gray-50 opacity-60' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <Checkbox
+                        id={`supplier-${supplier.id}`}
+                        checked={selectedSuppliers.has(supplier.id)}
+                        onCheckedChange={(checked) =>
+                          handleSupplierToggle(supplier.id, checked === true)
+                        }
+                        disabled={isApproved}
+                      />
+                      <div className="flex-1">
+                        <label
+                          htmlFor={`supplier-${supplier.id}`}
+                          className={`text-sm font-medium ${isSelectable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                        >
+                          {supplier.code} - {supplier.name}
+                        </label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant={getQuotationStatusVariant(supplier.quotationStatus)}>
+                            {getQuotationStatusLabel(supplier.quotationStatus)}
+                          </Badge>
+                          {supplier.quotationLastUpdated && (
+                            <span className="text-xs text-muted-foreground">
+                              Cập nhật: {new Date(supplier.quotationLastUpdated).toLocaleDateString('vi-VN')}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Selection Summary */}
               <div className="text-sm text-muted-foreground pt-2 border-t">
-                Đã chọn: {selectedSuppliers.size} / {approvableSuppliers.length} nhà cung cấp
+                Đã chọn: {selectedSuppliers.size} / {selectableSuppliers.length} nhà cung cấp (có thể duyệt)
               </div>
             </div>
           )}

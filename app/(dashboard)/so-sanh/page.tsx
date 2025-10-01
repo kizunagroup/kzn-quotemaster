@@ -48,8 +48,6 @@ import {
   CheckCircle,
   TrendingUp,
   TrendingDown,
-  ArrowUp,
-  ArrowDown,
   List,
   ChevronDown,
   AlertTriangle,
@@ -697,13 +695,13 @@ export default function ComparisonPage() {
                                           <TableCell className={`text-right font-narrow ${getCurrentValueBgColor()}`}>
                                             {formatNumber(supplier.totalCurrentValue)}
                                           </TableCell>
-                                          <TableCell className="text-center">
+                                          <TableCell className="text-right">
                                             {renderVarianceCell(supplier.varianceVsBase)}
                                           </TableCell>
-                                          <TableCell className="text-center">
+                                          <TableCell className="text-right">
                                             {renderVarianceCell(supplier.varianceVsPrevious)}
                                           </TableCell>
-                                          <TableCell className="text-center">
+                                          <TableCell className="text-right">
                                             {renderVarianceCell(supplier.varianceVsInitial)}
                                           </TableCell>
                                         </TableRow>
