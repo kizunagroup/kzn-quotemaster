@@ -337,12 +337,10 @@ export default function ComparisonPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-lg border p-6 space-y-4">
-        <h3 className="text-lg font-semibold">Bộ lọc so sánh</h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
           {/* Period Filter */}
-          <div className="space-y-2">
+          <div className="space-y-2 lg:min-w-[200px]">
             <label className="text-sm font-medium">Kỳ báo giá</label>
             <Select
               value={period}
@@ -373,7 +371,7 @@ export default function ComparisonPage() {
           </div>
 
           {/* Region Filter */}
-          <div className="space-y-2">
+          <div className="space-y-2 lg:min-w-[200px]">
             <label className="text-sm font-medium">
               Khu vực
               {!period && (
@@ -423,7 +421,7 @@ export default function ComparisonPage() {
           </div>
 
           {/* Category Multi-Select Filter */}
-          <div className="space-y-2">
+          <div className="space-y-2 lg:min-w-[300px] lg:flex-1">
             <label className="text-sm font-medium">
               Nhóm hàng
               {(!period || !region) && (
@@ -537,32 +535,31 @@ export default function ComparisonPage() {
                 </div>
               )}
           </div>
+          {/* Compare Button */}
+          <div className="lg:pt-6">
+            <Button
+              onClick={handleCompareClick}
+              disabled={!isCompareEnabled}
+              className="min-w-[120px] w-full lg:w-auto"
+            >
+              {comparisonLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang tải...
+                </>
+              ) : (
+                "So sánh"
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Error Display for Filters */}
         {filtersError && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3 mt-4">
             {filtersError}
           </div>
         )}
-
-        {/* Compare Button */}
-        <div className="flex justify-end">
-          <Button
-            onClick={handleCompareClick}
-            disabled={!isCompareEnabled}
-            className="min-w-[120px]"
-          >
-            {comparisonLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang tải...
-              </>
-            ) : (
-              "So sánh"
-            )}
-          </Button>
-        </div>
       </div>
 
       {/* Color Legend */}

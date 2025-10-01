@@ -322,7 +322,7 @@ export function ComparisonMatrix({ matrixData, className }: ComparisonMatrixProp
     <TooltipProvider>
       <Card className={cn("w-full", className)}>
         <CardHeader>
-          <CardTitle>Chi tiết So sánh Báo giá</CardTitle>
+          <CardTitle>Chi tiết so sánh</CardTitle>
           <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
             <Badge variant="outline">Kỳ: {period}</Badge>
             <Badge variant="outline">Khu vực: {region}</Badge>
