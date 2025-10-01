@@ -202,7 +202,7 @@ export function ProductsDataTable() {
         <DataTableColumnHeader title="Mã hàng" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-mono text-sm">
+        <div className="text-sm">
           {row.getValue("productCode")}
         </div>
       ),

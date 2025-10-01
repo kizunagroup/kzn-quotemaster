@@ -24,7 +24,7 @@ const getQuotationStatusLabel = (status: string | null): string => {
     case "pending":
       return "Chờ duyệt";
     case "negotiation":
-      return "Đang đàm phán";
+      return "Đàm phán";
     case "approved":
       return "Đã duyệt";
     case "draft":

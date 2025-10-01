@@ -243,7 +243,7 @@ export function TeamsDataTable() {
       cell: ({ row }) => {
         const teamType = row.getValue("teamType") as string;
         return (
-          <Badge variant={getTeamTypeVariant(teamType)}>
+          <Badge variant={getTeamTypeVariant(teamType)} className="font-medium">
             {getTeamTypeDisplay(teamType)}
           </Badge>
         );

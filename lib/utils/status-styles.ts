@@ -53,17 +53,17 @@ export const getStatusLabel = (status: string | null | undefined): string => {
     case "active":
       return "Hoạt động";
     case "inactive":
-      return "Ngừng hoạt động";
+      return "Tạm dừng";
     case "pending":
       return "Chờ duyệt";
     case "approved":
       return "Đã duyệt";
     case "negotiation":
-      return "Đang đàm phán";
+      return "Đàm phán";
     case "cancelled":
       return "Đã hủy";
     case "terminated":
-      return "Đã chấm dứt";
+      return "Đã nghỉ";
     case "rejected":
       return "Đã từ chối";
     default:
@@ -73,38 +73,36 @@ export const getStatusLabel = (status: string | null | undefined): string => {
 
 /**
  * Maps a status string to enhanced colored Badge className for rich visual styling.
+ * Uses a subtle, consistent color palette with font-medium weight for better readability.
  *
  * @param status - The status value (case-insensitive)
  * @returns Tailwind CSS classes for colored badge styling
  */
 export const getStatusClassName = (status: string | null | undefined): string => {
-  if (!status) return "bg-gray-100 text-gray-800 border-gray-200";
+  if (!status) return "bg-slate-100 text-slate-600 border-slate-200 font-medium";
 
   switch (status.toLowerCase()) {
     // Active/Approved states -> Light green background, dark green text
     case "active":
     case "approved":
-      return "bg-green-100 text-green-800 border-green-200";
+      return "bg-green-100 text-green-800 border-green-200 font-medium";
 
-    // Pending states -> Light yellow background, dark yellow text
+    // Pending states -> White background with yellow text for lighter appearance
     case "pending":
-      return "bg-yellow-100 text-yellow-800 border-yellow-200";
-
-    // Inactive states -> Light gray background, dark gray text
-    case "inactive":
-      return "bg-gray-100 text-gray-600 border-gray-200";
+      return "bg-white text-yellow-700 border-yellow-300 font-medium";
 
     // In-progress/Negotiation states -> Light orange background, dark orange text
     case "negotiation":
-      return "bg-orange-100 text-orange-800 border-orange-200";
+      return "bg-orange-100 text-orange-800 border-orange-200 font-medium";
 
-    // Cancelled/Terminated/Rejected states -> Light red background, dark red text
-    case "cancelled":
+    // Inactive/Terminated/Cancelled states -> Light slate background, dark slate text
+    case "inactive":
     case "terminated":
+    case "cancelled":
     case "rejected":
-      return "bg-red-100 text-red-800 border-red-200";
+      return "bg-slate-100 text-slate-600 border-slate-200 font-medium";
 
     default:
-      return "bg-gray-100 text-gray-800 border-gray-200";
+      return "bg-slate-100 text-slate-600 border-slate-200 font-medium";
   }
 };

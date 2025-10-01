@@ -87,7 +87,7 @@ const createColumns = (
       <DataTableColumnHeader column={column} title="Mã NCC" />
     ),
     cell: ({ row }) => (
-      <div className="font-mono text-sm">{row.getValue("supplierCode")}</div>
+      <div className="text-sm">{row.getValue("supplierCode")}</div>
     ),
   },
   {
@@ -114,12 +114,12 @@ const createColumns = (
       return (
         <div className="flex flex-wrap gap-1 max-w-[150px]">
           {categories.slice(0, 2).map((category, index) => (
-            <Badge key={index} variant="outline" className="text-xs">
+            <Badge key={index} variant="outline" className="text-xs font-medium">
               {category}
             </Badge>
           ))}
           {categories.length > 2 && (
-            <Badge variant="secondary" className="text-xs">
+            <Badge variant="secondary" className="text-xs font-medium">
               +{categories.length - 2}
             </Badge>
           )}

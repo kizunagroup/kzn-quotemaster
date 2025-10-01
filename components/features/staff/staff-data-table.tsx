@@ -385,12 +385,12 @@ export function StaffDataTable() {
           <div className="max-w-[200px]">
             <div className="flex flex-wrap gap-1">
               {teams.slice(0, 2).map((team, index) => (
-                <Badge key={team.teamId} variant="outline" className="text-xs">
+                <Badge key={team.teamId} variant="outline" className="text-xs font-medium">
                   {team.teamName}
                 </Badge>
               ))}
               {teams.length > 2 && (
-                <Badge variant="outline" className="text-xs">
+                <Badge variant="outline" className="text-xs font-medium">
                   +{teams.length - 2}
                 </Badge>
               )}
