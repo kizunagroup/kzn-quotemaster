@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 import { useSuppliers, type Supplier } from "@/lib/hooks/use-suppliers";
 import { toggleSupplierStatus } from "@/lib/actions/supplier.actions";
-import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
+import { getStatusClassName, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -184,7 +184,7 @@ export function SuppliersDataTable() {
         <DataTableColumnHeader title="Mã NCC" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("supplierCode") || "-"}</div>
+        <div className="text-sm">{row.getValue("supplierCode") || "-"}</div>
       ),
     },
     {
@@ -194,7 +194,7 @@ export function SuppliersDataTable() {
         <DataTableColumnHeader title="Tên Nhà Cung Cấp" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate font-medium">
+        <div className="max-w-[200px] truncate text-sm">
           {row.getValue("name")}
         </div>
       ),
@@ -264,7 +264,7 @@ export function SuppliersDataTable() {
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return (
-          <Badge variant={getStatusVariant(status)}>
+          <Badge className={getStatusClassName(status)}>
             {getStatusLabel(status)}
           </Badge>
         );

@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
+import { getStatusClassName, getStatusLabel } from "@/lib/utils/status-styles";
 import type { Quotation } from "@/lib/hooks/use-quotations";
 
 interface QuotationViewModalProps {
@@ -125,7 +125,7 @@ export function QuotationViewModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span>Chi tiết báo giá</span>
-            <Badge variant={getStatusVariant(quotation.status)}>
+            <Badge className={getStatusClassName(quotation.status)}>
               {getStatusLabel(quotation.status)}
             </Badge>
           </DialogTitle>

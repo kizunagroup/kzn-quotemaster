@@ -49,7 +49,7 @@ import {
 import { type PermissionSet } from "@/lib/auth/permissions";
 import { ImportExcelModal } from "./import-excel-modal";
 import { QuoteDetailsModal } from "./quote-details-modal";
-import { QuotationsTableToolbar, getStatusLabel, getStatusVariant } from "./quotations-table-toolbar";
+import { QuotationsTableToolbar, getStatusLabel, getStatusClassName } from "./quotations-table-toolbar";
 
 // Status helpers are now imported from the toolbar for consistency
 
@@ -67,7 +67,7 @@ const createColumns = (
       <DataTableColumnHeader column={column} title="Kỳ báo giá" />
     ),
     cell: ({ row }) => (
-      <div className="font-medium">{row.getValue("period")}</div>
+      <div className="text-sm">{row.getValue("period")}</div>
     ),
   },
   {
@@ -136,7 +136,7 @@ const createColumns = (
     cell: ({ row }) => {
       const status = row.getValue("status") as string;
       return (
-        <Badge variant={getStatusVariant(status)}>
+        <Badge className={getStatusClassName(status)}>
           {getStatusLabel(status)}
         </Badge>
       );

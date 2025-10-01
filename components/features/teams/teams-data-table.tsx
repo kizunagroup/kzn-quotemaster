@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 import { useTeams, type Team } from "@/lib/hooks/use-teams";
 import { getRegions, activateTeam } from "@/lib/actions/team.actions";
-import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
+import { getStatusClassName, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -221,7 +221,7 @@ export function TeamsDataTable() {
         <DataTableColumnHeader title="Mã Nhóm" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("teamCode") || "-"}</div>
+        <div className="text-sm">{row.getValue("teamCode") || "-"}</div>
       ),
     },
     {
@@ -278,7 +278,7 @@ export function TeamsDataTable() {
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return (
-          <Badge variant={getStatusVariant(status)}>
+          <Badge className={getStatusClassName(status)}>
             {getStatusLabel(status)}
           </Badge>
         );

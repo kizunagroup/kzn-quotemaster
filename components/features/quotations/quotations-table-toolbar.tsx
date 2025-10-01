@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useDebounce } from "use-debounce";
 import { Settings2 } from "lucide-react";
 import { Table } from "@tanstack/react-table";
-import { getStatusVariant as getStatusVariantCentral, getStatusLabel as getStatusLabelCentral } from "@/lib/utils/status-styles";
+import { getStatusClassName as getStatusClassNameCentral, getStatusLabel as getStatusLabelCentral } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -42,7 +42,7 @@ export const statusOptions = [
 
 // Re-export centralized status utilities for backward compatibility
 export const getStatusLabel = getStatusLabelCentral;
-export const getStatusVariant = getStatusVariantCentral;
+export const getStatusClassName = getStatusClassNameCentral;
 
 
 interface QuotationsTableToolbarProps {

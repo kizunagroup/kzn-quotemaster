@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { useKitchens, type Kitchen } from "@/lib/hooks/use-kitchens";
 import { useDataTableUrlState } from "@/lib/hooks/use-data-table-url-state";
 import { getRegions, activateKitchen } from "@/lib/actions/kitchen.actions";
-import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
+import { getStatusClassName, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -202,7 +202,7 @@ export function KitchensDataTable() {
         <DataTableColumnHeader title="Mã Bếp" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("kitchenCode")}</div>
+        <div className="text-sm">{row.getValue("kitchenCode")}</div>
       ),
     },
     {
@@ -258,7 +258,7 @@ export function KitchensDataTable() {
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return (
-          <Badge variant={getStatusVariant(status)}>
+          <Badge className={getStatusClassName(status)}>
             {getStatusLabel(status)}
           </Badge>
         );

@@ -13,7 +13,7 @@ import { toast } from "sonner";
 
 import { useProducts, type Product } from "@/lib/hooks/use-products";
 import { toggleProductStatus } from "@/lib/actions/product.actions";
-import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
+import { getStatusClassName, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -202,7 +202,7 @@ export function ProductsDataTable() {
         <DataTableColumnHeader title="Mã hàng" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-mono font-medium">
+        <div className="font-mono text-sm">
           {row.getValue("productCode")}
         </div>
       ),
@@ -214,7 +214,7 @@ export function ProductsDataTable() {
         <DataTableColumnHeader title="Tên hàng" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate font-medium">
+        <div className="max-w-[200px] truncate text-sm">
           {row.getValue("name")}
         </div>
       ),
@@ -244,7 +244,7 @@ export function ProductsDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader title="Đvt" column={column} />
       ),
-      cell: ({ row }) => <div>{row.getValue("unit")}</div>,
+      cell: ({ row }) => <div className="text-sm">{row.getValue("unit")}</div>,
     },
     {
       accessorKey: "category",
@@ -253,7 +253,7 @@ export function ProductsDataTable() {
         <DataTableColumnHeader title="Nhóm hàng" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[120px] truncate">{row.getValue("category")}</div>
+        <div className="max-w-[120px] truncate text-sm">{row.getValue("category")}</div>
       ),
     },
     {
@@ -265,7 +265,7 @@ export function ProductsDataTable() {
       cell: ({ row }) => {
         const price = row.getValue("basePrice") as string;
         return (
-          <div className="text-right font-narrow">{formatCurrency(price)}</div>
+          <div className="text-right font-narrow text-sm">{formatCurrency(price)}</div>
         );
       },
     },
@@ -282,7 +282,7 @@ export function ProductsDataTable() {
       cell: ({ row }) => {
         const quantity = row.getValue("baseQuantity") as string;
         return (
-          <div className="text-right font-narrow">
+          <div className="text-right font-narrow text-sm">
             {quantity ? Number(quantity).toLocaleString("vi-VN") : "-"}
           </div>
         );
@@ -297,7 +297,7 @@ export function ProductsDataTable() {
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return (
-          <Badge variant={getStatusVariant(status)}>
+          <Badge className={getStatusClassName(status)}>
             {getStatusLabel(status)}
           </Badge>
         );

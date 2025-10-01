@@ -70,3 +70,41 @@ export const getStatusLabel = (status: string | null | undefined): string => {
       return status;
   }
 };
+
+/**
+ * Maps a status string to enhanced colored Badge className for rich visual styling.
+ *
+ * @param status - The status value (case-insensitive)
+ * @returns Tailwind CSS classes for colored badge styling
+ */
+export const getStatusClassName = (status: string | null | undefined): string => {
+  if (!status) return "bg-gray-100 text-gray-800 border-gray-200";
+
+  switch (status.toLowerCase()) {
+    // Active/Approved states -> Light green background, dark green text
+    case "active":
+    case "approved":
+      return "bg-green-100 text-green-800 border-green-200";
+
+    // Pending states -> Light yellow background, dark yellow text
+    case "pending":
+      return "bg-yellow-100 text-yellow-800 border-yellow-200";
+
+    // Inactive states -> Light gray background, dark gray text
+    case "inactive":
+      return "bg-gray-100 text-gray-600 border-gray-200";
+
+    // In-progress/Negotiation states -> Light orange background, dark orange text
+    case "negotiation":
+      return "bg-orange-100 text-orange-800 border-orange-200";
+
+    // Cancelled/Terminated/Rejected states -> Light red background, dark red text
+    case "cancelled":
+    case "terminated":
+    case "rejected":
+      return "bg-red-100 text-red-800 border-red-200";
+
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-200";
+  }
+};

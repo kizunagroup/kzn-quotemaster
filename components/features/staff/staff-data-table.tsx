@@ -27,7 +27,7 @@ import {
   terminateStaff,
   resetPasswordByAdmin,
 } from "@/lib/actions/staff.actions";
-import { getStatusVariant, getStatusLabel } from "@/lib/utils/status-styles";
+import { getStatusClassName, getStatusLabel } from "@/lib/utils/status-styles";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -306,7 +306,7 @@ export function StaffDataTable() {
         <DataTableColumnHeader title="Mã NV" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("employeeCode") || "-"}</div>
+        <div className="text-sm">{row.getValue("employeeCode") || "-"}</div>
       ),
     },
     {
@@ -316,7 +316,7 @@ export function StaffDataTable() {
         <DataTableColumnHeader title="Tên Nhân Viên" column={column} />
       ),
       cell: ({ row }) => (
-        <div className="max-w-[200px] truncate font-medium">
+        <div className="max-w-[200px] truncate text-sm">
           {row.getValue("name")}
         </div>
       ),
@@ -420,7 +420,7 @@ export function StaffDataTable() {
       cell: ({ row }) => {
         const status = row.getValue("status") as string;
         return (
-          <Badge variant={getStatusVariant(status)}>
+          <Badge className={getStatusClassName(status)}>
             {getStatusLabel(status)}
           </Badge>
         );
