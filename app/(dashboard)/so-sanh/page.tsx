@@ -34,7 +34,7 @@ import {
   CheckCircle,
   TrendingUp,
   TrendingDown,
-  ChevronUp,
+  List,
   ChevronDown,
 } from "lucide-react";
 import {
@@ -81,9 +81,9 @@ export default function ComparisonPage() {
 
   // Helper functions for multi-select categories
   const handleCategoryToggle = (category: string) => {
-    setCategories(prev =>
+    setCategories((prev) =>
       prev.includes(category)
-        ? prev.filter(c => c !== category)
+        ? prev.filter((c) => c !== category)
         : [...prev, category]
     );
   };
@@ -219,7 +219,8 @@ export default function ComparisonPage() {
   };
 
   // Check if compare button should be enabled
-  const isCompareEnabled = period && region && categories.length > 0 && !comparisonLoading;
+  const isCompareEnabled =
+    period && region && categories.length > 0 && !comparisonLoading;
 
   // Handle batch negotiation and export
   const handleBatchNegotiationAndExport = async () => {
@@ -242,9 +243,9 @@ export default function ComparisonPage() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${categories.join('+')}_${
-        new Date().toISOString().split("T")[0]
-      }.xlsx`;
+      link.download = `GiaMucTieu_DamPhan_${period}_${region}_${categories.join(
+        "+"
+      )}_${new Date().toISOString().split("T")[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -301,9 +302,9 @@ export default function ComparisonPage() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `BangGiaMucTieu_${period}_${region}_${categories.join('+')}_${
-        new Date().toISOString().split("T")[0]
-      }.xlsx`;
+      link.download = `BangGiaMucTieu_${period}_${region}_${categories.join(
+        "+"
+      )}_${new Date().toISOString().split("T")[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -320,10 +321,7 @@ export default function ComparisonPage() {
 
   return (
     <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-      {/* Header */}
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">So sánh Báo giá</h2>
-      </div>
+      <h2 className="text-3xl font-bold tracking-tight">So sánh Báo giá</h2>
 
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border p-6">
@@ -337,9 +335,7 @@ export default function ComparisonPage() {
             >
               <SelectTrigger className="w-full">
                 <SelectValue
-                  placeholder={
-                    periodsLoading ? "Đang tải..." : "Kỳ báo giá..."
-                  }
+                  placeholder={periodsLoading ? "Đang tải..." : "Kỳ báo giá..."}
                 />
               </SelectTrigger>
               <SelectContent>
@@ -404,9 +400,7 @@ export default function ComparisonPage() {
                   ) : categories.length === 0 ? (
                     <span className="text-muted-foreground">Nhóm hàng...</span>
                   ) : (
-                    <span>
-                      Nhóm hàng ({categories.length})
-                    </span>
+                    <span>Nhóm hàng ({categories.length})</span>
                   )}
                   <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -541,11 +535,7 @@ export default function ComparisonPage() {
                 onClick={() => setIsDetailsVisible(!isDetailsVisible)}
                 className="h-8 w-8 p-0"
               >
-                {isDetailsVisible ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <List className="h-4 w-4" />
               </Button>
             </div>
           )}
@@ -602,7 +592,9 @@ export default function ComparisonPage() {
                     {matrixData.overviewKPIs.comparisonVsInitial.percentage > 0
                       ? "+"
                       : ""}
-                    {formatPercentage(matrixData.overviewKPIs.comparisonVsInitial.percentage)}
+                    {formatPercentage(
+                      matrixData.overviewKPIs.comparisonVsInitial.percentage
+                    )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {matrixData.overviewKPIs.comparisonVsInitial.difference > 0
@@ -637,7 +629,10 @@ export default function ComparisonPage() {
                           .percentage > 0
                           ? "+"
                           : ""}
-                        {formatPercentage(matrixData.overviewKPIs.comparisonVsPrevious.percentage)}
+                        {formatPercentage(
+                          matrixData.overviewKPIs.comparisonVsPrevious
+                            .percentage
+                        )}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {matrixData.overviewKPIs.comparisonVsPrevious
@@ -681,7 +676,9 @@ export default function ComparisonPage() {
                         {matrixData.overviewKPIs.comparisonVsBase.percentage > 0
                           ? "+"
                           : ""}
-                        {formatPercentage(matrixData.overviewKPIs.comparisonVsBase.percentage)}
+                        {formatPercentage(
+                          matrixData.overviewKPIs.comparisonVsBase.percentage
+                        )}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {matrixData.overviewKPIs.comparisonVsBase.difference > 0
@@ -742,16 +739,18 @@ export default function ComparisonPage() {
         <Card>
           <CardHeader>
             <CardTitle>Chi tiết so sánh</CardTitle>
+            {period && region && categories.length > 0 && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Kỳ: {period} | Khu vực: {region} | Nhóm hàng:{" "}
+                {categories.join(", ")}
+              </p>
+            )}
           </CardHeader>
           <CardContent>
             {comparisonLoading ? (
               <div className="text-center text-gray-500 space-y-4">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto" />
                 <p className="text-lg">Đang tải ma trận so sánh...</p>
-                <p className="text-sm">
-                  Đang xử lý ma trận so sánh báo giá cho kỳ {period}, khu vực{" "}
-                  {region}, nhóm hàng: {categories.join(', ')}.
-                </p>
               </div>
             ) : comparisonError ? (
               <div className="text-center space-y-4">
