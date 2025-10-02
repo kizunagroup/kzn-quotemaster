@@ -100,9 +100,7 @@ export function ImportExcelModal({
             if (parts.length === 3) {
               setPeriodYear(parts[0]);
               setPeriodMonth(parts[1]);
-              const currentSequence = parseInt(parts[2], 10);
-              // Auto-increment sequence for new period
-              setPeriodSequence(String(currentSequence + 1).padStart(2, "0"));
+              setPeriodSequence(parts[2]);
             }
           } else {
             // No existing periods, suggest first period
@@ -187,7 +185,8 @@ export function ImportExcelModal({
       return true;
     });
 
-    setSelectedFiles(validFiles);
+    // Append to existing files instead of replacing
+    setSelectedFiles(prev => [...prev, ...validFiles]);
   };
 
   // File selection handler
@@ -408,96 +407,91 @@ export function ImportExcelModal({
                     name="period"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Kỳ báo giá *</FormLabel>
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2">
-                            {/* Year Input */}
-                            <div className="flex-1">
-                              <label className="text-xs text-muted-foreground mb-1 block">
-                                Năm (YYYY)
-                              </label>
-                              <Input
-                                type="text"
-                                placeholder="2024"
-                                value={periodYear}
-                                onChange={handleYearChange}
-                                disabled={isProcessing}
-                                className="text-center"
-                                maxLength={4}
-                              />
-                            </div>
+                        <FormLabel>
+                          Kỳ báo giá *
+                          {periodYear && periodMonth && periodSequence && (
+                            <span className="ml-2 font-normal text-muted-foreground">
+                              ({periodYear}-{periodMonth}-{periodSequence})
+                            </span>
+                          )}
+                        </FormLabel>
+                        <div className="flex items-center gap-2">
+                          {/* Year Input */}
+                          <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">
+                              Năm (YYYY)
+                            </label>
+                            <Input
+                              type="text"
+                              placeholder="2024"
+                              value={periodYear}
+                              onChange={handleYearChange}
+                              disabled={isProcessing}
+                              className="text-center"
+                              maxLength={4}
+                            />
+                          </div>
 
-                            <span className="text-xl text-muted-foreground pt-5">-</span>
+                          <span className="text-xl text-muted-foreground pt-5">-</span>
 
-                            {/* Month Input */}
-                            <div className="flex-1">
-                              <label className="text-xs text-muted-foreground mb-1 block">
-                                Tháng (MM)
-                              </label>
+                          {/* Month Input */}
+                          <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">
+                              Tháng (MM)
+                            </label>
+                            <Input
+                              type="text"
+                              placeholder="01"
+                              value={periodMonth}
+                              onChange={handleMonthChange}
+                              disabled={isProcessing}
+                              className="text-center"
+                              maxLength={2}
+                            />
+                          </div>
+
+                          <span className="text-xl text-muted-foreground pt-5">-</span>
+
+                          {/* Sequence Input with Up/Down Buttons */}
+                          <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">
+                              Đợt (XX)
+                            </label>
+                            <div className="flex items-center gap-1">
                               <Input
                                 type="text"
                                 placeholder="01"
-                                value={periodMonth}
-                                onChange={handleMonthChange}
+                                value={periodSequence}
+                                onChange={handleSequenceChange}
                                 disabled={isProcessing}
                                 className="text-center"
                                 maxLength={2}
                               />
-                            </div>
-
-                            <span className="text-xl text-muted-foreground pt-5">-</span>
-
-                            {/* Sequence Input with Up/Down Buttons */}
-                            <div className="flex-1">
-                              <label className="text-xs text-muted-foreground mb-1 block">
-                                Đợt (XX)
-                              </label>
-                              <div className="flex items-center gap-1">
-                                <Input
-                                  type="text"
-                                  placeholder="01"
-                                  value={periodSequence}
-                                  onChange={handleSequenceChange}
+                              <div className="flex flex-col gap-0.5">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleSequenceIncrement}
                                   disabled={isProcessing}
-                                  className="text-center"
-                                  maxLength={2}
-                                />
-                                <div className="flex flex-col gap-0.5">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleSequenceIncrement}
-                                    disabled={isProcessing}
-                                    className="h-5 w-6 p-0"
-                                  >
-                                    <ChevronUp className="h-3 w-3" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleSequenceDecrement}
-                                    disabled={isProcessing || parseInt(periodSequence || "0", 10) <= 1}
-                                    className="h-5 w-6 p-0"
-                                  >
-                                    <ChevronDown className="h-3 w-3" />
-                                  </Button>
-                                </div>
+                                  className="h-5 w-6 p-0"
+                                >
+                                  <ChevronUp className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={handleSequenceDecrement}
+                                  disabled={isProcessing || parseInt(periodSequence || "0", 10) <= 1}
+                                  className="h-5 w-6 p-0"
+                                >
+                                  <ChevronDown className="h-3 w-3" />
+                                </Button>
                               </div>
                             </div>
                           </div>
-
-                          {/* Preview of complete period */}
-                          {periodYear && periodMonth && periodSequence && (
-                            <div className="text-sm text-muted-foreground">
-                              Kỳ: <span className="font-medium">{periodYear}-{periodMonth}-{periodSequence}</span>
-                            </div>
-                          )}
                         </div>
-                        <FormDescription>
-                          Kỳ báo giá tự động tăng dựa trên kỳ mới nhất. Kỳ này phải khớp với thông tin trong file Excel.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -518,9 +512,6 @@ export function ImportExcelModal({
                             disabled={isProcessing}
                           />
                         </FormControl>
-                        <FormDescription>
-                          Khu vực này phải khớp với thông tin trong file Excel.
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
