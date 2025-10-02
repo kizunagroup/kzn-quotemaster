@@ -228,16 +228,16 @@ export function QuoteDetailsModal({
                       </Badge>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="flex-1 overflow-auto p-0">
-                    <div className="w-full h-full overflow-auto px-6 pb-6">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-center text-sm">STT</TableHead>
-                            <TableHead className="text-sm">Mã SP</TableHead>
-                            <TableHead className="text-sm">Tên sản phẩm</TableHead>
-                            <TableHead className="text-sm">Đơn vị</TableHead>
-                            <TableHead className="text-right text-sm">
+                  <CardContent className="flex-1 overflow-auto p-0 px-6 pb-6">
+                    <div className="relative w-full">
+                      <table className="w-full caption-bottom text-sm">
+                        <thead className="sticky top-0 bg-white z-10 shadow-sm [&_tr]:border-b">
+                          <tr className="border-b transition-colors hover:bg-muted/50">
+                            <TableHead className="text-center text-sm bg-white">STT</TableHead>
+                            <TableHead className="text-sm bg-white">Mã SP</TableHead>
+                            <TableHead className="text-sm bg-white">Tên sản phẩm</TableHead>
+                            <TableHead className="text-sm bg-white">Đơn vị</TableHead>
+                            <TableHead className="text-right text-sm bg-white">
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger>
@@ -249,13 +249,13 @@ export function QuoteDetailsModal({
                                 </Tooltip>
                               </TooltipProvider>
                             </TableHead>
-                            <TableHead className="text-right text-sm">Đơn giá</TableHead>
-                            <TableHead className="text-right text-sm">VAT %</TableHead>
-                            <TableHead className="text-right text-sm">Tiền thuế VAT</TableHead>
-                            <TableHead className="text-right text-sm font-semibold">Thành tiền</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                            <TableHead className="text-right text-sm bg-white">Đơn giá</TableHead>
+                            <TableHead className="text-right text-sm bg-white">VAT %</TableHead>
+                            <TableHead className="text-right text-sm bg-white">Tiền thuế VAT</TableHead>
+                            <TableHead className="text-right text-sm font-semibold bg-white">Thành tiền</TableHead>
+                          </tr>
+                        </thead>
+                        <tbody className="[&_tr:last-child]:border-0">
                           {quotation.items && Array.isArray(quotation.items) && quotation.items.length > 0 ? (
                             quotation.items.map((item, index) => {
                               // Defensive checks for item data
@@ -283,7 +283,7 @@ export function QuoteDetailsModal({
                               const totalPrice = subtotal + vatAmount;
 
                             return (
-                              <TableRow key={item.id}>
+                              <tr key={item.id} className="border-b transition-colors hover:bg-muted/50">
                                 <TableCell className="text-center font-medium text-sm">
                                   {index + 1}
                                 </TableCell>
@@ -316,24 +316,25 @@ export function QuoteDetailsModal({
                                 <TableCell className="text-right text-sm font-medium">
                                   {formatNumber(totalPrice)}
                                 </TableCell>
-                              </TableRow>
+                              </tr>
                             );
                           })
                           ) : (
-                            <TableRow>
+                            <tr className="border-b">
                               <TableCell colSpan={9} className="text-center py-8 text-muted-foreground text-sm">
                                 Không có sản phẩm nào trong báo giá này
                               </TableCell>
-                            </TableRow>
+                            </tr>
                           )}
-                        </TableBody>
-                      </Table>
+                        </tbody>
+                      </table>
                     </div>
+                  </CardContent>
 
-                    {/* Summary */}
-                    <div className="mt-4 pt-4 border-t space-y-2">
+                  {/* Summary Section - Outside scrollable area */}
+                  <div className="flex-shrink-0 px-6 py-4 border-t space-y-3">
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Tổng giá trị (chưa VAT):</span>
+                        <span className="text-muted-foreground font-medium">Tổng giá trị (chưa VAT):</span>
                         <span className="font-medium">
                           {formatNumber((quotation.items ?? []).reduce(
                             (sum, item) => {
@@ -354,7 +355,7 @@ export function QuoteDetailsModal({
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">Tổng thuế VAT:</span>
+                        <span className="text-muted-foreground font-medium">Tổng thuế VAT:</span>
                         <span className="font-medium">
                           {formatNumber((quotation.items ?? []).reduce(
                             (sum, item) => {
@@ -377,10 +378,10 @@ export function QuoteDetailsModal({
                           ))}
                         </span>
                       </div>
-                      <Separator />
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold">Tổng giá trị báo giá:</span>
-                        <span className="text-lg font-bold">
+                      <Separator className="my-2" />
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-base font-bold">Tổng giá trị báo giá:</span>
+                        <span className="text-base font-bold text-primary">
                           {formatNumber((quotation.items ?? []).reduce(
                             (sum, item) => {
                               if (!item || !item.product) return sum;
@@ -403,8 +404,7 @@ export function QuoteDetailsModal({
                           ))}
                         </span>
                       </div>
-                    </div>
-                  </CardContent>
+                  </div>
                 </Card>
           </div>
             )}
