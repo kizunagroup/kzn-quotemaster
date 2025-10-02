@@ -186,7 +186,7 @@ export function ManyToManyAssignmentModal({
               placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 bg-white"
+              className="pl-9 bg-white focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-slate-400"
             />
           </div>
 
@@ -217,20 +217,20 @@ export function ManyToManyAssignmentModal({
 
           {/* Grouped List with Custom Accordion */}
           <ScrollArea className="flex-1 -mx-6 px-6">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <p className="text-sm text-muted-foreground">Đang tải...</p>
-              </div>
-            ) : groupedItems.size === 0 ? (
-              <div className="flex items-center justify-center py-12">
-                <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-              </div>
-            ) : (
-              <AccordionPrimitive.Root
-                type="multiple"
-                defaultValue={Array.from(groupedItems.keys())}
-                className="space-y-3"
-              >
+            <div className="h-[400px] overflow-y-auto pr-4">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-sm text-muted-foreground">Đang tải...</p>
+                </div>
+              ) : groupedItems.size === 0 ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+                </div>
+              ) : (
+                <AccordionPrimitive.Root
+                  type="multiple"
+                  className="space-y-3"
+                >
                 {Array.from(groupedItems.entries()).map(([groupName, groupItems]) => {
                   const groupSelected = isGroupSelected(groupItems);
                   const groupIndeterminate = isGroupIndeterminate(groupItems);
@@ -302,7 +302,8 @@ export function ManyToManyAssignmentModal({
                   );
                 })}
               </AccordionPrimitive.Root>
-            )}
+              )}
+            </div>
           </ScrollArea>
         </div>
 
