@@ -18,7 +18,7 @@ import {
 import { PriceBadge } from "@/components/ui/price-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { PriceListMatrixData } from "@/lib/actions/price-list.actions";
+import type { PriceListMatrixData } from "@/lib/types/price-list.types";
 
 export interface PriceMatrixProps {
   priceListData: PriceListMatrixData;

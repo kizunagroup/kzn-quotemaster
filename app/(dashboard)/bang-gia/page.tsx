@@ -15,9 +15,8 @@ import {
   getUserAccessibleKitchens,
   getAvailablePeriodsForTeam,
   getPriceListMatrix,
-  type PeriodInfo,
-  type PriceListMatrixData,
 } from "@/lib/actions/price-list.actions";
+import type { PeriodInfo, PriceListMatrixData } from "@/lib/types/price-list.types";
 import { toast } from "sonner";
 import { PriceMatrix } from "@/components/features/price-list/price-matrix";
 
