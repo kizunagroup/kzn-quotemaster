@@ -770,3 +770,22 @@ export async function getAvailableCategories(): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * Get the latest period from quotations table
+ * Returns the most recent period value (MAX) or null if no quotations exist
+ */
+export async function getLatestPeriod(): Promise<string | null> {
+  try {
+    await checkProcurementRole();
+
+    const result = await db
+      .select({ maxPeriod: sql<string>`MAX(${quotations.period})` })
+      .from(quotations);
+
+    return result[0]?.maxPeriod || null;
+  } catch (error) {
+    console.error("Error in getLatestPeriod:", error);
+    return null;
+  }
+}

@@ -4,7 +4,7 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { FileSpreadsheet, Upload, AlertCircle, CheckCircle, X } from "lucide-react";
+import { FileSpreadsheet, Upload, AlertCircle, CheckCircle, X, ChevronUp, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { RegionAutocomplete } from "@/components/ui/region-autocomplete";
 import {
   importQuotationsFromExcel,
+  getLatestPeriod,
   type ImportResult,
 } from "@/lib/actions/quotations.actions";
 
@@ -72,6 +73,10 @@ export function ImportExcelModal({
 }: ImportExcelModalProps) {
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
   const [importState, setImportState] = React.useState<ImportState>({ type: "idle" });
+  const [isDragActive, setIsDragActive] = React.useState(false);
+  const [periodYear, setPeriodYear] = React.useState("");
+  const [periodMonth, setPeriodMonth] = React.useState("");
+  const [periodSequence, setPeriodSequence] = React.useState("");
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const form = useForm<ImportFormValues>({
@@ -83,19 +88,90 @@ export function ImportExcelModal({
     },
   });
 
-  // Reset form and state when modal opens/closes
+  // Load latest period when modal opens
+  React.useEffect(() => {
+    if (open) {
+      const loadLatestPeriod = async () => {
+        try {
+          const latestPeriod = await getLatestPeriod();
+          if (latestPeriod) {
+            // Parse period: YYYY-MM-XX
+            const parts = latestPeriod.split("-");
+            if (parts.length === 3) {
+              setPeriodYear(parts[0]);
+              setPeriodMonth(parts[1]);
+              const currentSequence = parseInt(parts[2], 10);
+              // Auto-increment sequence for new period
+              setPeriodSequence(String(currentSequence + 1).padStart(2, "0"));
+            }
+          } else {
+            // No existing periods, suggest first period
+            const now = new Date();
+            setPeriodYear(String(now.getFullYear()));
+            setPeriodMonth(String(now.getMonth() + 1).padStart(2, "0"));
+            setPeriodSequence("01");
+          }
+        } catch (error) {
+          console.error("Error loading latest period:", error);
+        }
+      };
+
+      loadLatestPeriod();
+    }
+  }, [open]);
+
+  // Sync period parts to form value
+  React.useEffect(() => {
+    if (periodYear && periodMonth && periodSequence) {
+      const period = `${periodYear}-${periodMonth}-${periodSequence}`;
+      form.setValue("period", period);
+    }
+  }, [periodYear, periodMonth, periodSequence, form]);
+
+  // Reset form and state when modal closes
   React.useEffect(() => {
     if (!open) {
       form.reset();
       setSelectedFiles([]);
       setImportState({ type: "idle" });
+      setPeriodYear("");
+      setPeriodMonth("");
+      setPeriodSequence("");
     }
   }, [open, form]);
 
-  // File selection handler
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files || []);
+  // Period input handlers
+  const handleYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 4);
+    setPeriodYear(value);
+  };
 
+  const handleMonthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 2);
+    if (value === "" || (parseInt(value, 10) >= 1 && parseInt(value, 10) <= 12)) {
+      setPeriodMonth(value.padStart(2, "0"));
+    }
+  };
+
+  const handleSequenceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, "").slice(0, 2);
+    setPeriodSequence(value.padStart(2, "0"));
+  };
+
+  const handleSequenceIncrement = () => {
+    const current = parseInt(periodSequence || "0", 10);
+    setPeriodSequence(String(current + 1).padStart(2, "0"));
+  };
+
+  const handleSequenceDecrement = () => {
+    const current = parseInt(periodSequence || "0", 10);
+    if (current > 1) {
+      setPeriodSequence(String(current - 1).padStart(2, "0"));
+    }
+  };
+
+  // Validate and process files
+  const validateAndProcessFiles = (files: File[]) => {
     // Validate file types
     const validFiles = files.filter(file => {
       const isExcel = file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
@@ -112,15 +188,34 @@ export function ImportExcelModal({
     });
 
     setSelectedFiles(validFiles);
+  };
 
-    // Auto-suggest period from first file name if it contains a date pattern
-    if (validFiles.length > 0 && !form.getValues("period")) {
-      const fileName = validFiles[0].name;
-      const dateMatch = fileName.match(/(\d{4})-(\d{2})-(\d{2})/);
-      if (dateMatch) {
-        form.setValue("period", dateMatch[0]);
-      }
-    }
+  // File selection handler
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    validateAndProcessFiles(files);
+  };
+
+  // Drag and drop handlers
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(true);
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(false);
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDragActive(false);
+
+    const files = Array.from(event.dataTransfer.files);
+    validateAndProcessFiles(files);
   };
 
   // Remove file handler
@@ -219,22 +314,31 @@ export function ImportExcelModal({
               </Card>
             )}
 
-            {/* File Selection */}
+            {/* File Selection with Drag & Drop */}
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Chọn file Excel</label>
-                <div className="mt-2 flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isProcessing}
-                    className="flex items-center gap-2"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Chọn file...
-                  </Button>
-                  {selectedFiles.length > 0 && (
+                <div
+                  className={`mt-2 border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    isDragActive
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-300 hover:border-gray-400"
+                  } ${isProcessing ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => !isProcessing && fileInputRef.current?.click()}
+                >
+                  <Upload className={`h-8 w-8 mx-auto mb-2 ${isDragActive ? "text-blue-600" : "text-gray-400"}`} />
+                  <p className="text-sm font-medium mb-1">
+                    {isDragActive ? "Thả file vào đây..." : "Kéo thả file Excel hoặc nhấn để chọn"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Hỗ trợ file .xlsx, .xls
+                  </p>
+                </div>
+                {selectedFiles.length > 0 && (
+                  <div className="mt-2 flex justify-end">
                     <Button
                       type="button"
                       variant="ghost"
@@ -242,11 +346,11 @@ export function ImportExcelModal({
                       onClick={handleClearFiles}
                       disabled={isProcessing}
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-4 w-4 mr-1" />
                       Xóa tất cả
                     </Button>
-                  )}
-                </div>
+                  </div>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -298,22 +402,101 @@ export function ImportExcelModal({
             {selectedFiles.length > 0 && (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  {/* Period Field */}
+                  {/* Period Field - 3-Part Input */}
                   <FormField
                     control={form.control}
                     name="period"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Kỳ báo giá *</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="YYYY-MM-DD (ví dụ: 2024-01-01)"
-                            {...field}
-                            disabled={isProcessing}
-                          />
-                        </FormControl>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            {/* Year Input */}
+                            <div className="flex-1">
+                              <label className="text-xs text-muted-foreground mb-1 block">
+                                Năm (YYYY)
+                              </label>
+                              <Input
+                                type="text"
+                                placeholder="2024"
+                                value={periodYear}
+                                onChange={handleYearChange}
+                                disabled={isProcessing}
+                                className="text-center"
+                                maxLength={4}
+                              />
+                            </div>
+
+                            <span className="text-xl text-muted-foreground pt-5">-</span>
+
+                            {/* Month Input */}
+                            <div className="flex-1">
+                              <label className="text-xs text-muted-foreground mb-1 block">
+                                Tháng (MM)
+                              </label>
+                              <Input
+                                type="text"
+                                placeholder="01"
+                                value={periodMonth}
+                                onChange={handleMonthChange}
+                                disabled={isProcessing}
+                                className="text-center"
+                                maxLength={2}
+                              />
+                            </div>
+
+                            <span className="text-xl text-muted-foreground pt-5">-</span>
+
+                            {/* Sequence Input with Up/Down Buttons */}
+                            <div className="flex-1">
+                              <label className="text-xs text-muted-foreground mb-1 block">
+                                Đợt (XX)
+                              </label>
+                              <div className="flex items-center gap-1">
+                                <Input
+                                  type="text"
+                                  placeholder="01"
+                                  value={periodSequence}
+                                  onChange={handleSequenceChange}
+                                  disabled={isProcessing}
+                                  className="text-center"
+                                  maxLength={2}
+                                />
+                                <div className="flex flex-col gap-0.5">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleSequenceIncrement}
+                                    disabled={isProcessing}
+                                    className="h-5 w-6 p-0"
+                                  >
+                                    <ChevronUp className="h-3 w-3" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleSequenceDecrement}
+                                    disabled={isProcessing || parseInt(periodSequence || "0", 10) <= 1}
+                                    className="h-5 w-6 p-0"
+                                  >
+                                    <ChevronDown className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Preview of complete period */}
+                          {periodYear && periodMonth && periodSequence && (
+                            <div className="text-sm text-muted-foreground">
+                              Kỳ: <span className="font-medium">{periodYear}-{periodMonth}-{periodSequence}</span>
+                            </div>
+                          )}
+                        </div>
                         <FormDescription>
-                          Định dạng: YYYY-MM-DD. Kỳ này phải khớp với thông tin trong file Excel.
+                          Kỳ báo giá tự động tăng dựa trên kỳ mới nhất. Kỳ này phải khớp với thông tin trong file Excel.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
