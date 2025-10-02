@@ -19,6 +19,7 @@ import {
   type PriceListMatrixData,
 } from "@/lib/actions/price-list.actions";
 import { toast } from "sonner";
+import { PriceMatrix } from "@/components/features/price-list/price-matrix";
 
 interface Kitchen {
   id: number;
@@ -236,29 +237,19 @@ export default function PriceListPage() {
           </CardContent>
         </Card>
       ) : priceListData ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Bảng giá: {priceListData.teamName} - {priceListData.period}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Khu vực: {priceListData.teamRegion} | Tổng số sản phẩm:{" "}
-              {priceListData.summary.totalProducts} | Nhà cung cấp:{" "}
-              {priceListData.summary.totalSuppliers}
-            </p>
-          </CardHeader>
-          <CardContent>
-            {/* TODO: Render Price List Matrix Component */}
-            <div className="border rounded-lg p-4 bg-muted/50">
-              <p className="text-center text-muted-foreground">
-                Bảng giá matrix sẽ được hiển thị ở đây
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Bảng giá: {priceListData.teamName} - {priceListData.period}
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Khu vực: {priceListData.teamRegion}
               </p>
-              <p className="text-center text-sm text-muted-foreground mt-2">
-                (Component sẽ được tạo trong task tiếp theo)
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+          </Card>
+          <PriceMatrix priceListData={priceListData} />
+        </div>
       ) : (
         <Card>
           <CardContent className="flex items-center justify-center py-12">
