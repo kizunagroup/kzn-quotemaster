@@ -13,7 +13,7 @@ import {
   type Quotation,
   type QuoteItem,
   type Supplier,
-  type Product
+  type Product,
 } from "@/lib/db/schema";
 import { getUser } from "@/lib/db/queries";
 import { eq, and, inArray, desc, sql, like } from "drizzle-orm";
@@ -35,11 +35,19 @@ import {
 
 // ==================== AUTHORIZATION HELPERS ====================
 
-async function checkProcurementRole(requiredRoles: string[] = ['ADMIN_SUPER_ADMIN', 'PROCUREMENT_MANAGER', 'PROCUREMENT_STAFF']) {
+async function checkProcurementRole(
+  requiredRoles: string[] = [
+    "ADMIN_SUPER_ADMIN",
+    "PROCUREMENT_MANAGER",
+    "PROCUREMENT_STAFF",
+  ]
+) {
   const user = await getUser();
 
   if (!user) {
-    throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện hành động này");
+    throw new Error(
+      "Unauthorized: Bạn cần đăng nhập để thực hiện hành động này"
+    );
   }
 
   // TODO: Implement proper role checking based on team_members table
@@ -53,7 +61,9 @@ async function checkManagerRole() {
   const user = await getUser();
 
   if (!user) {
-    throw new Error("Unauthorized: Bạn cần đăng nhập để thực hiện hành động này");
+    throw new Error(
+      "Unauthorized: Bạn cần đăng nhập để thực hiện hành động này"
+    );
   }
 
   // TODO: Implement proper role checking for manager-level operations
@@ -67,14 +77,17 @@ async function checkManagerRole() {
 /**
  * Get quotations with filtering and pagination
  */
-export async function getQuotations(filters?: z.infer<typeof QuotationFiltersSchema>) {
+export async function getQuotations(
+  filters?: z.infer<typeof QuotationFiltersSchema>
+) {
   try {
     // Authorization check
     await checkProcurementRole();
 
     // Validate filters
     const validatedFilters = QuotationFiltersSchema.parse(filters || {});
-    const { period, region, supplierId, status, page, limit } = validatedFilters;
+    const { period, region, supplierId, status, page, limit } =
+      validatedFilters;
 
     // Build where conditions
     const whereConditions = [];
@@ -119,15 +132,22 @@ export async function getQuotations(filters?: z.infer<typeof QuotationFiltersSch
           email: suppliers.email,
         },
         creator: {
-          id: sql<number>`COALESCE(${quotations.createdBy}, 0)`.as('creator_id'),
-          name: sql<string>`COALESCE((SELECT name FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as('creator_name'),
-          email: sql<string>`COALESCE((SELECT email FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as('creator_email'),
+          id: sql<number>`COALESCE(${quotations.createdBy}, 0)`.as(
+            "creator_id"
+          ),
+          name: sql<string>`COALESCE((SELECT name FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as(
+            "creator_name"
+          ),
+          email:
+            sql<string>`COALESCE((SELECT email FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as(
+              "creator_email"
+            ),
         },
         itemCount: sql<number>`(
           SELECT COUNT(*)
           FROM ${quoteItems}
           WHERE ${quoteItems.quotationId} = ${quotations.id}
-        )`.as('item_count'),
+        )`.as("item_count"),
       })
       .from(quotations)
       .leftJoin(suppliers, eq(quotations.supplierId, suppliers.id))
@@ -149,9 +169,8 @@ export async function getQuotations(filters?: z.infer<typeof QuotationFiltersSch
         limit,
         total: count,
         totalPages: Math.ceil(count / limit),
-      }
+      },
     };
-
   } catch (error) {
     console.error("Error in getQuotations:", error);
     throw new Error(
@@ -196,16 +215,28 @@ export async function importQuotationsFromExcel(
     for (const file of files) {
       try {
         // Parse Excel file with region and period from import data
-        const parseResult: ParseResult = await processExcelFile(file, region, period);
+        const parseResult: ParseResult = await processExcelFile(
+          file,
+          region,
+          period
+        );
 
         if (!parseResult.success || !parseResult.data) {
-          result.errors.push(`File ${file.name}: ${parseResult.errors.map(e => e.message).join(', ')}`);
+          result.errors.push(
+            `File ${file.name}: ${parseResult.errors
+              .map((e) => e.message)
+              .join(", ")}`
+          );
           continue;
         }
 
         // Validate that region matches (period is now provided from form, not Excel)
         if (parseResult.data?.info?.region !== region) {
-          result.errors.push(`File ${file.name}: Khu vực trong file (${parseResult.data?.info?.region || 'N/A'}) không khớp với khu vực đã chọn (${region})`);
+          result.errors.push(
+            `File ${file.name}: Khu vực trong file (${
+              parseResult.data?.info?.region || "N/A"
+            }) không khớp với khu vực đã chọn (${region})`
+          );
           continue;
         }
 
@@ -223,19 +254,23 @@ export async function importQuotationsFromExcel(
           .limit(1);
 
         if (!supplier) {
-          result.errors.push(`File ${file.name}: Không tìm thấy nhà cung cấp với mã ${supplierCode}`);
+          result.errors.push(
+            `File ${file.name}: Không tìm thấy nhà cung cấp với mã ${supplierCode}`
+          );
           continue;
         }
 
         // Validate all products exist with input normalization
         if (!parseResult.data?.items) {
-          result.errors.push(`File ${file.name}: Dữ liệu sản phẩm không hợp lệ`);
+          result.errors.push(
+            `File ${file.name}: Dữ liệu sản phẩm không hợp lệ`
+          );
           continue;
         }
 
-        const productCodes = parseResult.data.items.map(item => {
+        const productCodes = parseResult.data.items.map((item) => {
           if (!item?.productCode) {
-            throw new Error('Product code is missing or invalid');
+            throw new Error("Product code is missing or invalid");
           }
           return item.productCode.trim().toUpperCase();
         });
@@ -245,7 +280,11 @@ export async function importQuotationsFromExcel(
           .from(products)
           .where(inArray(products.productCode, productCodes));
 
-        const existingProductCodes = new Set(existingProducts.map(p => p.productCode?.trim().toUpperCase()).filter(Boolean));
+        const existingProductCodes = new Set(
+          existingProducts
+            .map((p) => p.productCode?.trim().toUpperCase())
+            .filter(Boolean)
+        );
         const missingProducts = [];
         const validProducts = [];
 
@@ -260,18 +299,24 @@ export async function importQuotationsFromExcel(
             missingProducts.push({
               code: originalItem.productCode,
               normalizedCode,
-              row: i + 2 // Excel row number (accounting for header)
+              row: i + 2, // Excel row number (accounting for header)
             });
           }
         }
 
         if (missingProducts.length > 0) {
-          const errorDetails = missingProducts.map(p => `${p.code} (dòng ${p.row})`).join(', ');
-          result.errors.push(`File ${file.name}: Không tìm thấy sản phẩm với mã: ${errorDetails}`);
+          const errorDetails = missingProducts
+            .map((p) => `${p.code} (dòng ${p.row})`)
+            .join(", ");
+          result.errors.push(
+            `File ${file.name}: Không tìm thấy sản phẩm với mã: ${errorDetails}`
+          );
 
           // Add warning if normalization might help
-          if (missingProducts.some(p => p.code !== p.normalizedCode)) {
-            result.warnings.push(`File ${file.name}: Một số mã sản phẩm đã được chuẩn hóa (loại bỏ khoảng trắng, chuyển thành chữ hoa) nhưng vẫn không tìm thấy`);
+          if (missingProducts.some((p) => p.code !== p.normalizedCode)) {
+            result.warnings.push(
+              `File ${file.name}: Một số mã sản phẩm đã được chuẩn hóa (loại bỏ khoảng trắng, chuyển thành chữ hoa) nhưng vẫn không tìm thấy`
+            );
           }
           continue;
         }
@@ -296,7 +341,7 @@ export async function importQuotationsFromExcel(
 
           if (existingQuotation) {
             // Handle different update scenarios based on quotation status
-            if (existingQuotation.status === 'negotiation') {
+            if (existingQuotation.status === "negotiation") {
               // Intelligent update: Update negotiated prices for quotations in negotiation
               quotationId = existingQuotation.id;
               isUpdate = true;
@@ -305,7 +350,9 @@ export async function importQuotationsFromExcel(
               await tx
                 .update(quotations)
                 .set({
-                  quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
+                  quoteDate: parseResult.data?.info?.quoteDate
+                    ? new Date(parseResult.data.info.quoteDate)
+                    : null,
                   updateDate: new Date(),
                   updatedAt: new Date(),
                 })
@@ -313,22 +360,26 @@ export async function importQuotationsFromExcel(
 
               // For negotiation status, we'll update negotiated_price instead of replacing items
               // This will be handled in the item processing loop below
-            } else if (existingQuotation.status === 'draft') {
+            } else if (existingQuotation.status === "pending") {
               if (!overwrite) {
-                throw new Error(`Báo giá đã tồn tại cho NCC ${supplier.supplierCode} trong kỳ ${period} tại ${region}. Vui lòng chọn "Ghi đè" để cập nhật.`);
+                throw new Error(
+                  `Báo giá đã tồn tại cho NCC ${supplier.supplierCode} trong kỳ ${period} tại ${region}. Vui lòng chọn "Ghi đè" để cập nhật.`
+                );
               }
 
-              // Update existing draft quotation (standard overwrite)
+              // Update existing pending quotation (standard overwrite)
               await tx
                 .update(quotations)
                 .set({
-                  quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
+                  quoteDate: parseResult.data?.info?.quoteDate
+                    ? new Date(parseResult.data.info.quoteDate)
+                    : null,
                   updateDate: new Date(),
                   updatedAt: new Date(),
                 })
                 .where(eq(quotations.id, existingQuotation.id));
 
-              // Delete existing quote items for draft quotations
+              // Delete existing quote items for pending quotations
               await tx
                 .delete(quoteItems)
                 .where(eq(quoteItems.quotationId, existingQuotation.id));
@@ -337,7 +388,9 @@ export async function importQuotationsFromExcel(
               isUpdate = true;
             } else {
               // Cannot update quotations in 'approved', 'rejected', etc. status
-              throw new Error(`Không thể cập nhật báo giá ở trạng thái '${existingQuotation.status}'. Chỉ có thể cập nhật báo giá ở trạng thái 'draft' hoặc 'negotiation'.`);
+              throw new Error(
+                `Không thể cập nhật báo giá ở trạng thái '${existingQuotation.status}'. Chỉ có thể cập nhật báo giá ở trạng thái 'pending' hoặc 'negotiation'.`
+              );
             }
           } else {
             // Create new quotation
@@ -348,9 +401,13 @@ export async function importQuotationsFromExcel(
                 period,
                 supplierId: supplier.id,
                 region,
-                category: parseResult.data?.items?.[0]?.productCode?.substring(0, 2) || 'GEN', // Simple category logic
-                quoteDate: parseResult.data?.info?.quoteDate ? new Date(parseResult.data.info.quoteDate) : null,
-                status: 'pending',
+                category:
+                  parseResult.data?.items?.[0]?.productCode?.substring(0, 2) ||
+                  "GEN", // Simple category logic
+                quoteDate: parseResult.data?.info?.quoteDate
+                  ? new Date(parseResult.data.info.quoteDate)
+                  : null,
+                status: "pending",
                 createdBy: user.id,
               })
               .returning({ id: quotations.id });
@@ -360,26 +417,28 @@ export async function importQuotationsFromExcel(
 
           // Create product code to ID mapping with normalization
           const productMap = new Map();
-          existingProducts.forEach(p => {
+          existingProducts.forEach((p) => {
             if (p.productCode) {
               productMap.set(p.productCode.trim().toUpperCase(), p.id);
             }
           });
 
           // Handle item processing based on quotation status
-          if (existingQuotation && existingQuotation.status === 'negotiation') {
+          if (existingQuotation && existingQuotation.status === "negotiation") {
             // Update negotiated prices for existing items
             let updatedItemsCount = 0;
             for (const item of parseResult.data?.items || []) {
               if (!item?.productCode) {
-                throw new Error('Invalid item data: missing productCode');
+                throw new Error("Invalid item data: missing productCode");
               }
 
               const normalizedCode = item.productCode.trim().toUpperCase();
               const productId = productMap.get(normalizedCode);
 
               if (!productId) {
-                throw new Error(`Product mapping failed for code: ${item.productCode}`);
+                throw new Error(
+                  `Product mapping failed for code: ${item.productCode}`
+                );
               }
 
               // Update negotiated price for existing quote item
@@ -403,20 +462,24 @@ export async function importQuotationsFromExcel(
             }
 
             result.totalItems += updatedItemsCount;
-            console.log(`Updated negotiated prices for ${updatedItemsCount} items in quotation ${quotationId}`);
+            console.log(
+              `Updated negotiated prices for ${updatedItemsCount} items in quotation ${quotationId}`
+            );
           } else {
-            // Insert new quote items (for new quotations or draft updates)
+            // Insert new quote items (for new quotations or pending updates)
             const quoteItemsData = [];
             for (const item of parseResult.data?.items || []) {
               if (!item?.productCode) {
-                throw new Error('Invalid item data: missing productCode');
+                throw new Error("Invalid item data: missing productCode");
               }
 
               const normalizedCode = item.productCode.trim().toUpperCase();
               const productId = productMap.get(normalizedCode);
 
               if (!productId) {
-                throw new Error(`Product mapping failed for code: ${item.productCode}`);
+                throw new Error(
+                  `Product mapping failed for code: ${item.productCode}`
+                );
               }
 
               quoteItemsData.push({
@@ -425,7 +488,7 @@ export async function importQuotationsFromExcel(
                 quantity: item.quantity ?? 1,
                 initialPrice: item.initialPrice ?? 0,
                 vatPercentage: item.vatRate ?? 0,
-                currency: 'VND',
+                currency: "VND",
                 notes: item.notes || null,
               });
             }
@@ -447,21 +510,27 @@ export async function importQuotationsFromExcel(
 
         // Add any warnings from parsing
         if (parseResult.warnings.length > 0) {
-          result.warnings.push(`File ${file.name}: ${parseResult.warnings.map(w => w.message).join(', ')}`);
+          result.warnings.push(
+            `File ${file.name}: ${parseResult.warnings
+              .map((w) => w.message)
+              .join(", ")}`
+          );
         }
-
       } catch (error) {
-        result.errors.push(`File ${file.name}: ${error instanceof Error ? error.message : 'Lỗi không xác định'}`);
+        result.errors.push(
+          `File ${file.name}: ${
+            error instanceof Error ? error.message : "Lỗi không xác định"
+          }`
+        );
       }
     }
 
     result.success = result.processedFiles > 0 && result.errors.length === 0;
 
     // Revalidate the quotations page
-    revalidatePath('/bao-gia');
+    revalidatePath("/bao-gia");
 
     return result;
-
   } catch (error) {
     console.error("Error in importQuotationsFromExcel:", error);
     throw new Error(
@@ -475,7 +544,9 @@ export async function importQuotationsFromExcel(
  * This function only fetches raw data - NO data transformation or type conversion
  * All presentation logic is handled by the client component
  */
-export async function getQuotationDetails(id: number): Promise<QuotationDetailsWithItems | { error: string }> {
+export async function getQuotationDetails(
+  id: number
+): Promise<QuotationDetailsWithItems | { error: string }> {
   try {
     // Authorization check
     await checkProcurementRole();
@@ -504,9 +575,16 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
           status: suppliers.status,
         },
         creator: {
-          id: sql<number>`COALESCE(${quotations.createdBy}, 0)`.as('creator_id'),
-          name: sql<string>`COALESCE((SELECT name FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as('creator_name'),
-          email: sql<string>`COALESCE((SELECT email FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as('creator_email'),
+          id: sql<number>`COALESCE(${quotations.createdBy}, 0)`.as(
+            "creator_id"
+          ),
+          name: sql<string>`COALESCE((SELECT name FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as(
+            "creator_name"
+          ),
+          email:
+            sql<string>`COALESCE((SELECT email FROM users WHERE id = ${quotations.createdBy}), 'N/A')`.as(
+              "creator_email"
+            ),
         },
       })
       .from(quotations)
@@ -559,11 +637,11 @@ export async function getQuotationDetails(id: number): Promise<QuotationDetailsW
       ...quotation,
       items,
     } as QuotationDetailsWithItems;
-
   } catch (error) {
     console.error("Error in getQuotationDetails:", error);
     return {
-      error: error instanceof Error ? error.message : "Lỗi khi tải chi tiết báo giá"
+      error:
+        error instanceof Error ? error.message : "Lỗi khi tải chi tiết báo giá",
     };
   }
 }
@@ -594,8 +672,10 @@ export async function updateQuotationStatus(
     }
 
     // Validate status transition
-    if (currentQuotation.status === 'approved' && status !== 'cancelled') {
-      throw new Error("Không thể thay đổi trạng thái của báo giá đã được duyệt");
+    if (currentQuotation.status === "approved" && status !== "cancelled") {
+      throw new Error(
+        "Không thể thay đổi trạng thái của báo giá đã được duyệt"
+      );
     }
 
     // Update quotation status
@@ -609,7 +689,7 @@ export async function updateQuotationStatus(
       .where(eq(quotations.id, id));
 
     // If status is being set to approved, log to price history
-    if (status === 'approved') {
+    if (status === "approved") {
       // Get all quote items for this quotation
       const items = await db
         .select()
@@ -618,13 +698,13 @@ export async function updateQuotationStatus(
 
       // Log approved prices to price history
       const priceHistoryData = items
-        .filter(item => item.approvedPrice !== null)
-        .map(item => ({
+        .filter((item) => item.approvedPrice !== null)
+        .map((item) => ({
           productId: item.productId,
           supplierId: currentQuotation.supplierId,
           period: currentQuotation.period,
           price: item.approvedPrice!,
-          priceType: 'approved' as const,
+          priceType: "approved" as const,
           region: currentQuotation.region,
         }));
 
@@ -634,15 +714,16 @@ export async function updateQuotationStatus(
     }
 
     // Revalidate relevant pages
-    revalidatePath('/bao-gia');
-    revalidatePath('/so-sanh');
+    revalidatePath("/bao-gia");
+    revalidatePath("/so-sanh");
 
     return { success: "Cập nhật trạng thái báo giá thành công" };
-
   } catch (error) {
     console.error("Error in updateQuotationStatus:", error);
     throw new Error(
-      error instanceof Error ? error.message : "Lỗi khi cập nhật trạng thái báo giá"
+      error instanceof Error
+        ? error.message
+        : "Lỗi khi cập nhật trạng thái báo giá"
     );
   }
 }
@@ -650,8 +731,10 @@ export async function updateQuotationStatus(
 /**
  * Cancel quotation (convenience function)
  */
-export async function cancelQuotation(id: number): Promise<{ success: string }> {
-  return updateQuotationStatus({ id, status: 'cancelled' });
+export async function cancelQuotation(
+  id: number
+): Promise<{ success: string }> {
+  return updateQuotationStatus({ id, status: "cancelled" });
 }
 
 // ==================== UTILITY FUNCTIONS ====================
@@ -669,8 +752,9 @@ export async function getAvailableRegions(): Promise<string[]> {
       .where(sql`${teams.region} IS NOT NULL AND ${teams.region} != ''`)
       .orderBy(teams.region);
 
-    return regions.map(r => r.region).filter((region): region is string => Boolean(region));
-
+    return regions
+      .map((r) => r.region)
+      .filter((region): region is string => Boolean(region));
   } catch (error) {
     console.error("Error in getAvailableRegions:", error);
     throw new Error("Lỗi khi tải danh sách khu vực");
@@ -689,8 +773,7 @@ export async function getAvailablePeriods(): Promise<string[]> {
       .from(quotations)
       .orderBy(desc(quotations.period));
 
-    return periods.map(p => p.period);
-
+    return periods.map((p) => p.period);
   } catch (error) {
     console.error("Error in getAvailablePeriods:", error);
     throw new Error("Lỗi khi tải danh sách kỳ báo giá");
@@ -700,7 +783,9 @@ export async function getAvailablePeriods(): Promise<string[]> {
 /**
  * Get available suppliers for dropdown
  */
-export async function getAvailableSuppliers(): Promise<Array<{ id: number; code: string; name: string }>> {
+export async function getAvailableSuppliers(): Promise<
+  Array<{ id: number; code: string; name: string }>
+> {
   try {
     await checkProcurementRole();
 
@@ -711,11 +796,13 @@ export async function getAvailableSuppliers(): Promise<Array<{ id: number; code:
         name: suppliers.name,
       })
       .from(suppliers)
-      .where(eq(suppliers.status, 'active'))
+      .where(eq(suppliers.status, "active"))
       .orderBy(suppliers.supplierCode);
 
-    return supplierList.filter((supplier): supplier is { id: number; code: string; name: string } => Boolean(supplier.code));
-
+    return supplierList.filter(
+      (supplier): supplier is { id: number; code: string; name: string } =>
+        Boolean(supplier.code)
+    );
   } catch (error) {
     console.error("Error in getAvailableSuppliers:", error);
     throw new Error("Lỗi khi tải danh sách nhà cung cấp");
@@ -764,7 +851,10 @@ export async function getAvailableCategories(): Promise<string[]> {
       .from(products)
       .where(eq(products.status, "active"));
 
-    return categories.map(item => item.category).filter(Boolean).sort();
+    return categories
+      .map((item) => item.category)
+      .filter(Boolean)
+      .sort();
   } catch (error) {
     console.error("Error in getAvailableCategories:", error);
     return [];
