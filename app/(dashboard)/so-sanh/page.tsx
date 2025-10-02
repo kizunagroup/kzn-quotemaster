@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -61,6 +62,8 @@ import { toast } from "sonner";
 import { formatNumber, formatPercentage } from "@/lib/utils";
 
 export default function ComparisonPage() {
+  const searchParams = useSearchParams();
+
   // Filter states
   const [period, setPeriod] = useState<string>("");
   const [region, setRegion] = useState<string>("");
@@ -95,8 +98,12 @@ export default function ComparisonPage() {
   const [isDetailsVisible, setIsDetailsVisible] = useState(false);
 
   // Quick View filter state for details matrix
-  type QuickViewFilter = 'all' | 'price_increase' | 'price_decrease' | 'no_quotes';
-  const [activeFilter, setActiveFilter] = useState<QuickViewFilter>('all');
+  type QuickViewFilter =
+    | "all"
+    | "price_increase"
+    | "price_decrease"
+    | "no_quotes";
+  const [activeFilter, setActiveFilter] = useState<QuickViewFilter>("all");
 
   // Helper functions for multi-select categories
   const handleCategoryToggle = (category: string) => {
@@ -114,6 +121,33 @@ export default function ComparisonPage() {
   const handleDeselectAllCategories = () => {
     setCategories([]);
   };
+
+  // Handle URL parameters on component mount
+  useEffect(() => {
+    const urlPeriod = searchParams.get("period");
+    const urlRegion = searchParams.get("region");
+    const urlCategories = searchParams.get("categories");
+
+    // Set all URL parameters at once to avoid race conditions
+    if (urlPeriod) {
+      setPeriod(urlPeriod);
+    }
+    if (urlRegion) {
+      setRegion(urlRegion);
+    }
+    if (urlCategories) {
+      try {
+        const parsedCategories = JSON.parse(urlCategories);
+        if (Array.isArray(parsedCategories)) {
+          setCategories(parsedCategories);
+        }
+      } catch (err) {
+        console.error("Error parsing categories from URL:", err);
+        // Fallback to empty array, will be set to all available categories later
+        setCategories([]);
+      }
+    }
+  }, [searchParams]);
 
   // Fetch periods on component mount
   useEffect(() => {
@@ -152,8 +186,12 @@ export default function ComparisonPage() {
         const availableRegions = await getRegionsForPeriod(period);
         setRegions(availableRegions);
 
-        // Clear region selection if current region is not available
-        if (region && !availableRegions.includes(region)) {
+        // Check if we have a region from URL parameters
+        const urlRegion = searchParams.get("region");
+        if (urlRegion && availableRegions.includes(urlRegion)) {
+          setRegion(urlRegion);
+        } else if (region && !availableRegions.includes(region)) {
+          // Clear region selection if current region is not available
           setRegion("");
         }
       } catch (err) {
@@ -167,7 +205,7 @@ export default function ComparisonPage() {
     }
 
     fetchRegions();
-  }, [period]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [period, searchParams]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch categories when period or region changes (cascading filter)
   useEffect(() => {
@@ -188,8 +226,33 @@ export default function ComparisonPage() {
         );
         setAvailableCategories(fetchedCategories);
 
-        // Default to All: Select all categories by default
-        setCategories(fetchedCategories);
+        // Check if we have categories from URL parameters
+        const urlCategories = searchParams.get("categories");
+        if (urlCategories) {
+          try {
+            const parsedCategories = JSON.parse(urlCategories);
+            if (Array.isArray(parsedCategories)) {
+              // Filter categories to only include those available for this period/region
+              const validCategories = parsedCategories.filter((cat: string) =>
+                fetchedCategories.includes(cat)
+              );
+              setCategories(
+                validCategories.length > 0 ? validCategories : fetchedCategories
+              );
+            } else {
+              setCategories(fetchedCategories);
+            }
+          } catch (err) {
+            console.error(
+              "Error parsing categories from URL in fetchCategories:",
+              err
+            );
+            setCategories(fetchedCategories);
+          }
+        } else {
+          // Default to All: Select all categories by default
+          setCategories(fetchedCategories);
+        }
       } catch (err) {
         console.error("Error fetching categories for period and region:", err);
         setFiltersError(
@@ -206,7 +269,7 @@ export default function ComparisonPage() {
   }, [period, region]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Handle comparison action
-  const handleCompareClick = async () => {
+  const handleCompareClick = useCallback(async () => {
     if (!period || !region || categories.length === 0) {
       setComparisonError("Vui lòng chọn đầy đủ các tiêu chí lọc");
       return;
@@ -235,7 +298,38 @@ export default function ComparisonPage() {
     } finally {
       setComparisonLoading(false);
     }
-  };
+  }, [period, region, categories]);
+
+  // Auto-trigger comparison when all filters are set from URL parameters
+  useEffect(() => {
+    const urlPeriod = searchParams.get("period");
+    const urlRegion = searchParams.get("region");
+    const urlCategories = searchParams.get("categories");
+
+    // Only auto-trigger if all URL parameters are present and we have the data loaded
+    if (
+      urlPeriod &&
+      urlRegion &&
+      urlCategories &&
+      period === urlPeriod &&
+      region === urlRegion &&
+      categories.length > 0 &&
+      !comparisonLoading &&
+      !matrixData &&
+      availableCategories.length > 0
+    ) {
+      handleCompareClick();
+    }
+  }, [
+    period,
+    region,
+    categories,
+    searchParams,
+    comparisonLoading,
+    matrixData,
+    availableCategories,
+    handleCompareClick,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if compare button should be enabled
   const isCompareEnabled =
@@ -582,143 +676,238 @@ export default function ComparisonPage() {
           ) : matrixData ? (
             <div className="space-y-4">
               {/* New Grouped Overview: Region > Category > Supplier Performance */}
-              {matrixData.groupedOverview && matrixData.groupedOverview.regions.length > 0 ? (
+              {matrixData.groupedOverview &&
+              matrixData.groupedOverview.regions.length > 0 ? (
                 <div className="space-y-4">
                   {matrixData.groupedOverview.regions.map((regionData) => (
                     <div key={regionData.region} className="space-y-3">
-                      {regionData.categories.map((categoryData, categoryIndex) => (
-                        <div key={`${regionData.region}-${categoryData.category}`}>
-                          <Accordion type="single" collapsible defaultValue={categoryData.category}>
-                            <AccordionItem value={categoryData.category} className="border-none">
-                              <AccordionTrigger className="text-left hover:no-underline py-3">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-base">
-                                    {regionData.region} - {categoryData.category}
-                                  </span>
-                                  <Badge variant="outline" className="text-xs">
-                                    {categoryData.supplierPerformances.length} NCC
-                                  </Badge>
-                                </div>
-                              </AccordionTrigger>
-                            <AccordionContent>
-                              <div className="rounded-md border overflow-x-auto">
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead className="min-w-[180px]">Nhà cung cấp</TableHead>
-                                      <TableHead className="text-center min-w-[60px]">SP</TableHead>
-                                      <TableHead className="text-right min-w-[120px]">Giá trị cơ sở</TableHead>
-                                      <TableHead className="text-right min-w-[120px]">Giá trị kỳ trước</TableHead>
-                                      <TableHead className="text-right min-w-[120px]">Giá trị báo giá</TableHead>
-                                      <TableHead className="text-right min-w-[140px]">Giá trị hiện tại</TableHead>
-                                      <TableHead className="text-center min-w-[120px]">So với cơ sở</TableHead>
-                                      <TableHead className="text-center min-w-[120px]">So với kỳ trước</TableHead>
-                                      <TableHead className="text-center min-w-[120px]">So với báo giá</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {categoryData.supplierPerformances.map((supplier) => {
-                                      // Light background color for "Giá trị hiện tại" based on quotation status
-                                      const getCurrentValueBgColor = () => {
-                                        if (supplier.quotationStatus === 'approved') {
-                                          return "bg-green-50";
-                                        }
-                                        if (supplier.quotationStatus === 'negotiation') {
-                                          return "bg-orange-50";
-                                        }
-                                        return "";
-                                      };
-
-                                      // Helper to render variance cell - always show color and icon
-                                      const renderVarianceCell = (variance: { difference: number; percentage: number } | null) => {
-                                        if (!variance) {
-                                          return <span className="text-gray-400 text-sm">-</span>;
-                                        }
-
-                                        const isIncrease = variance.percentage > 0;
-                                        const isDecrease = variance.percentage < 0;
-
-                                        return (
-                                          <div className="flex flex-col items-end gap-1">
-                                            <div className="flex items-center gap-1">
-                                              {isIncrease && (
-                                                <TrendingUp className="h-3 w-3 text-red-600" />
-                                              )}
-                                              {isDecrease && (
-                                                <TrendingDown className="h-3 w-3 text-green-600" />
-                                              )}
-                                              <span
-                                                className={
-                                                  isIncrease
-                                                    ? "text-red-600 font-medium"
-                                                    : isDecrease
-                                                    ? "text-green-600 font-medium"
-                                                    : "text-gray-600"
-                                                }
-                                              >
-                                                {variance.difference > 0 ? "+" : ""}
-                                                {formatNumber(variance.difference)}
-                                              </span>
-                                            </div>
-                                            <span
-                                              className={`text-xs ${
-                                                isIncrease
-                                                  ? "text-red-600"
-                                                  : isDecrease
-                                                  ? "text-green-600"
-                                                  : "text-gray-600"
-                                              }`}
-                                            >
-                                              ({variance.percentage > 0 ? "+" : ""}
-                                              {formatPercentage(variance.percentage)})
-                                            </span>
-                                          </div>
-                                        );
-                                      };
-
-                                      return (
-                                        <TableRow key={supplier.supplierId}>
-                                          <TableCell>
-                                            <div>
-                                              <div className="font-medium">{supplier.supplierCode}</div>
-                                              <div className="text-xs text-muted-foreground">{supplier.supplierName}</div>
-                                            </div>
-                                          </TableCell>
-                                          <TableCell className="text-center font-narrow">{supplier.productCount}</TableCell>
-                                          <TableCell className="text-right font-narrow">{formatNumber(supplier.totalBaseValue)}</TableCell>
-                                          <TableCell className="text-right font-narrow">
-                                            {supplier.totalPreviousValue !== null
-                                              ? formatNumber(supplier.totalPreviousValue)
-                                              : "-"}
-                                          </TableCell>
-                                          <TableCell className="text-right font-narrow">{formatNumber(supplier.totalInitialValue)}</TableCell>
-                                          <TableCell className={`text-right font-narrow ${getCurrentValueBgColor()}`}>
-                                            {formatNumber(supplier.totalCurrentValue)}
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            {renderVarianceCell(supplier.varianceVsBase)}
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            {renderVarianceCell(supplier.varianceVsPrevious)}
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            {renderVarianceCell(supplier.varianceVsInitial)}
-                                          </TableCell>
+                      {regionData.categories.map(
+                        (categoryData, categoryIndex) => (
+                          <div
+                            key={`${regionData.region}-${categoryData.category}`}
+                          >
+                            <Accordion
+                              type="single"
+                              collapsible
+                              defaultValue={categoryData.category}
+                            >
+                              <AccordionItem
+                                value={categoryData.category}
+                                className="border-none"
+                              >
+                                <AccordionTrigger className="text-left hover:no-underline py-3">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-base">
+                                      {regionData.region} -{" "}
+                                      {categoryData.category}
+                                    </span>
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {categoryData.supplierPerformances.length}{" "}
+                                      NCC
+                                    </Badge>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="rounded-md border overflow-x-auto">
+                                    <Table>
+                                      <TableHeader>
+                                        <TableRow>
+                                          <TableHead className="min-w-[180px]">
+                                            Nhà cung cấp
+                                          </TableHead>
+                                          <TableHead className="text-center min-w-[60px]">
+                                            SP
+                                          </TableHead>
+                                          <TableHead className="text-right min-w-[120px]">
+                                            Giá trị cơ sở
+                                          </TableHead>
+                                          <TableHead className="text-right min-w-[120px]">
+                                            Giá trị kỳ trước
+                                          </TableHead>
+                                          <TableHead className="text-right min-w-[120px]">
+                                            Giá trị báo giá
+                                          </TableHead>
+                                          <TableHead className="text-right min-w-[140px]">
+                                            Giá trị hiện tại
+                                          </TableHead>
+                                          <TableHead className="text-center min-w-[120px]">
+                                            So với cơ sở
+                                          </TableHead>
+                                          <TableHead className="text-center min-w-[120px]">
+                                            So với kỳ trước
+                                          </TableHead>
+                                          <TableHead className="text-center min-w-[120px]">
+                                            So với báo giá
+                                          </TableHead>
                                         </TableRow>
-                                      );
-                                    })}
-                                  </TableBody>
-                                </Table>
-                              </div>
-                            </AccordionContent>
-                            </AccordionItem>
-                          </Accordion>
-                          {/* Add separator between groups, but not after the last one */}
-                          {categoryIndex < regionData.categories.length - 1 && (
-                            <Separator className="my-4" />
-                          )}
-                        </div>
-                      ))}
+                                      </TableHeader>
+                                      <TableBody>
+                                        {categoryData.supplierPerformances.map(
+                                          (supplier) => {
+                                            // Light background color for "Giá trị hiện tại" based on quotation status
+                                            const getCurrentValueBgColor =
+                                              () => {
+                                                if (
+                                                  supplier.quotationStatus ===
+                                                  "approved"
+                                                ) {
+                                                  return "bg-green-50";
+                                                }
+                                                if (
+                                                  supplier.quotationStatus ===
+                                                  "negotiation"
+                                                ) {
+                                                  return "bg-orange-50";
+                                                }
+                                                return "";
+                                              };
+
+                                            // Helper to render variance cell - always show color and icon
+                                            const renderVarianceCell = (
+                                              variance: {
+                                                difference: number;
+                                                percentage: number;
+                                              } | null
+                                            ) => {
+                                              if (!variance) {
+                                                return (
+                                                  <span className="text-gray-400 text-sm">
+                                                    -
+                                                  </span>
+                                                );
+                                              }
+
+                                              const isIncrease =
+                                                variance.percentage > 0;
+                                              const isDecrease =
+                                                variance.percentage < 0;
+
+                                              return (
+                                                <div className="flex flex-col items-end gap-1">
+                                                  <div className="flex items-center gap-1">
+                                                    {isIncrease && (
+                                                      <TrendingUp className="h-3 w-3 text-red-600" />
+                                                    )}
+                                                    {isDecrease && (
+                                                      <TrendingDown className="h-3 w-3 text-green-600" />
+                                                    )}
+                                                    <span
+                                                      className={
+                                                        isIncrease
+                                                          ? "text-red-600 font-medium"
+                                                          : isDecrease
+                                                          ? "text-green-600 font-medium"
+                                                          : "text-gray-600"
+                                                      }
+                                                    >
+                                                      {variance.difference > 0
+                                                        ? "+"
+                                                        : ""}
+                                                      {formatNumber(
+                                                        variance.difference
+                                                      )}
+                                                    </span>
+                                                  </div>
+                                                  <span
+                                                    className={`text-xs ${
+                                                      isIncrease
+                                                        ? "text-red-600"
+                                                        : isDecrease
+                                                        ? "text-green-600"
+                                                        : "text-gray-600"
+                                                    }`}
+                                                  >
+                                                    (
+                                                    {variance.percentage > 0
+                                                      ? "+"
+                                                      : ""}
+                                                    {formatPercentage(
+                                                      variance.percentage
+                                                    )}
+                                                    )
+                                                  </span>
+                                                </div>
+                                              );
+                                            };
+
+                                            return (
+                                              <TableRow
+                                                key={supplier.supplierId}
+                                              >
+                                                <TableCell>
+                                                  <div>
+                                                    <div className="font-medium">
+                                                      {supplier.supplierCode}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                      {supplier.supplierName}
+                                                    </div>
+                                                  </div>
+                                                </TableCell>
+                                                <TableCell className="text-center font-narrow">
+                                                  {supplier.productCount}
+                                                </TableCell>
+                                                <TableCell className="text-right font-narrow">
+                                                  {formatNumber(
+                                                    supplier.totalBaseValue
+                                                  )}
+                                                </TableCell>
+                                                <TableCell className="text-right font-narrow">
+                                                  {supplier.totalPreviousValue !==
+                                                  null
+                                                    ? formatNumber(
+                                                        supplier.totalPreviousValue
+                                                      )
+                                                    : "-"}
+                                                </TableCell>
+                                                <TableCell className="text-right font-narrow">
+                                                  {formatNumber(
+                                                    supplier.totalInitialValue
+                                                  )}
+                                                </TableCell>
+                                                <TableCell
+                                                  className={`text-right font-narrow ${getCurrentValueBgColor()}`}
+                                                >
+                                                  {formatNumber(
+                                                    supplier.totalCurrentValue
+                                                  )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                  {renderVarianceCell(
+                                                    supplier.varianceVsBase
+                                                  )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                  {renderVarianceCell(
+                                                    supplier.varianceVsPrevious
+                                                  )}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                  {renderVarianceCell(
+                                                    supplier.varianceVsInitial
+                                                  )}
+                                                </TableCell>
+                                              </TableRow>
+                                            );
+                                          }
+                                        )}
+                                      </TableBody>
+                                    </Table>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            </Accordion>
+                            {/* Add separator between groups, but not after the last one */}
+                            {categoryIndex <
+                              regionData.categories.length - 1 && (
+                              <Separator className="my-4" />
+                            )}
+                          </div>
+                        )
+                      )}
                     </div>
                   ))}
                 </div>
@@ -757,16 +946,18 @@ export default function ComparisonPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setActiveFilter('all')}
-                  className={activeFilter === 'all' ? 'bg-muted' : ''}
+                  onClick={() => setActiveFilter("all")}
+                  className={activeFilter === "all" ? "bg-muted" : ""}
                 >
                   Tất cả
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setActiveFilter('price_increase')}
-                  className={`flex items-center gap-1 ${activeFilter === 'price_increase' ? 'bg-muted' : ''}`}
+                  onClick={() => setActiveFilter("price_increase")}
+                  className={`flex items-center gap-1 ${
+                    activeFilter === "price_increase" ? "bg-muted" : ""
+                  }`}
                 >
                   <TrendingUp className="h-4 w-4 text-red-600" />
                   <span className="text-red-600">Tăng giá</span>
@@ -774,8 +965,10 @@ export default function ComparisonPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setActiveFilter('price_decrease')}
-                  className={`flex items-center gap-1 ${activeFilter === 'price_decrease' ? 'bg-muted' : ''}`}
+                  onClick={() => setActiveFilter("price_decrease")}
+                  className={`flex items-center gap-1 ${
+                    activeFilter === "price_decrease" ? "bg-muted" : ""
+                  }`}
                 >
                   <TrendingDown className="h-4 w-4 text-green-600" />
                   <span className="text-green-600">Giảm giá</span>
@@ -783,8 +976,10 @@ export default function ComparisonPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setActiveFilter('no_quotes')}
-                  className={`flex items-center gap-1 ${activeFilter === 'no_quotes' ? 'bg-muted' : ''}`}
+                  onClick={() => setActiveFilter("no_quotes")}
+                  className={`flex items-center gap-1 ${
+                    activeFilter === "no_quotes" ? "bg-muted" : ""
+                  }`}
                 >
                   <AlertTriangle className="h-4 w-4" />
                   Chưa báo giá
@@ -808,7 +1003,10 @@ export default function ComparisonPage() {
                 </div>
               </div>
             ) : matrixData ? (
-              <ComparisonMatrix matrixData={matrixData} activeFilter={activeFilter} />
+              <ComparisonMatrix
+                matrixData={matrixData}
+                activeFilter={activeFilter}
+              />
             ) : (
               <div className="text-center text-gray-500 space-y-2">
                 <p className="text-lg">

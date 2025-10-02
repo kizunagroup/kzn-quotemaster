@@ -49,7 +49,11 @@ import {
 import { type PermissionSet } from "@/lib/auth/permissions";
 import { ImportExcelModal } from "./import-excel-modal";
 import { QuoteDetailsModal } from "./quote-details-modal";
-import { QuotationsTableToolbar, getStatusLabel, getStatusClassName } from "./quotations-table-toolbar";
+import {
+  QuotationsTableToolbar,
+  getStatusLabel,
+  getStatusClassName,
+} from "./quotations-table-toolbar";
 
 // Status helpers are now imported from the toolbar for consistency
 
@@ -66,9 +70,7 @@ const createColumns = (
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Kỳ báo giá" />
     ),
-    cell: ({ row }) => (
-      <div className="text-sm">{row.getValue("period")}</div>
-    ),
+    cell: ({ row }) => <div className="text-sm">{row.getValue("period")}</div>,
   },
   {
     accessorKey: "region",
@@ -97,7 +99,10 @@ const createColumns = (
       <DataTableColumnHeader column={column} title="Tên NCC" />
     ),
     cell: ({ row }) => (
-      <div className="max-w-[200px] truncate" title={row.getValue("supplierName") as string}>
+      <div
+        className="max-w-[200px] truncate"
+        title={row.getValue("supplierName") as string}
+      >
         {row.getValue("supplierName")}
       </div>
     ),
@@ -114,7 +119,11 @@ const createColumns = (
       return (
         <div className="flex flex-wrap gap-1 max-w-[150px]">
           {categories.slice(0, 2).map((category, index) => (
-            <Badge key={index} variant="outline" className="text-xs font-medium">
+            <Badge
+              key={index}
+              variant="outline"
+              className="text-xs font-medium"
+            >
               {category}
             </Badge>
           ))}
@@ -171,7 +180,14 @@ const createColumns = (
     enableHiding: false,
     cell: ({ row }) => {
       const quotation = row.original;
-      return <QuotationActions quotation={quotation} permissions={permissions} onViewDetails={onViewDetails} onRefresh={onRefresh} />;
+      return (
+        <QuotationActions
+          quotation={quotation}
+          permissions={permissions}
+          onViewDetails={onViewDetails}
+          onRefresh={onRefresh}
+        />
+      );
     },
   },
 ];
@@ -181,7 +197,7 @@ function QuotationActions({
   quotation,
   permissions,
   onViewDetails,
-  onRefresh
+  onRefresh,
 }: {
   quotation: Quotation;
   permissions: PermissionSet | null;
@@ -199,6 +215,7 @@ function QuotationActions({
     const params = new URLSearchParams({
       period: quotation.period,
       region: quotation.region,
+      categories: JSON.stringify(quotation.categories),
     });
     router.push(`/so-sanh?${params.toString()}`);
   };
@@ -218,8 +235,9 @@ function QuotationActions({
 
   // Permission checks
   const canViewDetails = permissions?.canViewQuotes ?? false;
-  const canCancel = (permissions?.canApproveQuotes ?? false) &&
-                   (quotation.status === "pending" || quotation.status === "negotiation");
+  const canCancel =
+    (permissions?.canApproveQuotes ?? false) &&
+    (quotation.status === "pending" || quotation.status === "negotiation");
 
   return (
     <>
@@ -246,7 +264,10 @@ function QuotationActions({
           )}
           {canViewDetails && canCancel && <DropdownMenuSeparator />}
           {canCancel && (
-            <DropdownMenuItem onClick={handleCancel} className="text-destructive">
+            <DropdownMenuItem
+              onClick={handleCancel}
+              className="text-destructive"
+            >
               <X className="mr-2 h-4 w-4" />
               Hủy báo giá
             </DropdownMenuItem>
@@ -257,13 +278,18 @@ function QuotationActions({
   );
 }
 
-
 // Main data table component (refactored to match Products pattern)
 export function QuotationsDataTable() {
-  const [permissions, setPermissions] = React.useState<PermissionSet | null>(null);
+  const [permissions, setPermissions] = React.useState<PermissionSet | null>(
+    null
+  );
   const [availablePeriods, setAvailablePeriods] = React.useState<string[]>([]);
-  const [availableSuppliers, setAvailableSuppliers] = React.useState<Array<{ id: number; code: string; name: string }>>([]);
-  const [availableCategories, setAvailableCategories] = React.useState<string[]>([]);
+  const [availableSuppliers, setAvailableSuppliers] = React.useState<
+    Array<{ id: number; code: string; name: string }>
+  >([]);
+  const [availableCategories, setAvailableCategories] = React.useState<
+    string[]
+  >([]);
 
   // Use the new useQuotations hook (following Products pattern)
   const {
@@ -286,7 +312,8 @@ export function QuotationsDataTable() {
   // Modal states - CENTRALIZED STATE MANAGEMENT like Suppliers
   const [showImportModal, setShowImportModal] = React.useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = React.useState(false);
-  const [selectedQuotation, setSelectedQuotation] = React.useState<Quotation | null>(null);
+  const [selectedQuotation, setSelectedQuotation] =
+    React.useState<Quotation | null>(null);
 
   // Convert our URL sort state to TanStack Table sorting format (matching Products pattern)
   const sorting: SortingState = React.useMemo(() => {
@@ -317,12 +344,13 @@ export function QuotationsDataTable() {
   React.useEffect(() => {
     const fetchHelperData = async () => {
       try {
-        const [periods, suppliers, categories, permissionsResult] = await Promise.all([
-          getAvailablePeriods(),
-          getAvailableSuppliers(),
-          getAvailableCategories(),
-          getCurrentUserPermissions(),
-        ]);
+        const [periods, suppliers, categories, permissionsResult] =
+          await Promise.all([
+            getAvailablePeriods(),
+            getAvailableSuppliers(),
+            getAvailableCategories(),
+            getCurrentUserPermissions(),
+          ]);
         setAvailablePeriods(periods);
         setAvailableSuppliers(suppliers);
         setAvailableCategories(categories);
@@ -403,7 +431,8 @@ export function QuotationsDataTable() {
   };
 
   // Table configuration - matching Products pattern
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
   const columns = React.useMemo(
@@ -438,9 +467,12 @@ export function QuotationsDataTable() {
     return (
       <div className="flex h-[450px] shrink-0 items-center justify-center rounded-md border border-dashed">
         <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-          <h3 className="mt-4 text-lg font-semibold">Không có quyền truy cập</h3>
+          <h3 className="mt-4 text-lg font-semibold">
+            Không có quyền truy cập
+          </h3>
           <p className="mb-4 mt-2 text-sm text-muted-foreground">
-            Bạn không có quyền xem báo giá. Vui lòng liên hệ quản trị viên để được cấp quyền.
+            Bạn không có quyền xem báo giá. Vui lòng liên hệ quản trị viên để
+            được cấp quyền.
           </p>
         </div>
       </div>
