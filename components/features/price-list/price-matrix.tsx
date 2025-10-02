@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -15,9 +15,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { PriceBadge } from "@/components/ui/price-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
+import { cn, formatNumber } from "@/lib/utils";
 import type { PriceListMatrixData } from "@/lib/types/price-list.types";
 
 export interface PriceMatrixProps {
@@ -28,8 +30,17 @@ export interface PriceMatrixProps {
  * Price Matrix Component
  * Displays price list data grouped by product category
  * with dynamic supplier columns and best price highlighting
+ *
+ * Features:
+ * - VAT toggle (show/hide VAT %)
+ * - Expand/collapse all categories
+ * - Unified typography and terminology
  */
 export function PriceMatrix({ priceListData }: PriceMatrixProps) {
+  // State for VAT toggle and accordion expansion
+  const [showVAT, setShowVAT] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
+
   // Group products by category
   const productsByCategory = useMemo(() => {
     const grouped = new Map<string, typeof priceListData.products>();
@@ -51,11 +62,33 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
     return [...priceListData.suppliers].sort((a, b) => a.code.localeCompare(b.code));
   }, [priceListData.suppliers]);
 
+  // Helper function to get best price styling
+  const getPriceStyle = (isBestPrice: boolean) => {
+    if (isBestPrice) {
+      return "bg-green-100 text-green-800 border border-green-200 font-medium shadow-sm";
+    }
+    return "bg-gray-50 text-gray-700 border border-gray-200";
+  };
+
+  // Toggle all categories
+  const toggleAllCategories = () => {
+    if (expandedCategories.length > 0) {
+      setExpandedCategories([]);
+    } else {
+      setExpandedCategories(Array.from(productsByCategory.keys()));
+    }
+  };
+
   if (priceListData.products.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-12">
-          <p className="text-muted-foreground">Không có sản phẩm nào trong bảng giá này</p>
+          <div className="text-center">
+            <p className="text-muted-foreground">Không có hàng hóa nào trong bảng giá này</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Vui lòng kiểm tra lại kỳ báo giá hoặc bếp đã chọn.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -63,87 +96,121 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
 
   return (
     <div className="space-y-4">
-      {/* Summary Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{priceListData.summary.totalProducts}</div>
-            <p className="text-xs text-muted-foreground">Tổng số sản phẩm</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{priceListData.summary.totalSuppliers}</div>
-            <p className="text-xs text-muted-foreground">Nhà cung cấp</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">{priceListData.summary.quotedProducts}</div>
-            <p className="text-xs text-muted-foreground">Sản phẩm có báo giá</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-2xl font-bold">
-              {priceListData.summary.averageCoverage.toFixed(1)}%
-            </div>
-            <p className="text-xs text-muted-foreground">Độ phủ trung bình</p>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Price Matrix Table with Category Accordion */}
       <Card>
         <CardContent className="pt-6">
-          <Accordion type="multiple" className="w-full" defaultValue={Array.from(productsByCategory.keys())}>
+          {/* Action Bar - VAT Toggle & Expand/Collapse */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              {/* VAT Toggle Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowVAT(!showVAT)}
+              >
+                {showVAT ? (
+                  <>
+                    <EyeOff className="h-4 w-4 mr-2" />
+                    Ẩn VAT
+                  </>
+                ) : (
+                  <>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Hiện VAT
+                  </>
+                )}
+              </Button>
+
+              {/* Expand/Collapse All Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleAllCategories}
+              >
+                {expandedCategories.length > 0 ? (
+                  <>
+                    <ChevronUp className="h-4 w-4 mr-2" />
+                    Thu gọn tất cả
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    Mở rộng tất cả
+                  </>
+                )}
+              </Button>
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+              Hiển thị giá {showVAT ? "đã" : "chưa"} bao gồm VAT
+            </div>
+          </div>
+
+          {/* Category Accordion */}
+          <Accordion
+            type="multiple"
+            value={expandedCategories}
+            onValueChange={setExpandedCategories}
+            className="w-full"
+          >
             {Array.from(productsByCategory.entries()).map(([category, products]) => (
               <AccordionItem key={category} value={category}>
                 <AccordionTrigger className="hover:no-underline">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold">{category}</span>
-                    <Badge variant="secondary">{products.length} sản phẩm</Badge>
+                    <Badge variant="secondary">{products.length} hàng hóa</Badge>
                   </div>
                 </AccordionTrigger>
                 <AccordionContent>
-                  <div className="rounded-md border">
+                  <div className="rounded-md border overflow-x-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-white z-10">
                         <TableRow>
-                          <TableHead className="w-[100px]">Mã SP</TableHead>
-                          <TableHead className="min-w-[200px]">Tên sản phẩm</TableHead>
+                          {/* Column 1: Mã hàng hóa */}
+                          <TableHead className="min-w-[100px]">Mã hàng hóa</TableHead>
+
+                          {/* Column 2: Tên hàng hóa */}
+                          <TableHead className="min-w-[200px]">Tên hàng hóa</TableHead>
+
+                          {/* Dynamic supplier columns */}
                           {sortedSuppliers.map((supplier) => (
-                            <TableHead key={supplier.id} className="text-center min-w-[120px]">
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="font-semibold">{supplier.code}</span>
-                                <span className="text-xs text-muted-foreground font-normal">
+                            <TableHead key={supplier.id} className="min-w-[150px] text-right">
+                              <div className="space-y-1">
+                                <div className="font-medium">{supplier.code}</div>
+                                <div className="text-xs text-muted-foreground truncate">
                                   {supplier.name}
-                                </span>
+                                </div>
                               </div>
                             </TableHead>
                           ))}
                         </TableRow>
                       </TableHeader>
+
                       <TableBody>
-                        {products.map((product) => (
-                          <TableRow key={product.productId}>
-                            {/* Product Code */}
-                            <TableCell className="font-mono text-sm">
-                              {product.productCode}
+                        {products.map((product, index) => (
+                          <TableRow
+                            key={product.productId}
+                            className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                          >
+                            {/* Column 1: Product Code with Unit - NO font-mono */}
+                            <TableCell className="text-sm">
+                              <div className="space-y-1">
+                                <div className="font-medium">{product.productCode}</div>
+                                <div className="text-xs text-muted-foreground">
+                                  {product.unit}
+                                </div>
+                              </div>
                             </TableCell>
 
-                            {/* Product Name with Specification and Unit */}
+                            {/* Column 2: Product Name with Specification */}
                             <TableCell>
-                              <div className="flex flex-col">
-                                <span className="font-medium">{product.productName}</span>
+                              <div className="space-y-1">
+                                <div className="font-medium">{product.productName}</div>
                                 {product.specification && (
-                                  <span className="text-xs text-muted-foreground">
+                                  <div className="text-sm text-muted-foreground">
                                     {product.specification}
-                                  </span>
+                                  </div>
                                 )}
-                                <span className="text-xs text-muted-foreground">
-                                  Đơn vị: {product.unit}
-                                </span>
                               </div>
                             </TableCell>
 
@@ -151,25 +218,41 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
                             {sortedSuppliers.map((supplier) => {
                               const supplierPrice = product.suppliers[supplier.id];
 
+                              if (!supplierPrice) {
+                                return (
+                                  <TableCell key={supplier.id} className="text-right">
+                                    <div className="text-gray-400 text-sm py-4">—</div>
+                                  </TableCell>
+                                );
+                              }
+
+                              const isBestPrice = supplierPrice.hasBestPrice;
+
+                              // Toggle between prices based on VAT display
+                              const displayPrice = showVAT
+                                ? supplierPrice.totalPriceWithVAT
+                                : supplierPrice.approvedPrice;
+
                               return (
-                                <TableCell key={supplier.id} className="text-center">
-                                  {supplierPrice ? (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <PriceBadge
-                                        price={supplierPrice.totalPriceWithVAT}
-                                        isBestPrice={supplierPrice.hasBestPrice}
-                                        showBestPriceIcon={true}
-                                        size="sm"
-                                      />
-                                      {supplierPrice.vatRate > 0 && (
-                                        <span className="text-xs text-muted-foreground">
-                                          VAT: {supplierPrice.vatRate}%
-                                        </span>
+                                <TableCell key={supplier.id} className="text-right text-sm font-narrow">
+                                  <div className="space-y-2">
+                                    {/* Price Display with Best Price Highlighting */}
+                                    <div
+                                      className={cn(
+                                        "inline-block px-2 py-1 rounded text-sm font-narrow",
+                                        getPriceStyle(isBestPrice)
                                       )}
+                                    >
+                                      {formatNumber(displayPrice)}
                                     </div>
-                                  ) : (
-                                    <span className="text-xs text-muted-foreground">—</span>
-                                  )}
+
+                                    {/* Conditionally show VAT percentage */}
+                                    {showVAT && supplierPrice.vatRate > 0 && (
+                                      <div className="text-xs text-muted-foreground">
+                                        VAT: {supplierPrice.vatRate}%
+                                      </div>
+                                    )}
+                                  </div>
                                 </TableCell>
                               );
                             })}
@@ -182,36 +265,6 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
               </AccordionItem>
             ))}
           </Accordion>
-        </CardContent>
-      </Card>
-
-      {/* Supplier Coverage Summary */}
-      <Card>
-        <CardContent className="pt-6">
-          <h3 className="text-lg font-semibold mb-4">Chi tiết nhà cung cấp</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {sortedSuppliers.map((supplier) => (
-              <Card key={supplier.id}>
-                <CardContent className="pt-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold">{supplier.code}</span>
-                      <Badge variant="outline">{supplier.coveragePercentage.toFixed(1)}%</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{supplier.name}</p>
-                    <div className="text-xs text-muted-foreground">
-                      <p>
-                        Báo giá: {supplier.quotedProducts}/{supplier.totalProducts} sản phẩm
-                      </p>
-                      {supplier.contactPerson && <p>Liên hệ: {supplier.contactPerson}</p>}
-                      {supplier.phone && <p>SĐT: {supplier.phone}</p>}
-                      {supplier.email && <p>Email: {supplier.email}</p>}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         </CardContent>
       </Card>
     </div>

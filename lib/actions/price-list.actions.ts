@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { db } from "@/lib/db/drizzle";
 import {
   quotations,
@@ -44,17 +45,90 @@ async function checkTeamAccess(teamId: number) {
   return user;
 }
 
+// ==================== USER ACCESSIBLE REGIONS ====================
+
+/**
+ * Get list of regions that the current user can access
+ * Returns unique regions from KITCHEN-type teams based on user's role
+ *
+ * Permission Logic:
+ * - Admin users (department = 'ADMIN'): Can access ALL regions
+ * - Other users: Can only access regions of kitchens they are members of
+ */
+export async function getUserAccessibleRegions(): Promise<string[]> {
+  try {
+    const user = await getUser();
+
+    if (!user) {
+      throw new Error("Unauthorized: Bạn cần đăng nhập để xem danh sách khu vực");
+    }
+
+    console.log("[getUserAccessibleRegions] User ID:", user.id);
+    console.log("[getUserAccessibleRegions] User Department:", user.department);
+
+    const isAdmin = user.department === 'ADMIN';
+    console.log("[getUserAccessibleRegions] Is Admin:", isAdmin);
+
+    let regions;
+
+    if (isAdmin) {
+      // Admin: get all distinct regions from kitchens
+      console.log("[getUserAccessibleRegions] Fetching all regions for admin user");
+      regions = await db
+        .selectDistinct({ region: teams.region })
+        .from(teams)
+        .where(
+          and(
+            eq(teams.teamType, 'KITCHEN'),
+            isNull(teams.deletedAt),
+            sql`${teams.region} IS NOT NULL AND ${teams.region} != ''`
+          )
+        )
+        .orderBy(teams.region);
+    } else {
+      // Regular user: get regions only from their assigned kitchens
+      console.log("[getUserAccessibleRegions] Fetching regions from user's kitchens");
+      regions = await db
+        .selectDistinct({ region: teams.region })
+        .from(teams)
+        .innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
+        .where(
+          and(
+            eq(teamMembers.userId, user.id),
+            eq(teams.teamType, 'KITCHEN'),
+            isNull(teams.deletedAt),
+            sql`${teams.region} IS NOT NULL AND ${teams.region} != ''`
+          )
+        )
+        .orderBy(teams.region);
+    }
+
+    const regionList = regions.map(r => r.region).filter((r): r is string => r !== null && r !== '');
+
+    console.log("[getUserAccessibleRegions] Found regions:", regionList);
+
+    return regionList;
+
+  } catch (error) {
+    console.error("[getUserAccessibleRegions] Error:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Lỗi khi tải danh sách khu vực"
+    );
+  }
+}
+
 // ==================== USER ACCESSIBLE KITCHENS ====================
 
 /**
  * Get list of kitchens that the current user can access
  * Returns KITCHEN-type teams based on user's role and team membership
+ * Optionally filtered by region
  *
  * Permission Logic:
  * - Admin users (department = 'ADMIN'): Can access ALL kitchens
  * - Other users: Can only access kitchens they are a member of
  */
-export async function getUserAccessibleKitchens(): Promise<Array<{
+export async function getUserAccessibleKitchens(region?: string): Promise<Array<{
   id: number;
   name: string;
   kitchenCode: string;
@@ -80,6 +154,19 @@ export async function getUserAccessibleKitchens(): Promise<Array<{
     if (isAdmin) {
       // Admins can access ALL kitchens
       console.log("[getUserAccessibleKitchens] Fetching all kitchens for admin user");
+
+      // Build where conditions
+      const whereConditions = [
+        eq(teams.teamType, 'KITCHEN'),
+        isNull(teams.deletedAt)
+      ];
+
+      // Add region filter if provided
+      if (region) {
+        whereConditions.push(eq(teams.region, region));
+        console.log("[getUserAccessibleKitchens] Filtering by region:", region);
+      }
+
       kitchens = await db
         .select({
           id: teams.id,
@@ -89,16 +176,25 @@ export async function getUserAccessibleKitchens(): Promise<Array<{
           status: teams.status,
         })
         .from(teams)
-        .where(
-          and(
-            eq(teams.teamType, 'KITCHEN'),
-            isNull(teams.deletedAt)
-          )
-        )
+        .where(and(...whereConditions))
         .orderBy(teams.name);
     } else {
       // Non-admin users can only access kitchens they are a member of
       console.log("[getUserAccessibleKitchens] Fetching kitchens where user is a member");
+
+      // Build where conditions
+      const whereConditions = [
+        eq(teamMembers.userId, user.id),
+        eq(teams.teamType, 'KITCHEN'),
+        isNull(teams.deletedAt)
+      ];
+
+      // Add region filter if provided
+      if (region) {
+        whereConditions.push(eq(teams.region, region));
+        console.log("[getUserAccessibleKitchens] Filtering by region:", region);
+      }
+
       kitchens = await db
         .select({
           id: teams.id,
@@ -109,13 +205,7 @@ export async function getUserAccessibleKitchens(): Promise<Array<{
         })
         .from(teams)
         .innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
-        .where(
-          and(
-            eq(teamMembers.userId, user.id),
-            eq(teams.teamType, 'KITCHEN'),
-            isNull(teams.deletedAt)
-          )
-        )
+        .where(and(...whereConditions))
         .orderBy(teams.name);
     }
 

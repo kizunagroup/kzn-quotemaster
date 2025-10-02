@@ -9,9 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, FileDown, Search } from "lucide-react";
 import {
+  getUserAccessibleRegions,
   getUserAccessibleKitchens,
   getAvailablePeriodsForTeam,
   getPriceListMatrix,
@@ -29,8 +30,9 @@ interface Kitchen {
 }
 
 export default function PriceListPage() {
-
-  // State management
+  // State management - Hierarchical filter cascade
+  const [regions, setRegions] = useState<string[]>([]);
+  const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [periods, setPeriods] = useState<PeriodInfo[]>([]);
@@ -38,33 +40,76 @@ export default function PriceListPage() {
   const [priceListData, setPriceListData] = useState<PriceListMatrixData | null>(null);
 
   // Loading states
-  const [loadingKitchens, setLoadingKitchens] = useState(true);
+  const [loadingRegions, setLoadingRegions] = useState(true);
+  const [loadingKitchens, setLoadingKitchens] = useState(false);
   const [loadingPeriods, setLoadingPeriods] = useState(false);
   const [loadingPriceList, setLoadingPriceList] = useState(false);
 
-  // Load user's accessible kitchens on mount
+  // STEP 1: Load user's accessible regions on mount
+  useEffect(() => {
+    async function loadRegions() {
+      try {
+        setLoadingRegions(true);
+        const accessibleRegions = await getUserAccessibleRegions();
+        setRegions(accessibleRegions);
+
+        // Auto-select first region if available
+        if (accessibleRegions.length > 0) {
+          setSelectedRegion(accessibleRegions[0]);
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Không thể tải danh sách khu vực");
+      } finally {
+        setLoadingRegions(false);
+      }
+    }
+
+    loadRegions();
+  }, []);
+
+  // STEP 2: Load kitchens when region changes
   useEffect(() => {
     async function loadKitchens() {
+      if (!selectedRegion) {
+        setKitchens([]);
+        setSelectedTeamId(null);
+        setPeriods([]);
+        setSelectedPeriod("");
+        setPriceListData(null);
+        return;
+      }
+
       try {
         setLoadingKitchens(true);
-        const accessibleKitchens = await getUserAccessibleKitchens();
+        const accessibleKitchens = await getUserAccessibleKitchens(selectedRegion);
         setKitchens(accessibleKitchens);
+
+        // Auto-select first kitchen if available
+        if (accessibleKitchens.length > 0) {
+          setSelectedTeamId(accessibleKitchens[0].id);
+        } else {
+          setSelectedTeamId(null);
+          toast.info(`Không có bếp nào trong khu vực ${selectedRegion}`);
+        }
       } catch (error) {
         toast.error(error instanceof Error ? error.message : "Không thể tải danh sách bếp");
+        setKitchens([]);
+        setSelectedTeamId(null);
       } finally {
         setLoadingKitchens(false);
       }
     }
 
     loadKitchens();
-  }, []);
+  }, [selectedRegion]);
 
-  // Load available periods when kitchen is selected
+  // STEP 3: Load available periods when kitchen changes
   useEffect(() => {
     async function loadPeriods() {
       if (!selectedTeamId) {
         setPeriods([]);
         setSelectedPeriod("");
+        setPriceListData(null);
         return;
       }
 
@@ -95,7 +140,7 @@ export default function PriceListPage() {
   // Handle view price list
   const handleViewPriceList = async () => {
     if (!selectedTeamId || !selectedPeriod) {
-      toast.error("Vui lòng chọn bếp và kỳ báo giá");
+      toast.error("Vui lòng chọn đầy đủ khu vực, bếp và kỳ báo giá");
       return;
     }
 
@@ -120,112 +165,167 @@ export default function PriceListPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Bảng giá Bếp</h1>
-        <p className="text-muted-foreground mt-2">
-          Xem và quản lý bảng giá sản phẩm cho từng bếp theo kỳ báo giá
-        </p>
-      </div>
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <h2 className="text-3xl font-bold tracking-tight">Bảng giá Bếp</h2>
 
       {/* Filter Bar */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Bộ lọc</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Kitchen Select */}
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Bếp</label>
-              <Select
-                value={selectedTeamId?.toString() || ""}
-                onValueChange={(value) => {
-                  setSelectedTeamId(Number(value));
-                  setPriceListData(null); // Clear previous data
-                }}
-                disabled={loadingKitchens}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={loadingKitchens ? "Đang tải..." : "Chọn bếp"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {kitchens.map((kitchen) => (
-                    <SelectItem key={kitchen.id} value={kitchen.id.toString()}>
-                      {kitchen.name} ({kitchen.kitchenCode})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      <div className="bg-white rounded-lg border p-6">
+        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+        {/* Region Select */}
+        <div className="lg:min-w-[200px]">
+          <Select
+            value={selectedRegion}
+            onValueChange={(value) => {
+              setSelectedRegion(value);
+              setPriceListData(null);
+            }}
+            disabled={loadingRegions}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={loadingRegions ? "Đang tải..." : "Khu vực..."} />
+            </SelectTrigger>
+            <SelectContent>
+              {regions.map((region) => (
+                <SelectItem key={region} value={region}>
+                  {region}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            {/* Period Select */}
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Kỳ báo giá</label>
-              <Select
-                value={selectedPeriod}
-                onValueChange={(value) => {
-                  setSelectedPeriod(value);
-                  setPriceListData(null); // Clear previous data
-                }}
-                disabled={!selectedTeamId || loadingPeriods}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      !selectedTeamId
-                        ? "Chọn bếp trước"
-                        : loadingPeriods
-                        ? "Đang tải..."
-                        : "Chọn kỳ báo giá"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {periods.map((period) => (
-                    <SelectItem key={period.period} value={period.period}>
-                      {period.period} ({period.approvedQuotations} báo giá)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Kitchen Select */}
+        <div className="lg:min-w-[240px]">
+          <Select
+            value={selectedTeamId?.toString() || ""}
+            onValueChange={(value) => {
+              setSelectedTeamId(Number(value));
+              setPriceListData(null);
+            }}
+            disabled={!selectedRegion || loadingKitchens}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue
+                placeholder={
+                  !selectedRegion
+                    ? "Bếp (chọn khu vực trước)..."
+                    : loadingKitchens
+                    ? "Đang tải..."
+                    : kitchens.length === 0
+                    ? "Không có bếp"
+                    : "Bếp..."
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {kitchens.map((kitchen) => (
+                <SelectItem key={kitchen.id} value={kitchen.id.toString()}>
+                  {kitchen.name} ({kitchen.kitchenCode})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2 items-end">
-              <Button
-                onClick={handleViewPriceList}
-                disabled={!selectedTeamId || !selectedPeriod || loadingPriceList}
-                className="w-full md:w-auto"
-              >
-                {loadingPriceList ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Đang tải...
-                  </>
-                ) : (
-                  <>
-                    <Search className="mr-2 h-4 w-4" />
-                    Xem
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleExport}
-                disabled={!priceListData}
-                className="w-full md:w-auto"
-              >
-                <FileDown className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        {/* Period Select */}
+        <div className="lg:min-w-[260px]">
+          <Select
+            value={selectedPeriod}
+            onValueChange={(value) => {
+              setSelectedPeriod(value);
+              setPriceListData(null);
+            }}
+            disabled={!selectedTeamId || loadingPeriods}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue
+                placeholder={
+                  !selectedTeamId
+                    ? "Kỳ báo giá (chọn bếp trước)..."
+                    : loadingPeriods
+                    ? "Đang tải..."
+                    : periods.length === 0
+                    ? "Không có kỳ báo giá"
+                    : "Kỳ báo giá..."
+                }
+              />
+            </SelectTrigger>
+            <SelectContent>
+              {periods.map((period) => (
+                <SelectItem key={period.period} value={period.period}>
+                  {period.period} ({period.approvedQuotations} báo giá)
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      {/* Price List Display Area */}
+        {/* Action Buttons */}
+        <div>
+          <Button
+            onClick={handleViewPriceList}
+            disabled={!selectedTeamId || !selectedPeriod || loadingPriceList}
+            className="min-w-[120px] w-full lg:w-auto"
+          >
+            {loadingPriceList ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Đang tải...
+              </>
+            ) : (
+              "Xem"
+            )}
+          </Button>
+        </div>
+
+        <div>
+          <Button variant="outline" onClick={handleExport} disabled={!priceListData} className="w-full lg:w-auto">
+            <FileDown className="mr-2 h-4 w-4" />
+            Export
+          </Button>
+        </div>
+      </div>
+      </div>
+
+      {/* Summary Statistics - Only show when data is loaded */}
+      {priceListData && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold font-narrow">
+                {priceListData.summary.totalProducts}
+              </div>
+              <p className="text-xs text-muted-foreground">Tổng hàng hóa</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold font-narrow">
+                {priceListData.summary.totalSuppliers}
+              </div>
+              <p className="text-xs text-muted-foreground">Nhà cung cấp</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold font-narrow">
+                {priceListData.summary.quotedProducts}
+              </div>
+              <p className="text-xs text-muted-foreground">Hàng hóa có giá</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-2xl font-bold font-narrow">
+                {priceListData.summary.averageCoverage.toFixed(1)}%
+              </div>
+              <p className="text-xs text-muted-foreground">Độ phủ trung bình</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Price Matrix Display - No Header Card */}
       {loadingPriceList ? (
         <Card>
           <CardContent className="flex items-center justify-center py-12">
@@ -236,25 +336,13 @@ export default function PriceListPage() {
           </CardContent>
         </Card>
       ) : priceListData ? (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Bảng giá: {priceListData.teamName} - {priceListData.period}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Khu vực: {priceListData.teamRegion}
-              </p>
-            </CardHeader>
-          </Card>
-          <PriceMatrix priceListData={priceListData} />
-        </div>
+        <PriceMatrix priceListData={priceListData} />
       ) : (
         <Card>
           <CardContent className="flex items-center justify-center py-12">
             <div className="text-center">
               <p className="text-muted-foreground">
-                Chọn bếp và kỳ báo giá để xem bảng giá
+                Chọn khu vực, bếp và kỳ báo giá để xem bảng giá
               </p>
             </div>
           </CardContent>
