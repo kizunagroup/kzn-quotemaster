@@ -211,13 +211,13 @@ function QuotationActions({
   };
 
   const handleCompare = () => {
-    // Navigate to comparison page with pre-filled filters
+    // Navigate to comparison page with pre-filled filters in new tab
     const params = new URLSearchParams({
       period: quotation.period,
       region: quotation.region,
       categories: JSON.stringify(quotation.categories),
     });
-    router.push(`/so-sanh?${params.toString()}`);
+    window.open(`/so-sanh?${params.toString()}`, "_blank");
   };
 
   const handleCancel = async () => {
