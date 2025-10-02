@@ -3,8 +3,8 @@
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { db } from '@/lib/db/drizzle';
-import { suppliers } from '@/lib/db/schema';
-import { eq, and, ilike, isNull, sql } from 'drizzle-orm';
+import { suppliers, teams, supplierServiceScopes } from '@/lib/db/schema';
+import { eq, and, ilike, isNull, sql, inArray } from 'drizzle-orm';
 import { getUser } from '@/lib/db/queries';
 import { checkPermission } from '@/lib/auth/permissions';
 import {
@@ -289,5 +289,132 @@ export async function deleteSupplier(id: number): Promise<ActionResult> {
   } catch (error) {
     console.error('Error deleting supplier:', error);
     return { error: 'Có lỗi xảy ra khi xóa nhà cung cấp. Vui lòng thử lại.' };
+  }
+}
+
+// Server Action: Get All Kitchens (teams with type KITCHEN) for Service Scope Assignment
+export async function getAllKitchens(): Promise<Array<{ id: number; name: string; region: string | null }>> {
+  try {
+    // 1. Authorization Check
+    const user = await getUser();
+    if (!user) {
+      throw new Error('Không có quyền thực hiện thao tác này');
+    }
+
+    const hasPermission = await checkPermission(user.id, 'canManageSuppliers');
+    if (!hasPermission) {
+      throw new Error('Bạn không có quyền quản lý nhà cung cấp');
+    }
+
+    // 2. Fetch all KITCHEN teams
+    const kitchens = await db
+      .select({
+        id: teams.id,
+        name: teams.name,
+        region: teams.region,
+      })
+      .from(teams)
+      .where(and(eq(teams.teamType, 'KITCHEN'), isNull(teams.deletedAt)))
+      .orderBy(teams.region, teams.name);
+
+    return kitchens;
+  } catch (error) {
+    console.error('Error fetching kitchens:', error);
+    throw error;
+  }
+}
+
+// Server Action: Get Service Scopes for a Supplier
+export async function getScopesForSupplier(supplierId: number): Promise<number[]> {
+  try {
+    // 1. Authorization Check
+    const user = await getUser();
+    if (!user) {
+      throw new Error('Không có quyền thực hiện thao tác này');
+    }
+
+    const hasPermission = await checkPermission(user.id, 'canManageSuppliers');
+    if (!hasPermission) {
+      throw new Error('Bạn không có quyền quản lý nhà cung cấp');
+    }
+
+    // 2. Validation
+    if (!supplierId || supplierId <= 0) {
+      throw new Error('ID nhà cung cấp không hợp lệ');
+    }
+
+    // 3. Fetch service scopes
+    const scopes = await db
+      .select({ teamId: supplierServiceScopes.teamId })
+      .from(supplierServiceScopes)
+      .where(eq(supplierServiceScopes.supplierId, supplierId));
+
+    return scopes.map((scope) => scope.teamId);
+  } catch (error) {
+    console.error('Error fetching supplier scopes:', error);
+    throw error;
+  }
+}
+
+// Server Action: Update Supplier Service Scopes (Delete-then-Insert Pattern)
+export async function updateSupplierServiceScopes(
+  supplierId: number,
+  teamIds: number[]
+): Promise<ActionResult> {
+  try {
+    // 1. Authorization Check
+    const user = await getUser();
+    if (!user) {
+      return { error: 'Không có quyền thực hiện thao tác này' };
+    }
+
+    const hasPermission = await checkPermission(user.id, 'canManageSuppliers');
+    if (!hasPermission) {
+      return { error: 'Bạn không có quyền quản lý nhà cung cấp' };
+    }
+
+    // 2. Validation
+    if (!supplierId || supplierId <= 0) {
+      return { error: 'ID nhà cung cấp không hợp lệ' };
+    }
+
+    // 3. Check if supplier exists
+    const existingSupplier = await db
+      .select({ id: suppliers.id, name: suppliers.name })
+      .from(suppliers)
+      .where(and(eq(suppliers.id, supplierId), isNull(suppliers.deletedAt)))
+      .limit(1);
+
+    if (existingSupplier.length === 0) {
+      return { error: 'Không tìm thấy nhà cung cấp' };
+    }
+
+    // 4. Database Operation using Transaction (Delete-then-Insert Pattern)
+    await db.transaction(async (tx) => {
+      // Delete existing scopes for this supplier
+      await tx
+        .delete(supplierServiceScopes)
+        .where(eq(supplierServiceScopes.supplierId, supplierId));
+
+      // Insert new scopes if any teamIds provided
+      if (teamIds.length > 0) {
+        const scopeRecords = teamIds.map((teamId) => ({
+          supplierId,
+          teamId,
+          isActive: true,
+        }));
+
+        await tx.insert(supplierServiceScopes).values(scopeRecords);
+      }
+    });
+
+    // 5. Cache Revalidation
+    revalidatePath('/danh-muc/nha-cung-cap');
+
+    // 6. Return Success Response
+    return { success: `Đã cập nhật phạm vi dịch vụ cho nhà cung cấp "${existingSupplier[0].name}" thành công` };
+  } catch (error) {
+    console.error('Error updating supplier service scopes:', error);
+    return { error: 'Có lỗi xảy ra khi cập nhật phạm vi dịch vụ. Vui lòng thử lại.' };
   }
 }

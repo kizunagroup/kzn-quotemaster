@@ -8,7 +8,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
-import { MoreHorizontal, Edit, PowerOff, Power } from "lucide-react";
+import { MoreHorizontal, Edit, PowerOff, Power, Building2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSuppliers, type Supplier } from "@/lib/hooks/use-suppliers";
@@ -37,6 +37,7 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { SuppliersTableToolbar } from "./suppliers-table-toolbar";
 import { SupplierFormModal } from "./supplier-form-modal";
 import { SupplierDeleteDialog } from "./supplier-delete-dialog";
+import { SupplierServiceScopeModal } from "./supplier-service-scope-modal";
 
 // Date formatting helper - EXACTLY LIKE TEAMS
 const formatDate = (date: Date | string): string => {
@@ -53,6 +54,7 @@ export function SuppliersDataTable() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isServiceScopeModalOpen, setIsServiceScopeModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
     null
   );
@@ -133,6 +135,11 @@ export function SuppliersDataTable() {
     setIsDeleteModalOpen(true);
   };
 
+  const handleServiceScopeClick = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setIsServiceScopeModalOpen(true);
+  };
+
   // Handle activating a supplier directly (like Staff pattern)
   const handleActivateClick = async (supplier: Supplier) => {
     setActivatingId(supplier.id);
@@ -167,6 +174,11 @@ export function SuppliersDataTable() {
 
   const handleCloseDeleteModal = () => {
     setIsDeleteModalOpen(false);
+    setSelectedSupplier(null);
+  };
+
+  const handleCloseServiceScopeModal = () => {
+    setIsServiceScopeModalOpen(false);
     setSelectedSupplier(null);
   };
 
@@ -301,6 +313,11 @@ export function SuppliersDataTable() {
                 <DropdownMenuItem onClick={() => handleEditClick(supplier)}>
                   <Edit className="mr-2 h-4 w-4" />
                   Chỉnh sửa
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => handleServiceScopeClick(supplier)}>
+                  <Building2 className="mr-2 h-4 w-4" />
+                  Phạm vi Dịch vụ
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
@@ -481,6 +498,13 @@ export function SuppliersDataTable() {
       <SupplierDeleteDialog
         isOpen={isDeleteModalOpen}
         onClose={handleCloseDeleteModal}
+        onSuccess={handleModalSuccess}
+        supplier={selectedSupplier}
+      />
+
+      <SupplierServiceScopeModal
+        isOpen={isServiceScopeModalOpen}
+        onClose={handleCloseServiceScopeModal}
         onSuccess={handleModalSuccess}
         supplier={selectedSupplier}
       />
