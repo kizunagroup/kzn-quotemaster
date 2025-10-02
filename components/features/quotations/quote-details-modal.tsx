@@ -36,6 +36,8 @@ import {
 import { PriceBadge } from "@/components/ui/price-badge";
 import { getQuotationDetails } from "@/lib/actions/quotations.actions";
 import type { QuotationDetailsWithItems } from "@/lib/types/quotations.types";
+import { getStatusLabel, getStatusClassName } from "@/lib/utils/status-styles";
+import { formatNumber } from "@/lib/utils";
 
 interface QuoteDetailsModalProps {
   quotationId: number | null;
@@ -92,8 +94,8 @@ export function QuoteDetailsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-5xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Chi tiết Báo giá
@@ -108,53 +110,51 @@ export function QuoteDetailsModal({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[75vh] pr-4">
-          <div className="space-y-6">
-            {/* Loading State */}
-            {state.type === "loading" && (
-              <div className="flex items-center justify-center py-8">
-                <div className="flex items-center gap-2">
-                  <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                  <span className="text-sm text-muted-foreground">
-                    Đang tải thông tin báo giá...
-                  </span>
-                </div>
-              </div>
-            )}
+        {/* Loading State */}
+        {state.type === "loading" && (
+          <div className="flex items-center justify-center py-8">
+            <div className="flex items-center gap-2">
+              <div className="h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-muted-foreground">
+                Đang tải thông tin báo giá...
+              </span>
+            </div>
+          </div>
+        )}
 
-            {/* Error State */}
-            {state.type === "error" && (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-center space-y-2">
-                  <div className="text-destructive font-medium">
-                    Không thể tải thông tin báo giá
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    {state.error}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      if (quotationId) {
-                        setState({ type: "loading" });
-                        // Trigger reload
-                        const event = new CustomEvent("reload");
-                        window.dispatchEvent(event);
-                      }
-                    }}
-                  >
-                    Thử lại
-                  </Button>
-                </div>
+        {/* Error State */}
+        {state.type === "error" && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center space-y-2">
+              <div className="text-destructive font-medium">
+                Không thể tải thông tin báo giá
               </div>
-            )}
+              <div className="text-sm text-muted-foreground">
+                {state.error}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (quotationId) {
+                    setState({ type: "loading" });
+                    // Trigger reload
+                    const event = new CustomEvent("reload");
+                    window.dispatchEvent(event);
+                  }
+                }}
+              >
+                Thử lại
+              </Button>
+            </div>
+          </div>
+        )}
 
-            {/* Success State */}
-            {quotation && (
-              <>
-                {/* Basic Information */}
-                <Card>
+        {/* Success State */}
+        {quotation && (
+          <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+            {/* Basic Information - Fixed */}
+            <Card className="flex-shrink-0">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Building2 className="h-5 w-5" />
@@ -198,18 +198,8 @@ export function QuoteDetailsModal({
                           Trạng thái
                         </label>
                         <div>
-                          <Badge
-                            variant={
-                              quotation.status === "approved"
-                                ? "default"
-                                : quotation.status === "pending"
-                                ? "secondary"
-                                : "destructive"
-                            }
-                          >
-                            {quotation.status === "pending" && "Chờ duyệt"}
-                            {quotation.status === "approved" && "Đã duyệt"}
-                            {quotation.status === "cancelled" && "Đã hủy"}
+                          <Badge className={getStatusClassName(quotation.status)}>
+                            {getStatusLabel(quotation.status)}
                           </Badge>
                         </div>
                       </div>
@@ -224,26 +214,12 @@ export function QuoteDetailsModal({
                       </div>
 
                     </div>
-
-                    {quotation.notes && (
-                      <>
-                        <Separator className="my-4" />
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-muted-foreground">
-                            Ghi chú
-                          </label>
-                          <div className="text-sm bg-muted p-3 rounded-md">
-                            {quotation.notes}
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </CardContent>
                 </Card>
 
-                {/* Quotation Items */}
-                <Card>
-                  <CardHeader>
+                {/* Quotation Items - Scrollable */}
+                <Card className="flex-1 flex flex-col overflow-hidden">
+                  <CardHeader className="flex-shrink-0">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Package className="h-5 w-5" />
                       Danh sách Sản phẩm
@@ -252,16 +228,16 @@ export function QuoteDetailsModal({
                       </Badge>
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="border rounded-lg">
+                  <CardContent className="flex-1 overflow-auto p-0">
+                    <div className="w-full h-full overflow-auto px-6 pb-6">
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead className="w-[50px]">STT</TableHead>
-                            <TableHead>Mã sản phẩm</TableHead>
-                            <TableHead>Tên sản phẩm</TableHead>
-                            <TableHead>Đơn vị</TableHead>
-                            <TableHead className="text-right">
+                            <TableHead className="text-center text-sm">STT</TableHead>
+                            <TableHead className="text-sm">Mã SP</TableHead>
+                            <TableHead className="text-sm">Tên sản phẩm</TableHead>
+                            <TableHead className="text-sm">Đơn vị</TableHead>
+                            <TableHead className="text-right text-sm">
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger>
@@ -273,8 +249,10 @@ export function QuoteDetailsModal({
                                 </Tooltip>
                               </TooltipProvider>
                             </TableHead>
-                            <TableHead className="text-right">Đơn giá</TableHead>
-                            <TableHead className="text-right">Thành tiền</TableHead>
+                            <TableHead className="text-right text-sm">Đơn giá</TableHead>
+                            <TableHead className="text-right text-sm">VAT %</TableHead>
+                            <TableHead className="text-right text-sm">Tiền thuế VAT</TableHead>
+                            <TableHead className="text-right text-sm font-semibold">Thành tiền</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -285,21 +263,36 @@ export function QuoteDetailsModal({
 
                               // SMART CLIENT: Safe string-to-number conversion for display
                               // Server returns decimals as strings, we convert them here for calculations
-                              const baseQuantity = parseFloat(String(item.baseQuantity || 0)) || 0;
-                              const initialPrice = parseFloat(String(item.initialPrice || 0)) || 0;
-                              const totalPrice = baseQuantity * initialPrice;
+                              // Use baseQuantity from product as reference quantity for pricing calculation
+                              const quantity = parseFloat(String(item.baseQuantity || item.quantity || 0)) || 0;
+                              const vatRate = parseFloat(String(item.vatPercentage || 0)) || 0;
+
+                              // Smart price selection based on quotation status
+                              let displayPrice = 0;
+                              if (quotation.status === 'approved' && item.approvedPrice) {
+                                displayPrice = parseFloat(String(item.approvedPrice)) || 0;
+                              } else if (quotation.status === 'negotiation' && item.negotiatedPrice) {
+                                displayPrice = parseFloat(String(item.negotiatedPrice)) || 0;
+                              } else {
+                                displayPrice = parseFloat(String(item.initialPrice || 0)) || 0;
+                              }
+
+                              // Calculate VAT and total
+                              const subtotal = quantity * displayPrice;
+                              const vatAmount = subtotal * (vatRate / 100);
+                              const totalPrice = subtotal + vatAmount;
 
                             return (
                               <TableRow key={item.id}>
-                                <TableCell className="font-medium">
+                                <TableCell className="text-center font-medium text-sm">
                                   {index + 1}
                                 </TableCell>
-                                <TableCell className="font-mono text-sm">
+                                <TableCell className="text-sm">
                                   {item.product?.productCode ?? 'N/A'}
                                 </TableCell>
                                 <TableCell>
                                   <div>
-                                    <div className="font-medium">{item.product?.name ?? 'Sản phẩm không xác định'}</div>
+                                    <div className="font-medium text-sm">{item.product?.name ?? 'Sản phẩm không xác định'}</div>
                                     {item.product?.specification && (
                                       <div className="text-sm text-muted-foreground">
                                         {item.product.specification}
@@ -307,32 +300,28 @@ export function QuoteDetailsModal({
                                     )}
                                   </div>
                                 </TableCell>
-                                <TableCell>{item.product?.unit ?? 'N/A'}</TableCell>
-                                <TableCell className="text-right font-mono">
-                                  {baseQuantity.toLocaleString('vi-VN')}
+                                <TableCell className="text-sm">{item.product?.unit ?? 'N/A'}</TableCell>
+                                <TableCell className="text-right text-sm">
+                                  {formatNumber(quantity)}
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  <PriceBadge
-                                    price={initialPrice}
-                                    size="sm"
-                                    className="justify-end"
-                                    showCurrency={false}
-                                  />
+                                <TableCell className="text-right text-sm">
+                                  {formatNumber(displayPrice)}
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  <PriceBadge
-                                    price={totalPrice}
-                                    size="sm"
-                                    className="justify-end font-medium"
-                                    showCurrency={false}
-                                  />
+                                <TableCell className="text-right text-sm">
+                                  {vatRate.toFixed(0)}%
+                                </TableCell>
+                                <TableCell className="text-right text-sm">
+                                  {formatNumber(vatAmount)}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-medium">
+                                  {formatNumber(totalPrice)}
                                 </TableCell>
                               </TableRow>
                             );
                           })
                           ) : (
                             <TableRow>
-                              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground text-sm">
                                 Không có sản phẩm nào trong báo giá này
                               </TableCell>
                             </TableRow>
@@ -342,34 +331,86 @@ export function QuoteDetailsModal({
                     </div>
 
                     {/* Summary */}
-                    <div className="mt-4 pt-4 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-lg font-medium">Tổng giá trị báo giá:</span>
-                        <PriceBadge
-                          price={(quotation.items ?? []).reduce(
+                    <div className="mt-4 pt-4 border-t space-y-2">
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Tổng giá trị (chưa VAT):</span>
+                        <span className="font-medium">
+                          {formatNumber((quotation.items ?? []).reduce(
                             (sum, item) => {
                               if (!item || !item.product) return sum;
-                              // SMART CLIENT: Safe string-to-number conversion for summary calculation
-                              const baseQuantity = parseFloat(String(item.baseQuantity || 0)) || 0;
-                              const initialPrice = parseFloat(String(item.initialPrice || 0)) || 0;
-                              return sum + (baseQuantity * initialPrice);
+                              const quantity = parseFloat(String(item.baseQuantity || item.quantity || 0)) || 0;
+                              let displayPrice = 0;
+                              if (quotation.status === 'approved' && item.approvedPrice) {
+                                displayPrice = parseFloat(String(item.approvedPrice)) || 0;
+                              } else if (quotation.status === 'negotiation' && item.negotiatedPrice) {
+                                displayPrice = parseFloat(String(item.negotiatedPrice)) || 0;
+                              } else {
+                                displayPrice = parseFloat(String(item.initialPrice || 0)) || 0;
+                              }
+                              return sum + (quantity * displayPrice);
                             },
                             0
-                          )}
-                          size="lg"
-                          className="text-lg"
-                          showCurrency={false}
-                        />
+                          ))}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">Tổng thuế VAT:</span>
+                        <span className="font-medium">
+                          {formatNumber((quotation.items ?? []).reduce(
+                            (sum, item) => {
+                              if (!item || !item.product) return sum;
+                              const quantity = parseFloat(String(item.baseQuantity || item.quantity || 0)) || 0;
+                              const vatRate = parseFloat(String(item.vatPercentage || 0)) || 0;
+                              let displayPrice = 0;
+                              if (quotation.status === 'approved' && item.approvedPrice) {
+                                displayPrice = parseFloat(String(item.approvedPrice)) || 0;
+                              } else if (quotation.status === 'negotiation' && item.negotiatedPrice) {
+                                displayPrice = parseFloat(String(item.negotiatedPrice)) || 0;
+                              } else {
+                                displayPrice = parseFloat(String(item.initialPrice || 0)) || 0;
+                              }
+                              const subtotal = quantity * displayPrice;
+                              const vatAmount = subtotal * (vatRate / 100);
+                              return sum + vatAmount;
+                            },
+                            0
+                          ))}
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between items-center">
+                        <span className="text-lg font-bold">Tổng giá trị báo giá:</span>
+                        <span className="text-lg font-bold">
+                          {formatNumber((quotation.items ?? []).reduce(
+                            (sum, item) => {
+                              if (!item || !item.product) return sum;
+                              const quantity = parseFloat(String(item.baseQuantity || item.quantity || 0)) || 0;
+                              const vatRate = parseFloat(String(item.vatPercentage || 0)) || 0;
+                              let displayPrice = 0;
+                              if (quotation.status === 'approved' && item.approvedPrice) {
+                                displayPrice = parseFloat(String(item.approvedPrice)) || 0;
+                              } else if (quotation.status === 'negotiation' && item.negotiatedPrice) {
+                                displayPrice = parseFloat(String(item.negotiatedPrice)) || 0;
+                              } else {
+                                displayPrice = parseFloat(String(item.initialPrice || 0)) || 0;
+                              }
+                              const subtotal = quantity * displayPrice;
+                              const vatAmount = subtotal * (vatRate / 100);
+                              const totalPrice = subtotal + vatAmount;
+                              return sum + totalPrice;
+                            },
+                            0
+                          ))}
+                        </span>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-              </>
-            )}
           </div>
-        </ScrollArea>
+            )}
 
-        <div className="flex justify-end pt-4 border-t">
+
+        <div className="flex justify-end pt-4 border-t mt-auto flex-shrink-0">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
