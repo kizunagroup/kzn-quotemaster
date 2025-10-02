@@ -8,6 +8,7 @@ import {
   suppliers,
   products,
   teams,
+  teamMembers,
   supplierServiceScopes,
   type Quotation,
   type QuoteItem,
@@ -16,7 +17,7 @@ import {
   type Team
 } from "@/lib/db/schema";
 import { getUser } from "@/lib/db/queries";
-import { eq, and, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, inArray, desc, sql, isNull } from "drizzle-orm";
 import {
   calculatePriceListMatrix,
   type PriceItem
@@ -107,6 +108,62 @@ async function checkTeamAccess(teamId: number) {
   // For now, assume all authenticated users can access any team's price list
 
   return user;
+}
+
+// ==================== USER ACCESSIBLE KITCHENS ====================
+
+/**
+ * Get list of kitchens that the current user can access
+ * Returns only KITCHEN-type teams that the user is a member of
+ */
+export async function getUserAccessibleKitchens(): Promise<Array<{
+  id: number;
+  name: string;
+  kitchenCode: string;
+  region: string;
+  status: string;
+}>> {
+  try {
+    const user = await getUser();
+
+    if (!user) {
+      throw new Error("Unauthorized: Bạn cần đăng nhập để xem danh sách bếp");
+    }
+
+    // Get all teams user is a member of, filtered by KITCHEN type
+    const kitchens = await db
+      .select({
+        id: teams.id,
+        name: teams.name,
+        teamCode: teams.teamCode,
+        region: teams.region,
+        status: teams.status,
+      })
+      .from(teams)
+      .innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
+      .where(
+        and(
+          eq(teamMembers.userId, user.id),
+          eq(teams.teamType, 'KITCHEN'),
+          isNull(teams.deletedAt)
+        )
+      )
+      .orderBy(teams.name);
+
+    return kitchens.map(k => ({
+      id: k.id,
+      name: k.name,
+      kitchenCode: k.teamCode || '',
+      region: k.region || '',
+      status: k.status,
+    }));
+
+  } catch (error) {
+    console.error("Error in getUserAccessibleKitchens:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Lỗi khi tải danh sách bếp"
+    );
+  }
 }
 
 // ==================== MAIN ACTIONS ====================
@@ -278,7 +335,6 @@ export async function getPriceListMatrix(
         productCategory: products.category,
         approvedPrice: quoteItems.approvedPrice,
         vatPercentage: quoteItems.vatPercentage,
-        pricePerUnit: quoteItems.pricePerUnit,
         approvedAt: quoteItems.approvedAt,
       })
       .from(quotations)
@@ -342,7 +398,7 @@ export async function getPriceListMatrix(
       if (!supplierMap.has(row.supplierId)) {
         supplierMap.set(row.supplierId, {
           id: row.supplierId,
-          code: row.supplierCode,
+          code: row.supplierCode || '',
           name: row.supplierName,
           contactPerson: row.supplierContactPerson || undefined,
           phone: row.supplierPhone || undefined,
@@ -364,15 +420,15 @@ export async function getPriceListMatrix(
       // Add supplier price to product
       product.suppliers[row.supplierId] = {
         supplierId: row.supplierId,
-        supplierCode: row.supplierCode,
+        supplierCode: row.supplierCode || '',
         supplierName: row.supplierName,
         approvedPrice,
         vatRate,
-        pricePerUnit: Number(row.pricePerUnit || approvedPrice),
+        pricePerUnit: approvedPrice, // Use approvedPrice as pricePerUnit
         totalPriceWithVAT,
         hasBestPrice: false, // Will be calculated later
         quotationId: row.quotationId,
-        approvedAt: row.approvedAt,
+        approvedAt: row.approvedAt || undefined,
       };
 
       product.availableSuppliers = Object.keys(product.suppliers).length;
@@ -480,7 +536,7 @@ export async function getTeamInfo(teamId: number): Promise<{
     return {
       id: team.id,
       name: team.name,
-      region: team.region,
+      region: team.region || '',
       teamCode: team.teamCode || undefined,
       manager: team.managerName && team.managerEmail
         ? { name: team.managerName, email: team.managerEmail }
@@ -521,7 +577,10 @@ export async function getTeamSupplierScopes(teamId: number): Promise<Array<{
       .where(eq(supplierServiceScopes.teamId, teamId))
       .orderBy(suppliers.supplierCode);
 
-    return scopes;
+    return scopes.map(scope => ({
+      ...scope,
+      supplierCode: scope.supplierCode || '',
+    }));
 
   } catch (error) {
     console.error("Error in getTeamSupplierScopes:", error);
@@ -642,13 +701,13 @@ export async function getProductPriceComparison(
 
       return {
         supplierId: data.supplierId,
-        supplierCode: data.supplierCode,
+        supplierCode: data.supplierCode || '',
         supplierName: data.supplierName,
         approvedPrice,
         vatRate,
         totalPriceWithVAT,
         hasBestPrice: false,
-        approvedAt: data.approvedAt,
+        approvedAt: data.approvedAt || undefined,
       };
     });
 
