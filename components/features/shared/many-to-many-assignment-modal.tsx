@@ -15,7 +15,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export interface AssignmentItem {
@@ -56,6 +55,7 @@ export function ManyToManyAssignmentModal({
     new Set(initialSelectedIds)
   );
   const [isSaving, setIsSaving] = useState(false);
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
 
   // Reset selected IDs when modal opens with new data
   useMemo(() => {
@@ -191,8 +191,8 @@ export function ManyToManyAssignmentModal({
           </div>
 
           {/* Global Select All */}
-          <div className="flex items-center justify-between px-2 py-2 bg-white rounded-lg border">
-            <div className="flex items-center space-x-3">
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center space-x-2">
               <Checkbox
                 id="select-all"
                 checked={allSelected}
@@ -201,18 +201,14 @@ export function ManyToManyAssignmentModal({
               />
               <label
                 htmlFor="select-all"
-                className="text-sm font-semibold leading-none cursor-pointer"
+                className="text-sm font-medium leading-none cursor-pointer"
               >
-                {allSelected
-                  ? 'Bỏ chọn tất cả'
-                  : someSelected
-                  ? 'Chọn tất cả'
-                  : 'Chọn tất cả'}
+                Chọn tất cả
               </label>
             </div>
-            <Badge variant="secondary" className="text-xs font-medium">
-              Đã chọn: {selectedIds.size}/{items.length}
-            </Badge>
+            <span className="text-sm text-muted-foreground">
+              Đã chọn: {selectedIds.size} / {items.length}
+            </span>
           </div>
 
           {/* Grouped List with Custom Accordion */}
@@ -229,6 +225,8 @@ export function ManyToManyAssignmentModal({
               ) : (
                 <AccordionPrimitive.Root
                   type="multiple"
+                  value={openAccordions}
+                  onValueChange={setOpenAccordions}
                   className="space-y-3"
                 >
                 {Array.from(groupedItems.entries()).map(([groupName, groupItems]) => {
@@ -236,11 +234,23 @@ export function ManyToManyAssignmentModal({
                   const groupIndeterminate = isGroupIndeterminate(groupItems);
                   const selectedCount = groupItems.filter((item) => selectedIds.has(item.id)).length;
 
+                  const handleMouseEnter = () => {
+                    if (!openAccordions.includes(groupName)) {
+                      setOpenAccordions([...openAccordions, groupName]);
+                    }
+                  };
+
+                  const handleMouseLeave = () => {
+                    setOpenAccordions(openAccordions.filter(name => name !== groupName));
+                  };
+
                   return (
                     <AccordionPrimitive.Item
                       key={groupName}
                       value={groupName}
                       className="bg-white border rounded-lg overflow-hidden shadow-sm"
+                      onMouseEnter={handleMouseEnter}
+                      onMouseLeave={handleMouseLeave}
                     >
                       {/* Custom Accordion Header to avoid button nesting */}
                       <AccordionPrimitive.Header className="flex">
@@ -256,7 +266,7 @@ export function ManyToManyAssignmentModal({
                           {/* Accordion Trigger - separate from checkbox */}
                           <AccordionPrimitive.Trigger className="flex items-center justify-between flex-1 group outline-none">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold group-hover:text-primary transition-colors">
+                              <span className="text-sm font-medium group-hover:text-primary group-data-[state=open]:font-semibold transition-all">
                                 {groupName}
                               </span>
                               <span className="text-xs text-muted-foreground">
