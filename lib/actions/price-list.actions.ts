@@ -48,7 +48,11 @@ async function checkTeamAccess(teamId: number) {
 
 /**
  * Get list of kitchens that the current user can access
- * Returns only KITCHEN-type teams that the user is a member of
+ * Returns KITCHEN-type teams based on user's role and team membership
+ *
+ * Permission Logic:
+ * - Admin users (department = 'ADMIN'): Can access ALL kitchens
+ * - Other users: Can only access kitchens they are a member of
  */
 export async function getUserAccessibleKitchens(): Promise<Array<{
   id: number;
@@ -64,27 +68,60 @@ export async function getUserAccessibleKitchens(): Promise<Array<{
       throw new Error("Unauthorized: Bạn cần đăng nhập để xem danh sách bếp");
     }
 
-    // Get all teams user is a member of, filtered by KITCHEN type
-    const kitchens = await db
-      .select({
-        id: teams.id,
-        name: teams.name,
-        teamCode: teams.teamCode,
-        region: teams.region,
-        status: teams.status,
-      })
-      .from(teams)
-      .innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
-      .where(
-        and(
-          eq(teamMembers.userId, user.id),
-          eq(teams.teamType, 'KITCHEN'),
-          isNull(teams.deletedAt)
-        )
-      )
-      .orderBy(teams.name);
+    console.log("[getUserAccessibleKitchens] User ID:", user.id);
+    console.log("[getUserAccessibleKitchens] User Department:", user.department);
 
-    return kitchens.map(k => ({
+    // Check if user is an admin - admins can see all kitchens
+    const isAdmin = user.department === 'ADMIN';
+    console.log("[getUserAccessibleKitchens] Is Admin:", isAdmin);
+
+    let kitchens;
+
+    if (isAdmin) {
+      // Admins can access ALL kitchens
+      console.log("[getUserAccessibleKitchens] Fetching all kitchens for admin user");
+      kitchens = await db
+        .select({
+          id: teams.id,
+          name: teams.name,
+          teamCode: teams.teamCode,
+          region: teams.region,
+          status: teams.status,
+        })
+        .from(teams)
+        .where(
+          and(
+            eq(teams.teamType, 'KITCHEN'),
+            isNull(teams.deletedAt)
+          )
+        )
+        .orderBy(teams.name);
+    } else {
+      // Non-admin users can only access kitchens they are a member of
+      console.log("[getUserAccessibleKitchens] Fetching kitchens where user is a member");
+      kitchens = await db
+        .select({
+          id: teams.id,
+          name: teams.name,
+          teamCode: teams.teamCode,
+          region: teams.region,
+          status: teams.status,
+        })
+        .from(teams)
+        .innerJoin(teamMembers, eq(teams.id, teamMembers.teamId))
+        .where(
+          and(
+            eq(teamMembers.userId, user.id),
+            eq(teams.teamType, 'KITCHEN'),
+            isNull(teams.deletedAt)
+          )
+        )
+        .orderBy(teams.name);
+    }
+
+    console.log("[getUserAccessibleKitchens] Found kitchens count:", kitchens.length);
+
+    const result = kitchens.map(k => ({
       id: k.id,
       name: k.name,
       kitchenCode: k.teamCode || '',
@@ -92,8 +129,12 @@ export async function getUserAccessibleKitchens(): Promise<Array<{
       status: k.status,
     }));
 
+    console.log("[getUserAccessibleKitchens] Returning kitchens:", result);
+
+    return result;
+
   } catch (error) {
-    console.error("Error in getUserAccessibleKitchens:", error);
+    console.error("[getUserAccessibleKitchens] Error:", error);
     throw new Error(
       error instanceof Error ? error.message : "Lỗi khi tải danh sách bếp"
     );
