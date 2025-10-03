@@ -6,8 +6,8 @@ import { SWRConfig } from 'swr';
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
-  title: 'Next.js SaaS Starter',
-  description: 'Get started quickly with Next.js, Postgres, and Stripe.'
+  title: 'QuoteMaster - Hệ thống quản lý báo giá',
+  description: 'Hệ thống quản lý báo giá chuyên nghiệp cho chuỗi nhà hàng'
 };
 
 export const viewport: Viewport = {
