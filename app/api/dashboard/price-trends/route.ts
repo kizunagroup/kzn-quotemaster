@@ -118,7 +118,7 @@ export async function GET(request: Request) {
     const increases: ProductTrend[] = [];
     const decreases: ProductTrend[] = [];
 
-    for (const row of allTrends.rows) {
+    for (const row of allTrends) {
       const trend: ProductTrend = {
         productId: Number(row.product_id),
         productCode: String(row.product_code),
