@@ -6,7 +6,7 @@ import { SWRConfig } from 'swr';
 import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
-  title: 'QuoteMaster - Hệ thống quản lý báo giá',
+  title: 'QuoteMaster | Kizuna',
   description: 'Hệ thống quản lý báo giá chuyên nghiệp cho chuỗi nhà hàng'
 };
 

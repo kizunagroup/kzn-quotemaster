@@ -4,6 +4,12 @@ import { getDashboardStatsData } from '@/lib/actions/dashboard.actions';
 import { Suspense } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Trang chủ | Kizuna',
+  description: 'Tổng quan hệ thống quản lý báo giá'
+};
 
 /**
  * Home Dashboard Page (Trang chủ)

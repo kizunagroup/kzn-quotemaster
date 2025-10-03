@@ -2,6 +2,12 @@ import { checkoutAction } from '@/lib/payments/actions';
 import { Check } from 'lucide-react';
 import { getStripePrices, getStripeProducts } from '@/lib/payments/stripe';
 import { SubmitButton } from './submit-button';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Bảng giá | Kizuna',
+  description: 'Các gói dịch vụ QuoteMaster'
+};
 
 // Prices are fresh for one hour max
 export const revalidate = 3600;

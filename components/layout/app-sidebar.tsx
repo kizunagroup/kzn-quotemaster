@@ -153,14 +153,16 @@ export function AppSidebar() {
   return (
     <div className="flex h-full flex-col border-r bg-white">
       {/* Logo Section */}
-      <div className="flex h-20 items-center px-6">
-        <Link href="/trang-chu" className="relative h-10 w-full">
-          <Image
-            src="/logo.png"
-            alt="QuoteMaster Logo"
-            fill
-            className="object-contain object-left"
-          />
+      <div className="flex h-20 items-center justify-center px-6">
+        <Link href="/trang-chu" className="block">
+          <div className="relative h-10 w-32">
+            <Image
+              src="/logo.png"
+              alt="QuoteMaster Logo"
+              fill
+              className="object-contain object-center"
+            />
+          </div>
         </Link>
       </div>
 
