@@ -30,6 +30,7 @@ import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
 import { TeamCombobox } from "@/components/features/staff/team-combobox";
 import { getStaffDepartments } from "@/lib/actions/staff.actions";
 import type { Staff } from "@/lib/hooks/use-staff";
+import { getDepartmentLabel } from "@/lib/utils/departments";
 
 // Single source of truth for status options
 const statusOptions = [
@@ -39,29 +40,6 @@ const statusOptions = [
   { value: "terminated", label: "Đã Nghỉ" },
 ] as const;
 
-// Department display mapping for Vietnamese labels
-const getDepartmentDisplay = (department: string): string => {
-  switch (department.toUpperCase()) {
-    case "ADMIN":
-      return "Quản Trị";
-    case "BEP":
-      return "Bếp";
-    case "KE_TOAN":
-      return "Kế Toán";
-    case "KINH_DOANH":
-      return "Kinh Doanh";
-    case "NHAN_SU":
-      return "Nhân Sự";
-    case "PHAT_TRIEN_KINH_DOANH":
-      return "Phát Triển Kinh Doanh";
-    case "SAN_XUAT":
-      return "Sản Xuất";
-    case "TONG_VU":
-      return "Tổng Vụ";
-    default:
-      return department;
-  }
-};
 
 // Team options - this could be dynamically loaded in the future
 const teamOptions = [
@@ -164,7 +142,7 @@ export function StaffTableToolbar({
     { value: "all", label: "Tất cả phòng ban" },
     ...departments.map((department) => ({
       value: department,
-      label: getDepartmentDisplay(department),
+      label: getDepartmentLabel(department as any),
     })),
   ];
 

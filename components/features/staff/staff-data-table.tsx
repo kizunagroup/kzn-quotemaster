@@ -60,26 +60,7 @@ import { StaffTableToolbar } from "./staff-table-toolbar";
 import { StaffFormModal } from "./staff-form-modal";
 import { StaffDeleteDialog } from "./staff-delete-dialog";
 import { TeamAssignmentModal } from "./team-assignment-modal";
-
-// Department display mapping
-const getDepartmentDisplay = (department: string | null): string => {
-  if (!department) return "-";
-
-  switch (department.toUpperCase()) {
-    case "ADMIN":
-      return "Quản Trị";
-    case "PROCUREMENT":
-      return "Mua Sắm";
-    case "KITCHEN":
-      return "Bếp";
-    case "ACCOUNTING":
-      return "Kế Toán";
-    case "OPERATIONS":
-      return "Vận Hành";
-    default:
-      return department;
-  }
-};
+import { getDepartmentLabel } from "@/lib/utils/departments";
 
 // Format hire date
 const formatHireDate = (date: Date | null): string => {
@@ -363,9 +344,10 @@ export function StaffDataTable() {
       header: ({ column }) => (
         <DataTableColumnHeader title="Phòng Ban" column={column} />
       ),
-      cell: ({ row }) => (
-        <div>{getDepartmentDisplay(row.getValue("department"))}</div>
-      ),
+      cell: ({ row }) => {
+        const dept = row.getValue("department");
+        return <div>{dept ? getDepartmentLabel(dept as any) : "-"}</div>;
+      },
     },
     {
       id: "currentTeams",

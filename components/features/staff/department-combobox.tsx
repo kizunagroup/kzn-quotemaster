@@ -17,18 +17,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-
-// Department constants with Vietnamese labels - Official List
-const DEPARTMENTS = [
-  { value: "ADMIN", label: "Admin" },
-  { value: "NHAN_SU", label: "Nhân Sự" },
-  { value: "KE_TOAN", label: "Kế Toán" },
-  { value: "SAN_XUAT", label: "Sản Xuất" },
-  { value: "TONG_VU", label: "Tổng Vụ" },
-  { value: "KINH_DOANH", label: "Kinh Doanh" },
-  { value: "PHAT_TRIEN_KINH_DOANH", label: "Phát Triển Kinh Doanh" },
-  { value: "BEP", label: "Bếp" },
-] as const;
+import { DEPARTMENT_OPTIONS } from "@/lib/utils/departments";
 
 interface DepartmentComboboxProps {
   value?: string;
@@ -50,10 +39,10 @@ export function DepartmentCombobox({
 
   // Filter departments based on search query
   const filteredDepartments = React.useMemo(() => {
-    if (!searchQuery.trim()) return DEPARTMENTS;
+    if (!searchQuery.trim()) return DEPARTMENT_OPTIONS;
 
     const query = searchQuery.toLowerCase().trim();
-    return DEPARTMENTS.filter((department) =>
+    return DEPARTMENT_OPTIONS.filter((department) =>
       department.label.toLowerCase().includes(query) ||
       department.value.toLowerCase().includes(query)
     );
@@ -75,7 +64,7 @@ export function DepartmentCombobox({
 
   // Get display label for selected value
   const getDisplayLabel = (val: string) => {
-    const department = DEPARTMENTS.find(d => d.value === val);
+    const department = DEPARTMENT_OPTIONS.find(d => d.value === val);
     return department ? department.label : val;
   };
 
