@@ -44,7 +44,7 @@ export function ProductImportModal({
   onOpenChange,
   onSuccess,
 }: ProductImportModalProps) {
-  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([]);
   const [importState, setImportState] = React.useState<ImportState>({
     type: "idle",
   });
@@ -55,7 +55,7 @@ export function ProductImportModal({
   // Reset form and state when modal closes
   React.useEffect(() => {
     if (!open) {
-      setSelectedFile(null);
+      setSelectedFiles([]);
       setImportState({ type: "idle" });
     }
   }, [open]);
@@ -94,29 +94,47 @@ export function ProductImportModal({
     }
   };
 
-  // Validate and process file
-  const validateAndProcessFile = (file: File) => {
-    // Validate file type
-    const isExcel =
-      file.type ===
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-      file.type === "application/vnd.ms-excel" ||
-      file.name.endsWith(".xlsx") ||
-      file.name.endsWith(".xls");
+  // Validate and process files
+  const validateAndProcessFiles = (files: File[]) => {
+    const validFiles: File[] = [];
 
-    if (!isExcel) {
-      toast.error(`File ${file.name} không phải là file Excel`);
-      return;
+    for (const file of files) {
+      // Validate file type
+      const isExcel =
+        file.type ===
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        file.type === "application/vnd.ms-excel" ||
+        file.name.endsWith(".xlsx") ||
+        file.name.endsWith(".xls");
+
+      if (!isExcel) {
+        toast.error(`File ${file.name} không phải là file Excel`);
+        continue;
+      }
+
+      // Check for duplicates
+      const isDuplicate = selectedFiles.some(
+        (existing) => existing.name === file.name && existing.size === file.size
+      );
+
+      if (isDuplicate) {
+        toast.warning(`File ${file.name} đã được chọn`);
+        continue;
+      }
+
+      validFiles.push(file);
     }
 
-    setSelectedFile(file);
+    if (validFiles.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...validFiles]);
+    }
   };
 
   // File selection handler
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      validateAndProcessFile(file);
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      validateAndProcessFiles(Array.from(files));
     }
   };
 
@@ -138,15 +156,15 @@ export function ProductImportModal({
     event.stopPropagation();
     setIsDragActive(false);
 
-    const file = event.dataTransfer.files[0];
-    if (file) {
-      validateAndProcessFile(file);
+    const files = event.dataTransfer.files;
+    if (files && files.length > 0) {
+      validateAndProcessFiles(Array.from(files));
     }
   };
 
   // Remove file handler
-  const handleRemoveFile = () => {
-    setSelectedFile(null);
+  const handleRemoveFile = (fileName: string) => {
+    setSelectedFiles((prev) => prev.filter((file) => file.name !== fileName));
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -154,7 +172,7 @@ export function ProductImportModal({
 
   // Form submission handler
   const handleImport = async () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       toast.error("Vui lòng chọn file Excel");
       return;
     }
@@ -170,41 +188,58 @@ export function ProductImportModal({
 
       setImportState({ type: "processing" });
 
-      // Convert file to ArrayBuffer
-      const arrayBuffer = await selectedFile.arrayBuffer();
+      let totalCreated = 0;
+      let totalUpdated = 0;
+      const allErrors: string[] = [];
 
-      // Call the import action
-      const result = await importProductsFromExcel(arrayBuffer);
+      // Process each file sequentially
+      for (const file of selectedFiles) {
+        try {
+          // Convert file to ArrayBuffer
+          const arrayBuffer = await file.arrayBuffer();
 
-      if (result.success && result.errors.length === 0) {
+          // Call the import action
+          const result = await importProductsFromExcel(arrayBuffer);
+
+          totalCreated += result.created;
+          totalUpdated += result.updated;
+          allErrors.push(...result.errors);
+        } catch (error) {
+          allErrors.push(
+            `Lỗi xử lý file ${file.name}: ${error instanceof Error ? error.message : "Lỗi không xác định"}`
+          );
+        }
+      }
+
+      if (allErrors.length === 0) {
         setImportState({
           type: "success",
-          created: result.created,
-          updated: result.updated,
+          created: totalCreated,
+          updated: totalUpdated,
           errors: [],
         });
-        toast.success(result.success);
+        toast.success(`Import thành công ${selectedFiles.length} file`);
 
         // Call success callback after a short delay to show results
         setTimeout(() => {
           onSuccess?.();
           onOpenChange(false);
         }, 2000);
-      } else if (result.errors.length > 0) {
-        // Partial success or errors
+      } else if (totalCreated > 0 || totalUpdated > 0) {
+        // Partial success with errors
         setImportState({
           type: "success",
-          created: result.created,
-          updated: result.updated,
-          errors: result.errors,
+          created: totalCreated,
+          updated: totalUpdated,
+          errors: allErrors,
         });
         toast.warning(
-          `Import hoàn tất với ${result.errors.length} lỗi. Vui lòng kiểm tra chi tiết.`
+          `Import hoàn tất với ${allErrors.length} lỗi. Vui lòng kiểm tra chi tiết.`
         );
       } else {
         setImportState({
           type: "error",
-          error: result.errors[0] || "Có lỗi xảy ra khi import",
+          error: allErrors[0] || "Có lỗi xảy ra khi import",
         });
       }
     } catch (error) {
@@ -218,7 +253,7 @@ export function ProductImportModal({
 
   const isProcessing =
     importState.type === "uploading" || importState.type === "processing";
-  const canSubmit = selectedFile && !isProcessing;
+  const canSubmit = selectedFiles.length > 0 && !isProcessing;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -290,35 +325,45 @@ export function ProductImportModal({
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                   onChange={handleFileSelect}
                   className="hidden"
                 />
               </div>
 
-              {/* Selected File */}
-              {selectedFile && (
+              {/* Selected Files */}
+              {selectedFiles.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">File đã chọn</label>
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <FileSpreadsheet className="h-4 w-4 text-green-600" />
-                      <span className="text-sm truncate" title={selectedFile.name}>
-                        {selectedFile.name}
-                      </span>
-                      <Badge variant="outline" className="text-xs">
-                        {(selectedFile.size / 1024).toFixed(0)} KB
-                      </Badge>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleRemoveFile}
-                      disabled={isProcessing}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                  <label className="text-sm font-medium">
+                    File đã chọn ({selectedFiles.length})
+                  </label>
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                    {selectedFiles.map((file) => (
+                      <div
+                        key={`${file.name}-${file.size}`}
+                        className="flex items-center justify-between p-3 bg-muted rounded-md"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <FileSpreadsheet className="h-4 w-4 text-green-600" />
+                          <span className="text-sm truncate" title={file.name}>
+                            {file.name}
+                          </span>
+                          <Badge variant="outline" className="text-xs">
+                            {(file.size / 1024).toFixed(0)} KB
+                          </Badge>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveFile(file.name)}
+                          disabled={isProcessing}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
