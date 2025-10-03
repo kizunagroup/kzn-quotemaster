@@ -287,45 +287,7 @@ export default function PriceListPage() {
       </div>
       </div>
 
-      {/* Summary Statistics - Only show when data is loaded */}
-      {priceListData && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold font-narrow">
-                {priceListData.summary.totalProducts}
-              </div>
-              <p className="text-xs text-muted-foreground">Tổng hàng hóa</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold font-narrow">
-                {priceListData.summary.totalSuppliers}
-              </div>
-              <p className="text-xs text-muted-foreground">Nhà cung cấp</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold font-narrow">
-                {priceListData.summary.quotedProducts}
-              </div>
-              <p className="text-xs text-muted-foreground">Hàng hóa có giá</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-2xl font-bold font-narrow">
-                {priceListData.summary.averageCoverage.toFixed(1)}%
-              </div>
-              <p className="text-xs text-muted-foreground">Độ phủ trung bình</p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Price Matrix Display - No Header Card */}
+      {/* Price Matrix Display */}
       {loadingPriceList ? (
         <Card>
           <CardContent className="flex items-center justify-center py-12">

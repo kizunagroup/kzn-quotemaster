@@ -15,10 +15,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, EyeOff, ChevronDown, ChevronUp } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Eye, EyeOff, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import type { PriceListMatrixData } from "@/lib/types/price-list.types";
 
@@ -32,6 +33,7 @@ export interface PriceMatrixProps {
  * with dynamic supplier columns and best price highlighting
  *
  * Features:
+ * - Summary statistics bar
  * - VAT toggle (show/hide VAT %)
  * - Expand/collapse all categories
  * - Unified typography and terminology
@@ -98,53 +100,84 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
     <div className="space-y-4">
       {/* Price Matrix Table with Category Accordion */}
       <Card>
-        <CardContent className="pt-6">
-          {/* Action Bar - VAT Toggle & Expand/Collapse */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              {/* VAT Toggle Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowVAT(!showVAT)}
-              >
-                {showVAT ? (
-                  <>
-                    <EyeOff className="h-4 w-4 mr-2" />
-                    Ẩn VAT
-                  </>
-                ) : (
-                  <>
-                    <Eye className="h-4 w-4 mr-2" />
-                    Hiện VAT
-                  </>
-                )}
-              </Button>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
+          <div className="space-y-3">
+            {/* Title */}
+            <CardTitle>Chi tiết Bảng giá</CardTitle>
 
-              {/* Expand/Collapse All Button */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={toggleAllCategories}
-              >
-                {expandedCategories.length > 0 ? (
-                  <>
-                    <ChevronUp className="h-4 w-4 mr-2" />
-                    Thu gọn tất cả
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-4 w-4 mr-2" />
-                    Mở rộng tất cả
-                  </>
-                )}
-              </Button>
+            {/* Context Info - Period & Kitchen */}
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+              <span>Kỳ: {priceListData.period || "N/A"}</span>
+              <Separator orientation="vertical" className="h-4" />
+              <span>Bếp: {priceListData.teamName || "N/A"}</span>
             </div>
 
-            <div className="text-sm text-muted-foreground">
-              Hiển thị giá {showVAT ? "đã" : "chưa"} bao gồm VAT
+            {/* Summary Statistics Bar */}
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Tổng hàng hóa:</span>
+                <span className="font-semibold font-narrow">{priceListData.summary.totalProducts}</span>
+              </div>
+              <Separator orientation="vertical" className="h-4" />
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Nhà cung cấp:</span>
+                <span className="font-semibold font-narrow">{priceListData.summary.totalSuppliers}</span>
+              </div>
+              <Separator orientation="vertical" className="h-4" />
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Hàng hóa có giá:</span>
+                <span className="font-semibold font-narrow">{priceListData.summary.quotedProducts}</span>
+              </div>
+              <Separator orientation="vertical" className="h-4" />
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Độ phủ TB:</span>
+                <span className="font-semibold font-narrow">{priceListData.summary.averageCoverage.toFixed(1)}%</span>
+              </div>
             </div>
           </div>
+
+          {/* Utility Action Buttons - Right Side */}
+          <div className="flex items-center gap-2">
+            {/* VAT Toggle Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowVAT(!showVAT)}
+            >
+              {showVAT ? (
+                <>
+                  <EyeOff className="h-4 w-4 mr-2" />
+                  Ẩn giá VAT
+                </>
+              ) : (
+                <>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Hiện giá VAT
+                </>
+              )}
+            </Button>
+
+            {/* Expand/Collapse All Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleAllCategories}
+            >
+              {expandedCategories.length > 0 ? (
+                <>
+                  <ChevronsUpDown className="h-4 w-4 mr-2" />
+                  Thu gọn tất cả
+                </>
+              ) : (
+                <>
+                  <ChevronsDownUp className="h-4 w-4 mr-2" />
+                  Mở rộng tất cả
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
 
           {/* Category Accordion */}
           <Accordion
