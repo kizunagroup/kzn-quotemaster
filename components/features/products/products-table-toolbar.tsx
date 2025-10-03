@@ -141,10 +141,10 @@ export function ProductsTableToolbar({
         return;
       }
 
-      // Create blob and download
-      const blob = new Blob([result.buffer], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
+      // Convert Base64 string back to Blob
+      const blob = await (await fetch(
+        `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.base64}`
+      )).blob();
 
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');

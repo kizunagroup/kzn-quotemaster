@@ -334,7 +334,7 @@ export async function getProductCategories(): Promise<string[] | { error: string
 
 // Server Action: Generate Product Import Template
 export async function generateProductImportTemplate(): Promise<
-  { success: true; buffer: Buffer } | { error: string }
+  { success: true; base64: string } | { error: string }
 > {
   try {
     // 1. Authorization Check (CRITICAL FIRST STEP)
@@ -446,10 +446,11 @@ export async function generateProductImportTemplate(): Promise<
       mainSheet.getCell(`H${row}`).dataValidation = statusValidation;
     }
 
-    // 8. Generate buffer
+    // 8. Generate buffer and convert to Base64
     const buffer = await workbook.xlsx.writeBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
 
-    return { success: true, buffer: Buffer.from(buffer) };
+    return { success: true, base64 };
   } catch (error) {
     console.error('Error generating product import template:', error);
     return { error: 'Có lỗi xảy ra khi tạo file mẫu. Vui lòng thử lại.' };
