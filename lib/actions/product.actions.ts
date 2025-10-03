@@ -373,7 +373,7 @@ export async function generateProductImportTemplate(): Promise<
     const ExcelJS = (await import('exceljs')).default;
     const workbook = new ExcelJS.Workbook();
 
-    // 4. Create hidden validation data sheet
+    // 4. Create hidden validation data sheet (UPGRADE: Ensure hidden state)
     const validationSheet = workbook.addWorksheet('data_validation', {
       state: 'hidden'
     });
@@ -382,6 +382,10 @@ export async function generateProductImportTemplate(): Promise<
     categories.forEach((category, index) => {
       validationSheet.getCell(`A${index + 1}`).value = category;
     });
+
+    // Populate status values in column B (Vietnamese labels for UI)
+    validationSheet.getCell('B1').value = 'Hoạt động';
+    validationSheet.getCell('B2').value = 'Tạm dừng';
 
     // 5. Create main data sheet
     const mainSheet = workbook.addWorksheet('Danh sách Hàng hóa');
@@ -400,14 +404,17 @@ export async function generateProductImportTemplate(): Promise<
 
     mainSheet.addRow(headers);
 
-    // Style header row
+    // UPGRADE: Style header row cells individually (row 1 only)
     const headerRow = mainSheet.getRow(1);
     headerRow.font = { bold: true };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0E0E0' }
-    };
+    headers.forEach((_, colIndex) => {
+      const cell = headerRow.getCell(colIndex + 1);
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE0E0E0' }
+      };
+    });
 
     // Set column widths
     mainSheet.columns = [
@@ -421,12 +428,16 @@ export async function generateProductImportTemplate(): Promise<
       { key: 'status', width: 15 }
     ];
 
-    // 6. Apply data validation for "Nhóm hàng" column (column E, index 5)
+    // 6. UPGRADE: Apply data validation with Error Alert for "Nhóm hàng" column (column E, index 5)
     if (categories.length > 0) {
       const categoryValidation = {
         type: 'list' as const,
         allowBlank: true,
-        formulae: [`data_validation!$A$1:$A$${categories.length}`]
+        formulae: [`data_validation!$A$1:$A$${categories.length}`],
+        showErrorMessage: true,
+        errorStyle: 'warning',
+        errorTitle: 'Tạo Nhóm hàng Mới?',
+        error: 'Giá trị bạn nhập không có trong danh sách. Bạn có chắc muốn tạo một nhóm hàng mới không?'
       };
 
       // Apply validation to 1000 rows
@@ -435,11 +446,11 @@ export async function generateProductImportTemplate(): Promise<
       }
     }
 
-    // 7. Apply data validation for "Trạng thái" column (column H, index 8)
+    // 7. UPGRADE: Apply data validation with Vietnamese labels for "Trạng thái" column (column H, index 8)
     const statusValidation = {
       type: 'list' as const,
       allowBlank: true,
-      formulae: ['"active,inactive"']
+      formulae: [`data_validation!$B$1:$B$2`]
     };
 
     for (let row = 2; row <= 1001; row++) {
@@ -455,6 +466,22 @@ export async function generateProductImportTemplate(): Promise<
     console.error('Error generating product import template:', error);
     return { error: 'Có lỗi xảy ra khi tạo file mẫu. Vui lòng thử lại.' };
   }
+}
+
+// Helper function to convert Vietnamese status labels to database values
+function parseStatus(statusValue: string): 'active' | 'inactive' {
+  const trimmed = statusValue.trim().toLowerCase();
+
+  // Handle Vietnamese labels
+  if (trimmed === 'hoạt động') return 'active';
+  if (trimmed === 'tạm dừng') return 'inactive';
+
+  // Handle English values (backward compatibility)
+  if (trimmed === 'active') return 'active';
+  if (trimmed === 'inactive') return 'inactive';
+
+  // Default to active
+  return 'active';
 }
 
 // Server Action: Import Products from Excel
@@ -507,7 +534,8 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
         const category = row.getCell(5).value?.toString().trim();
         const basePrice = row.getCell(6).value?.toString().trim() || null;
         const baseQuantity = row.getCell(7).value?.toString().trim() || null;
-        const status = row.getCell(8).value?.toString().trim() || 'active';
+        const statusRaw = row.getCell(8).value?.toString().trim() || 'active';
+        const status = parseStatus(statusRaw);
 
         // Skip empty rows
         if (!productCode && !name) continue;
@@ -574,7 +602,7 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
               category,
               basePrice,
               baseQuantity,
-              status: status as 'active' | 'inactive'
+              status
             };
 
             await tx.insert(products).values(insertData);
