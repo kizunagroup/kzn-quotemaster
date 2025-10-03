@@ -178,7 +178,7 @@ export default function PriceListPage() {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `BangGia_${priceListData.teamName}_${priceListData.period}.xlsx`;
+      link.download = `Bảng giá_${priceListData.period}_${priceListData.teamName}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

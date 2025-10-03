@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Eye, EyeOff, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { Eye, EyeOff, ChevronsDown, ChevronsUp } from "lucide-react";
 import { cn, formatNumber } from "@/lib/utils";
 import type { PriceListMatrixData } from "@/lib/types/price-list.types";
 
@@ -146,13 +146,13 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
             >
               {showVAT ? (
                 <>
-                  <EyeOff className="h-4 w-4 mr-2" />
-                  Hiện giá chưa thuế
+                  <Eye className="h-4 w-4 mr-2" />
+                  Đang xem giá sau thuế
                 </>
               ) : (
                 <>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Hiện giá sau thuế
+                  <EyeOff className="h-4 w-4 mr-2" />
+                  Đang xem giá chưa thuế
                 </>
               )}
             </Button>
@@ -165,12 +165,12 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
             >
               {expandedCategories.length > 0 ? (
                 <>
-                  <ChevronsUpDown className="h-4 w-4 mr-2" />
+                  <ChevronsUp className="h-4 w-4 mr-2" />
                   Thu gọn tất cả
                 </>
               ) : (
                 <>
-                  <ChevronsDownUp className="h-4 w-4 mr-2" />
+                  <ChevronsDown className="h-4 w-4 mr-2" />
                   Mở rộng tất cả
                 </>
               )}

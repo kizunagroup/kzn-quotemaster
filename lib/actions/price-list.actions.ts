@@ -862,11 +862,11 @@ export async function exportPriceList(
 
     const supplierHeaderRow = supplierSheet.addRow(supplierHeaders);
     supplierHeaderRow.eachCell((cell) => {
-      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.font = { bold: true, color: { argb: "FF000000" } };
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FF4472C4" },
+        fgColor: { argb: "FFD3D3D3" }, // Light gray - same as product info headers
       };
       cell.alignment = { vertical: "middle", horizontal: "center" };
       cell.border = {
