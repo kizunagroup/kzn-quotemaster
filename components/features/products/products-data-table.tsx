@@ -58,19 +58,18 @@ const formatCurrency = (amount: string | null): string => {
 };
 
 export function ProductsDataTable() {
-  // Modal states - CENTRALIZED STATE MANAGEMENT like Staff with Key-based Reset Pattern
+  // Modal states - SIMPLIFIED like Quotations pattern (no key-based reset for simple modals)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
 
-  // Key-based Reset Pattern for modals to prevent UI freeze
+  // Key-based Reset Pattern for form modals only
   const [createModalKey, setCreateModalKey] = useState(0);
   const [editModalKey, setEditModalKey] = useState(0);
   const [deleteModalKey, setDeleteModalKey] = useState(0);
-  const [importModalKey, setImportModalKey] = useState(0);
 
   // Fetch product data using our custom hook
   const {
@@ -155,8 +154,7 @@ export function ProductsDataTable() {
   };
 
   const handleImportClick = () => {
-    setImportModalKey((prev) => prev + 1); // Reset modal key
-    setIsImportModalOpen(true);
+    setShowImportModal(true);
   };
 
   // Handle activating a product directly (like Staff pattern)
@@ -196,8 +194,9 @@ export function ProductsDataTable() {
     setSelectedProduct(null);
   };
 
-  const handleCloseImportModal = () => {
-    setIsImportModalOpen(false);
+  const handleImportSuccess = () => {
+    refresh();
+    setShowImportModal(false);
   };
 
   // Success handlers that refresh data and close modals
@@ -540,11 +539,11 @@ export function ProductsDataTable() {
         product={selectedProduct}
       />
 
+      {/* Import Modal - SIMPLIFIED like Quotations pattern */}
       <ProductImportModal
-        key={`import-${importModalKey}`}
-        open={isImportModalOpen}
-        onOpenChange={handleCloseImportModal}
-        onSuccess={handleModalSuccess}
+        open={showImportModal}
+        onOpenChange={setShowImportModal}
+        onSuccess={handleImportSuccess}
       />
     </div>
   );

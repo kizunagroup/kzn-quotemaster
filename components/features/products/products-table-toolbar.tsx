@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDebounce } from "use-debounce";
-import { Plus, Settings2, Upload, Download, FileSpreadsheet, FileDown } from "lucide-react";
+import { Plus, Settings2, Upload, Download, FileDown } from "lucide-react";
 import { Table } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -29,7 +28,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
-import { getProductCategories, generateProductImportTemplate, exportProductsToExcel } from "@/lib/actions/product.actions";
+import { exportProductsToExcel } from "@/lib/actions/product.actions";
 import type { Product } from "@/lib/hooks/use-products";
 
 // Single source of truth for status options - STANDARDIZED
@@ -84,9 +83,6 @@ export function ProductsTableToolbar({
   const [categories, setCategories] = useState<string[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
 
-  // Template download loading state
-  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
-
   // Export loading state
   const [isExporting, setIsExporting] = useState(false);
 
@@ -110,6 +106,7 @@ export function ProductsTableToolbar({
     const fetchCategories = async () => {
       setCategoriesLoading(true);
       try {
+        const { getProductCategories } = await import("@/lib/actions/product.actions");
         const result = await getProductCategories();
         if (Array.isArray(result)) {
           setCategories(result);
@@ -131,40 +128,6 @@ export function ProductsTableToolbar({
   // Handle local search input change
   const handleLocalSearchChange = (value: string) => {
     setLocalSearchValue(value);
-  };
-
-  // Handle download template
-  const handleDownloadTemplate = async () => {
-    setIsDownloadingTemplate(true);
-    try {
-      const result = await generateProductImportTemplate();
-
-      if ('error' in result) {
-        toast.error(result.error);
-        return;
-      }
-
-      // Convert Base64 string back to Blob
-      const blob = await (await fetch(
-        `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.base64}`
-      )).blob();
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Template_Import_Hang_Hoa_${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      toast.success('Đã tải Template Import thành công');
-    } catch (error) {
-      console.error('Error downloading template:', error);
-      toast.error('Có lỗi xảy ra khi tải template');
-    } finally {
-      setIsDownloadingTemplate(false);
-    }
   };
 
   // Handle export products
@@ -279,45 +242,26 @@ export function ProductsTableToolbar({
             </Tooltip>
           </TooltipProvider>
 
-          {/* Export Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportProducts}
-            disabled={isExporting}
-          >
-            <FileDown className="mr-2 h-4 w-4" />
-            {isExporting ? 'Đang xuất...' : 'Export'}
-          </Button>
-
-          {/* Import Dropdown Menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Upload className="mr-2 h-4 w-4" />
-                Import
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={handleDownloadTemplate}
-                disabled={isDownloadingTemplate}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                {isDownloadingTemplate ? 'Đang tải...' : 'Tải Template Import'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onImportClick}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Import từ File...
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
           {/* Create Button */}
           <Button onClick={onCreateClick}>
             <Plus className="mr-2 h-4 w-4" />
             Thêm Hàng hóa
+          </Button>
+
+          {/* Import Button */}
+          <Button variant="outline" onClick={onImportClick}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import
+          </Button>
+
+          {/* Export Button */}
+          <Button
+            variant="outline"
+            onClick={handleExportProducts}
+            disabled={isExporting}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {isExporting ? 'Đang xuất...' : 'Export'}
           </Button>
         </div>
       }

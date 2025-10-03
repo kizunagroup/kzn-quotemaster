@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { FileSpreadsheet, Upload, AlertCircle, CheckCircle, X } from "lucide-react";
+import { FileSpreadsheet, Upload, AlertCircle, CheckCircle, X, Download } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-import { importProductsFromExcel } from "@/lib/actions/product.actions";
+import { importProductsFromExcel, generateProductImportTemplate } from "@/lib/actions/product.actions";
 
 interface ProductImportModalProps {
   open: boolean;
@@ -49,6 +49,7 @@ export function ProductImportModal({
     type: "idle",
   });
   const [isDragActive, setIsDragActive] = React.useState(false);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Reset form and state when modal closes
@@ -58,6 +59,40 @@ export function ProductImportModal({
       setImportState({ type: "idle" });
     }
   }, [open]);
+
+  // Handle download template
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    try {
+      const result = await generateProductImportTemplate();
+
+      if ('error' in result) {
+        toast.error(result.error);
+        return;
+      }
+
+      // Convert Base64 string back to Blob
+      const blob = await (await fetch(
+        `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.base64}`
+      )).blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Template_Import_Hang_Hoa_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Đã tải Template Import thành công');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Có lỗi xảy ra khi tải template');
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  };
 
   // Validate and process file
   const validateAndProcessFile = (file: File) => {
@@ -193,10 +228,23 @@ export function ProductImportModal({
             <FileSpreadsheet className="h-5 w-5" />
             Import Hàng hóa từ Excel
           </DialogTitle>
-          <DialogDescription>
-            Tải lên file Excel chứa danh sách hàng hóa. File phải có sheet "Danh
-            sách Hàng hóa" với các cột: Mã hàng, Tên hàng hóa, Quy cách, Đơn vị
-            tính, Nhóm hàng, Giá cơ sở, Số lượng cơ sở, Trạng thái.
+          <DialogDescription className="space-y-2">
+            <p>
+              Tải lên file Excel chứa danh sách hàng hóa. File phải có sheet "Danh
+              sách Hàng hóa" với các cột: Mã hàng, Tên hàng hóa, Quy cách, Đơn vị
+              tính, Nhóm hàng, Giá cơ sở, Số lượng cơ sở, Trạng thái.
+            </p>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              onClick={handleDownloadTemplate}
+              disabled={isDownloadingTemplate}
+              className="p-0 h-auto"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {isDownloadingTemplate ? 'Đang tải...' : 'Tải file mẫu'}
+            </Button>
           </DialogDescription>
         </DialogHeader>
 

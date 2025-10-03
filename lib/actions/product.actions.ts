@@ -400,9 +400,9 @@ export async function generateProductImportTemplate(): Promise<
     const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
 
-    // 4. Create hidden validation data sheet (BUGFIX: Correctly hide worksheet)
+    // 4. Create very hidden validation data sheet (POLISH: veryHidden for better UX)
     const validationSheet = workbook.addWorksheet("data_validation");
-    validationSheet.state = "veryHidden"; // Correct way to hide worksheet in ExcelJS
+    validationSheet.state = "veryHidden"; // veryHidden prevents users from unhiding in Excel
 
     // Populate categories in column A
     categories.forEach((category, index) => {
@@ -771,9 +771,9 @@ export async function exportProductsToExcel(
         (category): category is string => category !== null && category.trim() !== ""
       );
 
-    // 6. Create hidden validation data sheet
+    // 6. Create very hidden validation data sheet (POLISH: veryHidden for better UX)
     const validationSheet = workbook.addWorksheet("data_validation");
-    validationSheet.state = "hidden";
+    validationSheet.state = "veryHidden";
 
     // Populate categories in column A
     categories.forEach((category, index) => {
@@ -825,18 +825,32 @@ export async function exportProductsToExcel(
       { key: "status", width: 15 },
     ];
 
-    // 8. Populate data rows
-    productList.forEach((product) => {
+    // 8. Populate data rows with proper number formatting
+    productList.forEach((product, index) => {
+      const rowNumber = index + 2; // Start from row 2 (after header)
+
+      // Convert string numbers to actual numbers for Excel
+      const basePriceNum = product.basePrice ? parseFloat(product.basePrice) : null;
+      const baseQuantityNum = product.baseQuantity ? parseFloat(product.baseQuantity) : null;
+
       mainSheet.addRow([
         product.productCode,
         product.name,
         product.specification || "",
         product.unit,
         product.category,
-        product.basePrice || "",
-        product.baseQuantity || "",
+        basePriceNum,
+        baseQuantityNum,
         product.status === "active" ? "Hoạt động" : "Tạm dừng",
       ]);
+
+      // Apply number format to price and quantity cells
+      if (basePriceNum !== null) {
+        mainSheet.getCell(`F${rowNumber}`).numFmt = '#,##0.00';
+      }
+      if (baseQuantityNum !== null) {
+        mainSheet.getCell(`G${rowNumber}`).numFmt = '#,##0.00';
+      }
     });
 
     // 9. Apply data validation for "Nhóm hàng" column (column E, index 5)
