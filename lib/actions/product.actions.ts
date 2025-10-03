@@ -1,18 +1,18 @@
-'use server';
+"use server";
 
-import { z } from 'zod';
-import { revalidatePath } from 'next/cache';
-import { db } from '@/lib/db/drizzle';
-import { products } from '@/lib/db/schema';
-import { eq, and, ilike, isNull, sql, asc } from 'drizzle-orm';
-import { getUser } from '@/lib/db/queries';
-import { checkPermission } from '@/lib/auth/permissions';
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db/drizzle";
+import { products } from "@/lib/db/schema";
+import { eq, and, ilike, isNull, sql, asc } from "drizzle-orm";
+import { getUser } from "@/lib/db/queries";
+import { checkPermission } from "@/lib/auth/permissions";
 import {
   createProductSchema,
   updateProductSchema,
   type CreateProductInput,
   type UpdateProductInput,
-} from '@/lib/schemas/product.schemas';
+} from "@/lib/schemas/product.schemas";
 
 // Return type for server actions
 type ActionResult = {
@@ -21,7 +21,10 @@ type ActionResult = {
 };
 
 // Helper function to check product code uniqueness
-async function isProductCodeUnique(productCode: string, excludeId?: number): Promise<boolean> {
+async function isProductCodeUnique(
+  productCode: string,
+  excludeId?: number
+): Promise<boolean> {
   const trimmedCode = productCode.trim().toUpperCase();
 
   const conditions = [
@@ -44,18 +47,20 @@ async function isProductCodeUnique(productCode: string, excludeId?: number): Pro
 }
 
 // Server Action: Create Product
-export async function createProduct(values: CreateProductInput): Promise<ActionResult> {
+export async function createProduct(
+  values: CreateProductInput
+): Promise<ActionResult> {
   try {
     // 1. Authorization Check (CRITICAL FIRST STEP)
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
     // Check if user has permission to manage products
-    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
-      return { error: 'Bạn không có quyền quản lý hàng hóa' };
+      return { error: "Bạn không có quyền quản lý hàng hóa" };
     }
 
     // 2. Input Validation
@@ -70,7 +75,7 @@ export async function createProduct(values: CreateProductInput): Promise<ActionR
     // 3. Business Logic Validation - Check for duplicate product code (case-insensitive)
     const isUnique = await isProductCodeUnique(validatedData.productCode);
     if (!isUnique) {
-      return { error: 'Mã hàng đã tồn tại trong hệ thống' };
+      return { error: "Mã hàng đã tồn tại trong hệ thống" };
     }
 
     // 4. Database Operation
@@ -80,44 +85,50 @@ export async function createProduct(values: CreateProductInput): Promise<ActionR
       specification: validatedData.specification?.trim() || null,
       unit: validatedData.unit.trim(),
       category: validatedData.category.trim(),
-      basePrice: validatedData.basePrice ? validatedData.basePrice.trim() : null,
-      baseQuantity: validatedData.baseQuantity ? validatedData.baseQuantity.trim() : null,
-      status: validatedData.status || 'active',
+      basePrice: validatedData.basePrice
+        ? validatedData.basePrice.trim()
+        : null,
+      baseQuantity: validatedData.baseQuantity
+        ? validatedData.baseQuantity.trim()
+        : null,
+      status: validatedData.status || "active",
     };
 
     await db.insert(products).values(insertData);
 
     // 5. Cache Revalidation
-    revalidatePath('/danh-muc/hang-hoa');
+    revalidatePath("/danh-muc/hang-hoa");
 
     // 6. Return Success Response
-    return { success: 'Hàng hóa đã được tạo thành công' };
+    return { success: "Hàng hóa đã được tạo thành công" };
   } catch (error) {
-    console.error('Error creating product:', error);
+    console.error("Error creating product:", error);
 
     // Handle specific database errors
     if (error instanceof Error) {
-      if (error.message.includes('unique constraint')) {
-        return { error: 'Mã hàng đã tồn tại trong hệ thống' };
+      if (error.message.includes("unique constraint")) {
+        return { error: "Mã hàng đã tồn tại trong hệ thống" };
       }
     }
 
-    return { error: 'Có lỗi xảy ra khi tạo hàng hóa. Vui lòng thử lại.' };
+    return { error: "Có lỗi xảy ra khi tạo hàng hóa. Vui lòng thử lại." };
   }
 }
 
 // Server Action: Update Product
-export async function updateProduct(values: UpdateProductInput): Promise<ActionResult> {
+export async function updateProduct(
+  values: UpdateProductInput
+): Promise<ActionResult> {
   try {
     // 1. Authorization Check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
-    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
-      return { error: 'Bạn không có quyền quản lý hàng hóa' };
+      return { error: "Bạn không có quyền quản lý hàng hóa" };
     }
 
     // 2. Input Validation
@@ -137,13 +148,16 @@ export async function updateProduct(values: UpdateProductInput): Promise<ActionR
       .limit(1);
 
     if (existingProduct.length === 0) {
-      return { error: 'Không tìm thấy hàng hóa' };
+      return { error: "Không tìm thấy hàng hóa" };
     }
 
     // 4. Business Logic Validation - Check for duplicate product code (case-insensitive)
-    const isUnique = await isProductCodeUnique(validatedData.productCode, validatedData.id);
+    const isUnique = await isProductCodeUnique(
+      validatedData.productCode,
+      validatedData.id
+    );
     if (!isUnique) {
-      return { error: 'Mã hàng đã tồn tại trong hệ thống' };
+      return { error: "Mã hàng đã tồn tại trong hệ thống" };
     }
 
     // 5. Database Operation
@@ -153,8 +167,12 @@ export async function updateProduct(values: UpdateProductInput): Promise<ActionR
       specification: validatedData.specification?.trim() || null,
       unit: validatedData.unit.trim(),
       category: validatedData.category.trim(),
-      basePrice: validatedData.basePrice ? validatedData.basePrice.trim() : null,
-      baseQuantity: validatedData.baseQuantity ? validatedData.baseQuantity.trim() : null,
+      basePrice: validatedData.basePrice
+        ? validatedData.basePrice.trim()
+        : null,
+      baseQuantity: validatedData.baseQuantity
+        ? validatedData.baseQuantity.trim()
+        : null,
       status: validatedData.status,
       updatedAt: new Date(),
     };
@@ -165,21 +183,21 @@ export async function updateProduct(values: UpdateProductInput): Promise<ActionR
       .where(eq(products.id, validatedData.id));
 
     // 6. Cache Revalidation
-    revalidatePath('/danh-muc/hang-hoa');
+    revalidatePath("/danh-muc/hang-hoa");
 
     // 7. Return Success Response
-    return { success: 'Hàng hóa đã được cập nhật thành công' };
+    return { success: "Hàng hóa đã được cập nhật thành công" };
   } catch (error) {
-    console.error('Error updating product:', error);
+    console.error("Error updating product:", error);
 
     // Handle specific database errors
     if (error instanceof Error) {
-      if (error.message.includes('unique constraint')) {
-        return { error: 'Mã hàng đã tồn tại trong hệ thống' };
+      if (error.message.includes("unique constraint")) {
+        return { error: "Mã hàng đã tồn tại trong hệ thống" };
       }
     }
 
-    return { error: 'Có lỗi xảy ra khi cập nhật hàng hóa. Vui lòng thử lại.' };
+    return { error: "Có lỗi xảy ra khi cập nhật hàng hóa. Vui lòng thử lại." };
   }
 }
 
@@ -189,17 +207,17 @@ export async function toggleProductStatus(id: number): Promise<ActionResult> {
     // 1. Authorization Check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
-    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
-      return { error: 'Bạn không có quyền quản lý hàng hóa' };
+      return { error: "Bạn không có quyền quản lý hàng hóa" };
     }
 
     // 2. Validation
     if (!id || id <= 0) {
-      return { error: 'ID hàng hóa không hợp lệ' };
+      return { error: "ID hàng hóa không hợp lệ" };
     }
 
     // 3. Check if product exists and get current status
@@ -210,11 +228,11 @@ export async function toggleProductStatus(id: number): Promise<ActionResult> {
       .limit(1);
 
     if (existingProduct.length === 0) {
-      return { error: 'Không tìm thấy hàng hóa' };
+      return { error: "Không tìm thấy hàng hóa" };
     }
 
     const product = existingProduct[0];
-    const newStatus = product.status === 'active' ? 'inactive' : 'active';
+    const newStatus = product.status === "active" ? "inactive" : "active";
 
     // 4. Database Operation
     await db
@@ -226,14 +244,19 @@ export async function toggleProductStatus(id: number): Promise<ActionResult> {
       .where(eq(products.id, id));
 
     // 5. Cache Revalidation
-    revalidatePath('/danh-muc/hang-hoa');
+    revalidatePath("/danh-muc/hang-hoa");
 
     // 6. Return Success Response
-    const statusText = newStatus === 'active' ? 'kích hoạt' : 'tạm dừng';
-    return { success: `Đã ${statusText} hàng hóa "${product.name}" thành công` };
+    const statusText = newStatus === "active" ? "kích hoạt" : "tạm dừng";
+    return {
+      success: `Đã ${statusText} hàng hóa "${product.name}" thành công`,
+    };
   } catch (error) {
-    console.error('Error toggling product status:', error);
-    return { error: 'Có lỗi xảy ra khi thay đổi trạng thái hàng hóa. Vui lòng thử lại.' };
+    console.error("Error toggling product status:", error);
+    return {
+      error:
+        "Có lỗi xảy ra khi thay đổi trạng thái hàng hóa. Vui lòng thử lại.",
+    };
   }
 }
 
@@ -243,17 +266,17 @@ export async function deleteProduct(id: number): Promise<ActionResult> {
     // 1. Authorization Check
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền thực hiện thao tác này' };
+      return { error: "Không có quyền thực hiện thao tác này" };
     }
 
-    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
-      return { error: 'Bạn không có quyền quản lý hàng hóa' };
+      return { error: "Bạn không có quyền quản lý hàng hóa" };
     }
 
     // 2. Validation
     if (!id || id <= 0) {
-      return { error: 'ID hàng hóa không hợp lệ' };
+      return { error: "ID hàng hóa không hợp lệ" };
     }
 
     // 3. Check if product exists
@@ -264,7 +287,7 @@ export async function deleteProduct(id: number): Promise<ActionResult> {
       .limit(1);
 
     if (existingProduct.length === 0) {
-      return { error: 'Không tìm thấy hàng hóa' };
+      return { error: "Không tìm thấy hàng hóa" };
     }
 
     const product = existingProduct[0];
@@ -279,35 +302,37 @@ export async function deleteProduct(id: number): Promise<ActionResult> {
       .where(eq(products.id, id));
 
     // 5. Cache Revalidation
-    revalidatePath('/danh-muc/hang-hoa');
+    revalidatePath("/danh-muc/hang-hoa");
 
     // 6. Return Success Response
     return { success: `Đã xóa hàng hóa "${product.name}" thành công` };
   } catch (error) {
-    console.error('Error deleting product:', error);
-    return { error: 'Có lỗi xảy ra khi xóa hàng hóa. Vui lòng thử lại.' };
+    console.error("Error deleting product:", error);
+    return { error: "Có lỗi xảy ra khi xóa hàng hóa. Vui lòng thử lại." };
   }
 }
 
 // Server Action: Get Product Categories
-export async function getProductCategories(): Promise<string[] | { error: string }> {
+export async function getProductCategories(): Promise<
+  string[] | { error: string }
+> {
   try {
     // 1. Authorization Check (CRITICAL FIRST STEP)
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền truy cập' };
+      return { error: "Không có quyền truy cập" };
     }
 
     // Check if user has permission to view products
-    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
-      return { error: 'Bạn không có quyền xem danh sách hàng hóa' };
+      return { error: "Bạn không có quyền xem danh sách hàng hóa" };
     }
 
     // 2. Database Query - Get distinct categories
     const result = await db
       .selectDistinct({
-        category: products.category
+        category: products.category,
       })
       .from(products)
       .where(
@@ -320,15 +345,16 @@ export async function getProductCategories(): Promise<string[] | { error: string
 
     // 3. Extract and return category strings
     const categories = result
-      .map(row => row.category)
-      .filter((category): category is string =>
-        category !== null && category.trim() !== ''
+      .map((row) => row.category)
+      .filter(
+        (category): category is string =>
+          category !== null && category.trim() !== ""
       );
 
     return categories;
   } catch (error) {
-    console.error('Error fetching product categories:', error);
-    return { error: 'Có lỗi xảy ra khi tải danh sách nhóm hàng' };
+    console.error("Error fetching product categories:", error);
+    return { error: "Có lỗi xảy ra khi tải danh sách nhóm hàng" };
   }
 }
 
@@ -340,19 +366,19 @@ export async function generateProductImportTemplate(): Promise<
     // 1. Authorization Check (CRITICAL FIRST STEP)
     const user = await getUser();
     if (!user) {
-      return { error: 'Không có quyền truy cập' };
+      return { error: "Không có quyền truy cập" };
     }
 
     // Check if user has permission to manage products
-    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
-      return { error: 'Bạn không có quyền quản lý hàng hóa' };
+      return { error: "Bạn không có quyền quản lý hàng hóa" };
     }
 
     // 2. Fetch distinct categories for dropdown validation
     const categoriesResult = await db
       .selectDistinct({
-        category: products.category
+        category: products.category,
       })
       .from(products)
       .where(
@@ -364,19 +390,19 @@ export async function generateProductImportTemplate(): Promise<
       .orderBy(asc(products.category));
 
     const categories = categoriesResult
-      .map(row => row.category)
-      .filter((category): category is string =>
-        category !== null && category.trim() !== ''
+      .map((row) => row.category)
+      .filter(
+        (category): category is string =>
+          category !== null && category.trim() !== ""
       );
 
     // 3. Create Excel workbook using ExcelJS
-    const ExcelJS = (await import('exceljs')).default;
+    const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
 
-    // 4. Create hidden validation data sheet (UPGRADE: Ensure hidden state)
-    const validationSheet = workbook.addWorksheet('data_validation', {
-      state: 'hidden'
-    });
+    // 4. Create hidden validation data sheet (BUGFIX: Correctly hide worksheet)
+    const validationSheet = workbook.addWorksheet("data_validation");
+    validationSheet.state = "veryHidden"; // Correct way to hide worksheet in ExcelJS
 
     // Populate categories in column A
     categories.forEach((category, index) => {
@@ -384,22 +410,22 @@ export async function generateProductImportTemplate(): Promise<
     });
 
     // Populate status values in column B (Vietnamese labels for UI)
-    validationSheet.getCell('B1').value = 'Hoạt động';
-    validationSheet.getCell('B2').value = 'Tạm dừng';
+    validationSheet.getCell("B1").value = "Hoạt động";
+    validationSheet.getCell("B2").value = "Tạm dừng";
 
     // 5. Create main data sheet
-    const mainSheet = workbook.addWorksheet('Danh sách Hàng hóa');
+    const mainSheet = workbook.addWorksheet("Danh sách Hàng hóa");
 
     // Define headers (Vietnamese for UI)
     const headers = [
-      'Mã hàng',
-      'Tên hàng hóa',
-      'Quy cách',
-      'Đơn vị tính',
-      'Nhóm hàng',
-      'Giá cơ sở',
-      'Số lượng cơ sở',
-      'Trạng thái'
+      "Mã hàng",
+      "Tên hàng hóa",
+      "Quy cách",
+      "Đơn vị tính",
+      "Nhóm hàng",
+      "Giá cơ sở",
+      "Số lượng cơ sở",
+      "Trạng thái",
     ];
 
     mainSheet.addRow(headers);
@@ -410,34 +436,35 @@ export async function generateProductImportTemplate(): Promise<
     headers.forEach((_, colIndex) => {
       const cell = headerRow.getCell(colIndex + 1);
       cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE0E0E0' }
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE0E0E0" },
       };
     });
 
     // Set column widths
     mainSheet.columns = [
-      { key: 'productCode', width: 15 },
-      { key: 'name', width: 30 },
-      { key: 'specification', width: 25 },
-      { key: 'unit', width: 15 },
-      { key: 'category', width: 20 },
-      { key: 'basePrice', width: 15 },
-      { key: 'baseQuantity', width: 18 },
-      { key: 'status', width: 15 }
+      { key: "productCode", width: 15 },
+      { key: "name", width: 30 },
+      { key: "specification", width: 25 },
+      { key: "unit", width: 15 },
+      { key: "category", width: 20 },
+      { key: "basePrice", width: 15 },
+      { key: "baseQuantity", width: 18 },
+      { key: "status", width: 15 },
     ];
 
     // 6. UPGRADE: Apply data validation with Error Alert for "Nhóm hàng" column (column E, index 5)
     if (categories.length > 0) {
       const categoryValidation = {
-        type: 'list' as const,
+        type: "list" as const,
         allowBlank: true,
         formulae: [`data_validation!$A$1:$A$${categories.length}`],
         showErrorMessage: true,
-        errorStyle: 'warning',
-        errorTitle: 'Tạo Nhóm hàng Mới?',
-        error: 'Giá trị bạn nhập không có trong danh sách. Bạn có chắc muốn tạo một nhóm hàng mới không?'
+        errorStyle: "warning",
+        errorTitle: "Tạo Nhóm hàng Mới?",
+        error:
+          "Giá trị bạn nhập không có trong danh sách. Bạn có chắc muốn tạo một nhóm hàng mới không?",
       };
 
       // Apply validation to 1000 rows
@@ -446,11 +473,15 @@ export async function generateProductImportTemplate(): Promise<
       }
     }
 
-    // 7. UPGRADE: Apply data validation with Vietnamese labels for "Trạng thái" column (column H, index 8)
+    // 7. BUGFIX: Apply strict data validation for "Trạng thái" column (column H, index 8)
     const statusValidation = {
-      type: 'list' as const,
+      type: "list" as const,
       allowBlank: true,
-      formulae: [`data_validation!$B$1:$B$2`]
+      formulae: [`data_validation!$B$1:$B$2`],
+      showErrorMessage: true,
+      errorStyle: "stop",
+      errorTitle: "Giá trị không hợp lệ",
+      error: "Vui lòng chọn một giá trị từ danh sách: Hoạt động hoặc Tạm dừng",
     };
 
     for (let row = 2; row <= 1001; row++) {
@@ -459,29 +490,29 @@ export async function generateProductImportTemplate(): Promise<
 
     // 8. Generate buffer and convert to Base64
     const buffer = await workbook.xlsx.writeBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
+    const base64 = Buffer.from(buffer).toString("base64");
 
     return { success: true, base64 };
   } catch (error) {
-    console.error('Error generating product import template:', error);
-    return { error: 'Có lỗi xảy ra khi tạo file mẫu. Vui lòng thử lại.' };
+    console.error("Error generating product import template:", error);
+    return { error: "Có lỗi xảy ra khi tạo file mẫu. Vui lòng thử lại." };
   }
 }
 
 // Helper function to convert Vietnamese status labels to database values
-function parseStatus(statusValue: string): 'active' | 'inactive' {
+function parseStatus(statusValue: string): "active" | "inactive" {
   const trimmed = statusValue.trim().toLowerCase();
 
   // Handle Vietnamese labels
-  if (trimmed === 'hoạt động') return 'active';
-  if (trimmed === 'tạm dừng') return 'inactive';
+  if (trimmed === "hoạt động") return "active";
+  if (trimmed === "tạm dừng") return "inactive";
 
   // Handle English values (backward compatibility)
-  if (trimmed === 'active') return 'active';
-  if (trimmed === 'inactive') return 'inactive';
+  if (trimmed === "active") return "active";
+  if (trimmed === "inactive") return "inactive";
 
   // Default to active
-  return 'active';
+  return "active";
 }
 
 // Server Action: Import Products from Excel
@@ -492,28 +523,38 @@ type ImportResult = {
   errors: string[];
 };
 
-export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<ImportResult> {
+export async function importProductsFromExcel(
+  fileBuffer: ArrayBuffer
+): Promise<ImportResult> {
   try {
     // 1. Authorization Check (CRITICAL FIRST STEP)
     const user = await getUser();
     if (!user) {
-      return { created: 0, updated: 0, errors: ['Không có quyền truy cập'] };
+      return { created: 0, updated: 0, errors: ["Không có quyền truy cập"] };
     }
 
     // Check if user has permission to manage products
-    const hasPermission = await checkPermission(user.id, 'canManageProducts');
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
     if (!hasPermission) {
-      return { created: 0, updated: 0, errors: ['Bạn không có quyền quản lý hàng hóa'] };
+      return {
+        created: 0,
+        updated: 0,
+        errors: ["Bạn không có quyền quản lý hàng hóa"],
+      };
     }
 
     // 2. Parse Excel file using ExcelJS
-    const ExcelJS = (await import('exceljs')).default;
+    const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(fileBuffer);
 
-    const worksheet = workbook.getWorksheet('Danh sách Hàng hóa');
+    const worksheet = workbook.getWorksheet("Danh sách Hàng hóa");
     if (!worksheet) {
-      return { created: 0, updated: 0, errors: ['Không tìm thấy sheet "Danh sách Hàng hóa"'] };
+      return {
+        created: 0,
+        updated: 0,
+        errors: ['Không tìm thấy sheet "Danh sách Hàng hóa"'],
+      };
     }
 
     // 3. Process rows with transaction
@@ -534,7 +575,7 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
         const category = row.getCell(5).value?.toString().trim();
         const basePrice = row.getCell(6).value?.toString().trim() || null;
         const baseQuantity = row.getCell(7).value?.toString().trim() || null;
-        const statusRaw = row.getCell(8).value?.toString().trim() || 'active';
+        const statusRaw = row.getCell(8).value?.toString().trim() || "active";
         const status = parseStatus(statusRaw);
 
         // Skip empty rows
@@ -562,15 +603,17 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
           if (existingProduct.length > 0) {
             // UPDATE LOGIC: Build update object with non-empty values only
             const updateData: Record<string, any> = {
-              updatedAt: new Date()
+              updatedAt: new Date(),
             };
 
             if (name) updateData.name = name;
-            if (specification !== undefined) updateData.specification = specification;
+            if (specification !== undefined)
+              updateData.specification = specification;
             if (unit) updateData.unit = unit;
             if (category) updateData.category = category;
             if (basePrice !== undefined) updateData.basePrice = basePrice;
-            if (baseQuantity !== undefined) updateData.baseQuantity = baseQuantity;
+            if (baseQuantity !== undefined)
+              updateData.baseQuantity = baseQuantity;
             if (status) updateData.status = status;
 
             await tx
@@ -582,15 +625,21 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
           } else {
             // CREATE LOGIC: Validate required fields
             if (!name) {
-              errors.push(`Dòng ${rowNumber}: Thiếu tên hàng hóa (mã: ${productCode})`);
+              errors.push(
+                `Dòng ${rowNumber}: Thiếu tên hàng hóa (mã: ${productCode})`
+              );
               continue;
             }
             if (!unit) {
-              errors.push(`Dòng ${rowNumber}: Thiếu đơn vị tính (mã: ${productCode})`);
+              errors.push(
+                `Dòng ${rowNumber}: Thiếu đơn vị tính (mã: ${productCode})`
+              );
               continue;
             }
             if (!category) {
-              errors.push(`Dòng ${rowNumber}: Thiếu nhóm hàng (mã: ${productCode})`);
+              errors.push(
+                `Dòng ${rowNumber}: Thiếu nhóm hàng (mã: ${productCode})`
+              );
               continue;
             }
 
@@ -602,7 +651,7 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
               category,
               basePrice,
               baseQuantity,
-              status
+              status,
             };
 
             await tx.insert(products).values(insertData);
@@ -610,13 +659,19 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
           }
         } catch (rowError) {
           console.error(`Error processing row ${rowNumber}:`, rowError);
-          errors.push(`Dòng ${rowNumber}: ${rowError instanceof Error ? rowError.message : 'Lỗi không xác định'}`);
+          errors.push(
+            `Dòng ${rowNumber}: ${
+              rowError instanceof Error
+                ? rowError.message
+                : "Lỗi không xác định"
+            }`
+          );
         }
       }
     });
 
     // 4. Cache Revalidation
-    revalidatePath('/danh-muc/hang-hoa');
+    revalidatePath("/danh-muc/hang-hoa");
 
     // 5. Return detailed result
     const successMessage = `Import hoàn tất: ${created} hàng hóa mới, ${updated} hàng hóa cập nhật`;
@@ -624,14 +679,14 @@ export async function importProductsFromExcel(fileBuffer: ArrayBuffer): Promise<
       success: successMessage,
       created,
       updated,
-      errors
+      errors,
     };
   } catch (error) {
-    console.error('Error importing products from Excel:', error);
+    console.error("Error importing products from Excel:", error);
     return {
       created: 0,
       updated: 0,
-      errors: ['Có lỗi xảy ra khi import file Excel. Vui lòng thử lại.']
+      errors: ["Có lỗi xảy ra khi import file Excel. Vui lòng thử lại."],
     };
   }
 }
