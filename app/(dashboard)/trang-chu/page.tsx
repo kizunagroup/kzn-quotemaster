@@ -1,5 +1,6 @@
-import { KPICards, DashboardStats } from '@/components/features/dashboard/kpi-cards';
+import { KPICards } from '@/components/features/dashboard/kpi-cards';
 import { PriceTrends } from '@/components/features/dashboard/price-trends';
+import { getDashboardStatsData } from '@/lib/actions/dashboard.actions';
 import { Suspense } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,46 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
  * - Section 1: KPI Cards (Kitchens, Products, Suppliers, Quotations)
  * - Section 2: Price Trends (Top price increases and decreases)
  *
- * This is a React Server Component that fetches data from the dashboard API.
+ * This is a React Server Component that directly calls the dashboard action.
  */
-
-async function getDashboardStats(): Promise<DashboardStats> {
-  try {
-    // Fetch dashboard statistics from API
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/dashboard/stats`,
-      {
-        cache: 'no-store', // Always fetch fresh data
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      console.error('Failed to fetch dashboard stats:', response.statusText);
-      // Return empty stats on error
-      return {
-        totalKitchens: 0,
-        totalProducts: 0,
-        totalSuppliers: 0,
-        totalQuotations: 0,
-      };
-    }
-
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
-    // Return empty stats on error
-    return {
-      totalKitchens: 0,
-      totalProducts: 0,
-      totalSuppliers: 0,
-      totalQuotations: 0,
-    };
-  }
-}
 
 // Loading skeleton for KPI cards
 function KPICardsLoading() {
@@ -89,8 +52,20 @@ function PriceTrendsLoading() {
 }
 
 export default async function HomePage() {
-  // Fetch dashboard statistics
-  const stats = await getDashboardStats();
+  // Fetch dashboard statistics directly from server action
+  let stats;
+  try {
+    stats = await getDashboardStatsData();
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    // Return empty stats on error
+    stats = {
+      totalKitchens: 0,
+      totalProducts: 0,
+      totalSuppliers: 0,
+      totalQuotations: 0,
+    };
+  }
 
   return (
     <div className="flex-1 space-y-6 p-6">
