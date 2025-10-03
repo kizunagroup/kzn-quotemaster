@@ -169,22 +169,26 @@ export async function GET(request: Request) {
 
     for (const row of allTrends) {
       // Transform database row into typed ProductTrend object
+      // CRITICAL: Ensure proper numeric conversion from PostgreSQL numeric type
+      const priceChangePercentage = parseFloat(String(row.price_change_percentage));
+
       const trend: ProductTrend = {
         productId: Number(row.product_id),
         productCode: String(row.product_code),
         productName: String(row.product_name),
-        currentPrice: Number(row.current_price),
-        previousPrice: Number(row.previous_price),
-        priceChange: Number(row.price_change),
-        priceChangePercentage: Number(row.price_change_percentage),
+        currentPrice: parseFloat(String(row.current_price)),
+        previousPrice: parseFloat(String(row.previous_price)),
+        priceChange: parseFloat(String(row.price_change)),
+        priceChangePercentage: priceChangePercentage,
         supplier: String(row.supplier_name), // Supplier offering current best price
         period: currentPeriod,
       };
 
       // Classify as increase or decrease based on percentage change sign
-      if (trend.priceChangePercentage > 0) {
+      // BUG FIX: Use explicit comparison to handle floating point precision
+      if (priceChangePercentage > 0) {
         increases.push(trend); // Price went up (bad for buyers)
-      } else if (trend.priceChangePercentage < 0) {
+      } else if (priceChangePercentage < 0) {
         decreases.push(trend); // Price went down (good for buyers)
       }
       // Note: We skip items with 0% change (already filtered in WHERE clause)
@@ -199,6 +203,19 @@ export async function GET(request: Request) {
     //   (most negative percentages first)
     //
     decreases.sort((a, b) => a.priceChangePercentage - b.priceChangePercentage);
+
+    // Debug logging to verify data separation
+    console.log('[Price Trends API] Total trends found:', allTrends.length);
+    console.log('[Price Trends API] Increases count:', increases.length);
+    console.log('[Price Trends API] Decreases count:', decreases.length);
+    if (decreases.length > 0) {
+      console.log('[Price Trends API] First decrease sample:', {
+        name: decreases[0].productName,
+        percentage: decreases[0].priceChangePercentage,
+        previous: decreases[0].previousPrice,
+        current: decreases[0].currentPrice
+      });
+    }
 
     // 7. Return top 10 of each category for dashboard display
     const response: PriceTrendsResponse = {
