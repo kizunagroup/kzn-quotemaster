@@ -89,11 +89,11 @@ export const navigationConfig: NavigationConfig = {
         description: 'Quản lý nhân viên và phân quyền'
       },
       {
-        href: '/danh-muc/bep',
-        label: 'Bếp',
+        href: '/danh-muc/nhom',
+        label: 'Nhóm',
         icon: 'Building',
         roles: ['ADMIN_*'],
-        description: 'Quản lý danh sách bếp'
+        description: 'Quản lý danh sách nhóm'
       },
       {
         href: '/danh-muc/hang-hoa',

@@ -98,7 +98,7 @@ export const signIn = validatedAction(signInSchema, async (data, formData) => {
   //   return createCheckoutSession({ team: foundTeam, priceId });
   // }
 
-  redirect('/dashboard');
+  redirect('/trang-chu');
 });
 
 const signUpSchema = z.object({

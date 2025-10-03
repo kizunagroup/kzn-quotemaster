@@ -5,8 +5,16 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import useSWR from 'swr';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import useSWR, { mutate } from 'swr';
 import { User } from '@/lib/db/schema';
+import { signOut } from '@/app/(login)/actions';
+import { useRouter } from 'next/navigation';
 import {
   Home,
   Upload,
@@ -16,6 +24,8 @@ import {
   Building,
   Package,
   Truck,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import Image from 'next/image';
@@ -102,6 +112,7 @@ function NavSection({ section, currentPath }: NavSectionProps) {
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: user } = useSWR<User>('/api/user', fetcher);
 
   // Get user's role from team membership
@@ -127,6 +138,12 @@ export function AppSidebar() {
       .join('')
       .toUpperCase();
   };
+
+  async function handleSignOut() {
+    await signOut();
+    mutate('/api/user');
+    router.push('/sign-in');
+  }
 
   return (
     <div className="flex h-full flex-col border-r bg-white">
@@ -158,25 +175,41 @@ export function AppSidebar() {
         ))}
       </nav>
 
-      {/* User Profile Section */}
+      {/* User Profile Section with Dropdown Menu */}
       <div className="border-t p-4">
         {user ? (
-          <div className="flex items-center gap-3">
-            <Avatar className="h-9 w-9">
-              <AvatarImage alt={getUserDisplayName()} />
-              <AvatarFallback className="bg-orange-100 text-orange-600 text-sm font-semibold">
-                {getUserInitials()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {getUserDisplayName()}
-              </p>
-              <p className="text-xs text-gray-500 truncate">
-                {user.email}
-              </p>
-            </div>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-50 rounded-lg p-2 -m-2 transition-colors">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage alt={getUserDisplayName()} />
+                  <AvatarFallback className="bg-orange-100 text-orange-600 text-sm font-semibold">
+                    {getUserInitials()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 overflow-hidden">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {getUserDisplayName()}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {user.email}
+                  </p>
+                </div>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="flex items-center cursor-pointer">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Tài khoản của tôi</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Đăng xuất</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-full bg-gray-200 animate-pulse" />
