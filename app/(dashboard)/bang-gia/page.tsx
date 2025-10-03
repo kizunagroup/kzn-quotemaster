@@ -16,6 +16,7 @@ import {
   getUserAccessibleKitchens,
   getAvailablePeriodsForTeam,
   getPriceListMatrix,
+  exportPriceList,
 } from "@/lib/actions/price-list.actions";
 import type { PeriodInfo, PriceListMatrixData } from "@/lib/types/price-list.types";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ export default function PriceListPage() {
   const [loadingKitchens, setLoadingKitchens] = useState(false);
   const [loadingPeriods, setLoadingPeriods] = useState(false);
   const [loadingPriceList, setLoadingPriceList] = useState(false);
+  const [loadingExport, setLoadingExport] = useState(false);
 
   // STEP 1: Load user's accessible regions on mount
   useEffect(() => {
@@ -159,9 +161,35 @@ export default function PriceListPage() {
     }
   };
 
-  // Handle export (placeholder for now)
-  const handleExport = () => {
-    toast.info("Tính năng xuất Excel sẽ được cập nhật trong phiên bản tiếp theo");
+  // Handle export to Excel
+  const handleExport = async () => {
+    if (!priceListData) {
+      toast.error("Không có dữ liệu để xuất file");
+      return;
+    }
+
+    try {
+      setLoadingExport(true);
+      toast.info("Đang tạo file Excel...");
+
+      const blob = await exportPriceList(priceListData);
+
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `BangGia_${priceListData.teamName}_${priceListData.period}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Đã tải file Excel thành công");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Không thể xuất file Excel");
+    } finally {
+      setLoadingExport(false);
+    }
   };
 
   return (
@@ -171,120 +199,131 @@ export default function PriceListPage() {
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border p-6">
         <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-        {/* Region Select */}
-        <div className="lg:min-w-[200px]">
-          <Select
-            value={selectedRegion}
-            onValueChange={(value) => {
-              setSelectedRegion(value);
-              setPriceListData(null);
-            }}
-            disabled={loadingRegions}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder={loadingRegions ? "Đang tải..." : "Khu vực..."} />
-            </SelectTrigger>
-            <SelectContent>
-              {regions.map((region) => (
-                <SelectItem key={region} value={region}>
-                  {region}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          {/* Region Select */}
+          <div className="lg:min-w-[200px]">
+            <Select
+              value={selectedRegion}
+              onValueChange={(value) => {
+                setSelectedRegion(value);
+                setPriceListData(null);
+              }}
+              disabled={loadingRegions}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder={loadingRegions ? "Đang tải..." : "Khu vực..."} />
+              </SelectTrigger>
+              <SelectContent>
+                {regions.map((region) => (
+                  <SelectItem key={region} value={region}>
+                    {region}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Kitchen Select */}
-        <div className="lg:min-w-[240px]">
-          <Select
-            value={selectedTeamId?.toString() || ""}
-            onValueChange={(value) => {
-              setSelectedTeamId(Number(value));
-              setPriceListData(null);
-            }}
-            disabled={!selectedRegion || loadingKitchens}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue
-                placeholder={
-                  !selectedRegion
-                    ? "Bếp (chọn khu vực trước)..."
-                    : loadingKitchens
-                    ? "Đang tải..."
-                    : kitchens.length === 0
-                    ? "Không có bếp"
-                    : "Bếp..."
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {kitchens.map((kitchen) => (
-                <SelectItem key={kitchen.id} value={kitchen.id.toString()}>
-                  {kitchen.name} ({kitchen.kitchenCode})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          {/* Kitchen Select */}
+          <div className="lg:min-w-[240px]">
+            <Select
+              value={selectedTeamId?.toString() || ""}
+              onValueChange={(value) => {
+                setSelectedTeamId(Number(value));
+                setPriceListData(null);
+              }}
+              disabled={!selectedRegion || loadingKitchens}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={
+                    !selectedRegion
+                      ? "Bếp (chọn khu vực trước)..."
+                      : loadingKitchens
+                      ? "Đang tải..."
+                      : kitchens.length === 0
+                      ? "Không có bếp"
+                      : "Bếp..."
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {kitchens.map((kitchen) => (
+                  <SelectItem key={kitchen.id} value={kitchen.id.toString()}>
+                    {kitchen.name} ({kitchen.kitchenCode})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Period Select */}
-        <div className="lg:min-w-[260px]">
-          <Select
-            value={selectedPeriod}
-            onValueChange={(value) => {
-              setSelectedPeriod(value);
-              setPriceListData(null);
-            }}
-            disabled={!selectedTeamId || loadingPeriods}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue
-                placeholder={
-                  !selectedTeamId
-                    ? "Kỳ báo giá (chọn bếp trước)..."
-                    : loadingPeriods
-                    ? "Đang tải..."
-                    : periods.length === 0
-                    ? "Không có kỳ báo giá"
-                    : "Kỳ báo giá..."
-                }
-              />
-            </SelectTrigger>
-            <SelectContent>
-              {periods.map((period) => (
-                <SelectItem key={period.period} value={period.period}>
-                  {period.period} ({period.approvedQuotations} báo giá)
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+          {/* Period Select */}
+          <div className="lg:min-w-[260px]">
+            <Select
+              value={selectedPeriod}
+              onValueChange={(value) => {
+                setSelectedPeriod(value);
+                setPriceListData(null);
+              }}
+              disabled={!selectedTeamId || loadingPeriods}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={
+                    !selectedTeamId
+                      ? "Kỳ báo giá (chọn bếp trước)..."
+                      : loadingPeriods
+                      ? "Đang tải..."
+                      : periods.length === 0
+                      ? "Không có kỳ báo giá"
+                      : "Kỳ báo giá..."
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {periods.map((period) => (
+                  <SelectItem key={period.period} value={period.period}>
+                    {period.period} ({period.approvedQuotations} báo giá)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-        {/* Action Buttons */}
-        <div>
-          <Button
-            onClick={handleViewPriceList}
-            disabled={!selectedTeamId || !selectedPeriod || loadingPriceList}
-            className="min-w-[120px] w-full lg:w-auto"
-          >
-            {loadingPriceList ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang tải...
-              </>
-            ) : (
-              "Xem"
-            )}
-          </Button>
-        </div>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button
+              onClick={handleViewPriceList}
+              disabled={!selectedTeamId || !selectedPeriod || loadingPriceList}
+              className="min-w-[120px]"
+            >
+              {loadingPriceList ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang tải...
+                </>
+              ) : (
+                "Xem"
+              )}
+            </Button>
 
-        <div>
-          <Button variant="outline" onClick={handleExport} disabled={!priceListData} className="w-full lg:w-auto">
-            <FileDown className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+            <Button
+              variant="outline"
+              onClick={handleExport}
+              disabled={!priceListData || loadingExport}
+            >
+              {loadingExport ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang xuất...
+                </>
+              ) : (
+                <>
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export
+                </>
+              )}
+            </Button>
+          </div>
         </div>
-      </div>
       </div>
 
       {/* Price Matrix Display */}

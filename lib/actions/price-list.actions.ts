@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import ExcelJS from "exceljs";
 import { db } from "@/lib/db/drizzle";
 import {
   quotations,
@@ -810,6 +811,357 @@ export async function getProductPriceComparison(
     console.error("Error in getProductPriceComparison:", error);
     throw new Error(
       error instanceof Error ? error.message : "Lỗi khi so sánh giá sản phẩm"
+    );
+  }
+}
+
+/**
+ * Export price list matrix to Excel with complex multi-sheet structure
+ * - Sheet 1: Supplier information
+ * - Subsequent sheets: One per category with complex headers
+ */
+export async function exportPriceList(
+  priceListData: PriceListMatrixData
+): Promise<Blob> {
+  try {
+    console.log("[exportPriceList] Starting export with data:", {
+      productsCount: priceListData.products.length,
+      suppliersCount: priceListData.suppliers.length,
+      teamName: priceListData.teamName,
+      period: priceListData.period,
+    });
+
+    // Authorization check
+    await checkTeamAccess(priceListData.teamId);
+
+    if (!priceListData.products || priceListData.products.length === 0) {
+      throw new Error("Không có dữ liệu sản phẩm để xuất file");
+    }
+
+    if (!priceListData.suppliers || priceListData.suppliers.length === 0) {
+      throw new Error("Không có dữ liệu nhà cung cấp để xuất file");
+    }
+
+    // Create new workbook
+    const workbook = new ExcelJS.Workbook();
+
+    // ==================== SHEET 1: SUPPLIER INFORMATION ====================
+    const supplierSheet = workbook.addWorksheet("Thông tin NCC");
+
+    // Set up supplier sheet headers
+    const supplierHeaders = [
+      "Mã NCC",
+      "Tên NCC",
+      "Người liên hệ",
+      "Số điện thoại",
+      "Email",
+      "Số sản phẩm báo giá",
+      "Tổng số sản phẩm",
+      "Tỷ lệ phủ (%)",
+    ];
+
+    const supplierHeaderRow = supplierSheet.addRow(supplierHeaders);
+    supplierHeaderRow.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF4472C4" },
+      };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border = {
+        top: { style: "thin" },
+        left: { style: "thin" },
+        bottom: { style: "thin" },
+        right: { style: "thin" },
+      };
+    });
+
+    // Add supplier data rows
+    priceListData.suppliers.forEach((supplier) => {
+      const row = supplierSheet.addRow([
+        supplier.code,
+        supplier.name,
+        supplier.contactPerson || "",
+        supplier.phone || "",
+        supplier.email || "",
+        supplier.quotedProducts,
+        supplier.totalProducts,
+        supplier.coveragePercentage,
+      ]);
+
+      row.eachCell((cell) => {
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      });
+    });
+
+    // Auto-fit columns for supplier sheet
+    supplierSheet.columns.forEach((column) => {
+      let maxLength = 10;
+      column.eachCell?.({ includeEmpty: false }, (cell) => {
+        const cellLength = cell.value ? cell.value.toString().length : 0;
+        if (cellLength > maxLength) {
+          maxLength = cellLength;
+        }
+      });
+      column.width = Math.min(Math.max(maxLength + 2, 12), 50);
+    });
+
+    console.log(
+      `[exportPriceList] Created supplier sheet with ${priceListData.suppliers.length} suppliers`
+    );
+
+    // ==================== CATEGORY SHEETS ====================
+    // Group products by category
+    const productsByCategory = new Map<string, typeof priceListData.products>();
+    priceListData.products.forEach((product) => {
+      if (!productsByCategory.has(product.category)) {
+        productsByCategory.set(product.category, []);
+      }
+      productsByCategory.get(product.category)!.push(product);
+    });
+
+    console.log(
+      `[exportPriceList] Processing ${productsByCategory.size} categories`
+    );
+
+    // Create a sheet for each category
+    for (const [category, categoryProducts] of productsByCategory.entries()) {
+      console.log(
+        `[exportPriceList] Creating sheet for category: ${category} with ${categoryProducts.length} products`
+      );
+
+      const categorySheet = workbook.addWorksheet(category);
+
+      // ==================== COMPLEX HEADER CONSTRUCTION ====================
+      // Header structure:
+      // Row 1: Product info headers + merged cells for each supplier name
+      // Row 2: Empty for product info columns + "Đơn giá", "VAT %", "Giá có VAT" for each supplier
+
+      const suppliers = priceListData.suppliers;
+      const productInfoColCount = 4; // Mã SP, Tên SP, Quy cách, Đơn vị
+
+      // ROW 1: Main header row
+      const headerRow1 = categorySheet.getRow(1);
+      headerRow1.height = 25;
+
+      // Product info headers (row 1)
+      headerRow1.getCell(1).value = "Mã sản phẩm";
+      headerRow1.getCell(2).value = "Tên sản phẩm";
+      headerRow1.getCell(3).value = "Quy cách";
+      headerRow1.getCell(4).value = "Đơn vị";
+
+      // Style product info headers
+      for (let i = 1; i <= productInfoColCount; i++) {
+        const cell = headerRow1.getCell(i);
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF70AD47" },
+        };
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        cell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+      }
+
+      // Merge cells for product info headers (spanning 2 rows)
+      categorySheet.mergeCells(1, 1, 2, 1); // Mã sản phẩm
+      categorySheet.mergeCells(1, 2, 2, 2); // Tên sản phẩm
+      categorySheet.mergeCells(1, 3, 2, 3); // Quy cách
+      categorySheet.mergeCells(1, 4, 2, 4); // Đơn vị
+
+      // ROW 2: Sub-header row
+      const headerRow2 = categorySheet.getRow(2);
+      headerRow2.height = 20;
+
+      // Supplier headers (spanning 3 columns each)
+      let currentCol = productInfoColCount + 1;
+      suppliers.forEach((supplier) => {
+        // Merge cells for supplier name (row 1, spanning 3 columns)
+        const startCol = currentCol;
+        const endCol = currentCol + 2;
+
+        categorySheet.mergeCells(1, startCol, 1, endCol);
+        const supplierNameCell = headerRow1.getCell(startCol);
+        supplierNameCell.value = supplier.name;
+        supplierNameCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        supplierNameCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF4472C4" },
+        };
+        supplierNameCell.alignment = { vertical: "middle", horizontal: "center" };
+        supplierNameCell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+
+        // Sub-headers for this supplier (row 2)
+        const priceCell = headerRow2.getCell(startCol);
+        priceCell.value = "Đơn giá";
+        priceCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        priceCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF5B9BD5" },
+        };
+        priceCell.alignment = { vertical: "middle", horizontal: "center" };
+        priceCell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+
+        const vatCell = headerRow2.getCell(startCol + 1);
+        vatCell.value = "VAT %";
+        vatCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        vatCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF5B9BD5" },
+        };
+        vatCell.alignment = { vertical: "middle", horizontal: "center" };
+        vatCell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+
+        const totalCell = headerRow2.getCell(startCol + 2);
+        totalCell.value = "Giá có VAT";
+        totalCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        totalCell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FF5B9BD5" },
+        };
+        totalCell.alignment = { vertical: "middle", horizontal: "center" };
+        totalCell.border = {
+          top: { style: "thin" },
+          left: { style: "thin" },
+          bottom: { style: "thin" },
+          right: { style: "thin" },
+        };
+
+        currentCol += 3;
+      });
+
+      // ==================== DATA ROWS ====================
+      categoryProducts.forEach((product) => {
+        const dataRow = categorySheet.addRow([
+          product.productCode,
+          product.productName,
+          product.specification || "",
+          product.unit,
+        ]);
+
+        // Add supplier price data
+        suppliers.forEach((supplier) => {
+          const supplierData = product.suppliers[supplier.id];
+
+          if (supplierData) {
+            // Has price data
+            dataRow.getCell(dataRow.cellCount + 1).value = supplierData.approvedPrice;
+            dataRow.getCell(dataRow.cellCount + 1).value = supplierData.vatRate;
+            dataRow.getCell(dataRow.cellCount + 1).value = supplierData.totalPriceWithVAT;
+
+            // Highlight best price
+            if (supplierData.hasBestPrice) {
+              const priceCell = dataRow.getCell(dataRow.cellCount - 2);
+              const vatCell = dataRow.getCell(dataRow.cellCount - 1);
+              const totalCell = dataRow.getCell(dataRow.cellCount);
+
+              priceCell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFFFF00" }, // Yellow highlight
+              };
+              vatCell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFFFF00" },
+              };
+              totalCell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFFFF00" },
+              };
+            }
+          } else {
+            // No price data - empty cells
+            dataRow.getCell(dataRow.cellCount + 1).value = "";
+            dataRow.getCell(dataRow.cellCount + 1).value = "";
+            dataRow.getCell(dataRow.cellCount + 1).value = "";
+          }
+        });
+
+        // Apply borders to all cells
+        dataRow.eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin" },
+            left: { style: "thin" },
+            bottom: { style: "thin" },
+            right: { style: "thin" },
+          };
+        });
+
+        // Format number columns
+        for (let i = productInfoColCount + 1; i <= dataRow.cellCount; i++) {
+          const cell = dataRow.getCell(i);
+          if (typeof cell.value === "number") {
+            cell.numFmt = "#,##0.00";
+          }
+        }
+      });
+
+      // Auto-fit columns for category sheet
+      categorySheet.columns.forEach((column, idx) => {
+        let maxLength = 10;
+        column.eachCell?.({ includeEmpty: false }, (cell) => {
+          const cellLength = cell.value ? cell.value.toString().length : 0;
+          if (cellLength > maxLength) {
+            maxLength = cellLength;
+          }
+        });
+        column.width = Math.min(Math.max(maxLength + 2, 12), 50);
+      });
+
+      console.log(
+        `[exportPriceList] Completed sheet for category: ${category}`
+      );
+    }
+
+    // ==================== GENERATE FILE ====================
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    console.log(
+      `[exportPriceList] Generated Excel file with ${
+        productsByCategory.size + 1
+      } sheets`
+    );
+
+    // Return as Blob for download
+    return new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+  } catch (error) {
+    console.error("Error in exportPriceList:", error);
+    throw new Error(
+      error instanceof Error ? error.message : "Lỗi khi xuất file bảng giá"
     );
   }
 }
