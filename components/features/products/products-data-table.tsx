@@ -37,6 +37,7 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { ProductsTableToolbar } from "./products-table-toolbar";
 import { ProductFormModal } from "./product-form-modal";
 import { ProductDeleteDialog } from "./product-delete-dialog";
+import { ProductImportModal } from "./product-import-modal";
 
 // Date formatting helper - EXACTLY LIKE TEAMS
 const formatDate = (date: Date | string): string => {
@@ -61,6 +62,7 @@ export function ProductsDataTable() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activatingId, setActivatingId] = useState<number | null>(null);
 
@@ -68,6 +70,7 @@ export function ProductsDataTable() {
   const [createModalKey, setCreateModalKey] = useState(0);
   const [editModalKey, setEditModalKey] = useState(0);
   const [deleteModalKey, setDeleteModalKey] = useState(0);
+  const [importModalKey, setImportModalKey] = useState(0);
 
   // Fetch product data using our custom hook
   const {
@@ -151,6 +154,11 @@ export function ProductsDataTable() {
     setIsDeleteModalOpen(true);
   };
 
+  const handleImportClick = () => {
+    setImportModalKey((prev) => prev + 1); // Reset modal key
+    setIsImportModalOpen(true);
+  };
+
   // Handle activating a product directly (like Staff pattern)
   const handleActivateClick = async (product: Product) => {
     setActivatingId(product.id);
@@ -186,6 +194,10 @@ export function ProductsDataTable() {
   const handleCloseDeleteModal = () => {
     setIsDeleteModalOpen(false);
     setSelectedProduct(null);
+  };
+
+  const handleCloseImportModal = () => {
+    setIsImportModalOpen(false);
   };
 
   // Success handlers that refresh data and close modals
@@ -428,6 +440,7 @@ export function ProductsDataTable() {
         hasActiveFiltersOnly={hasActiveFiltersOnly}
         table={table}
         onCreateClick={handleCreateClick}
+        onImportClick={handleImportClick}
       />
 
       {/* Table */}
@@ -525,6 +538,13 @@ export function ProductsDataTable() {
         onClose={handleCloseDeleteModal}
         onSuccess={handleModalSuccess}
         product={selectedProduct}
+      />
+
+      <ProductImportModal
+        key={`import-${importModalKey}`}
+        open={isImportModalOpen}
+        onOpenChange={handleCloseImportModal}
+        onSuccess={handleModalSuccess}
       />
     </div>
   );

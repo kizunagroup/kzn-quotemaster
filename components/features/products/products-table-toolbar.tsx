@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useDebounce } from "use-debounce";
-import { Plus, Settings2, Upload } from "lucide-react";
+import { Plus, Settings2, Upload, Download, FileSpreadsheet } from "lucide-react";
 import { Table } from "@tanstack/react-table";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -16,6 +17,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -27,7 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
-import { getProductCategories } from "@/lib/actions/product.actions";
+import { getProductCategories, generateProductImportTemplate } from "@/lib/actions/product.actions";
 import type { Product } from "@/lib/hooks/use-products";
 
 // Single source of truth for status options - STANDARDIZED
@@ -58,6 +60,7 @@ interface ProductsTableToolbarProps {
 
   // Actions
   onCreateClick: () => void;
+  onImportClick: () => void;
 }
 
 export function ProductsTableToolbar({
@@ -72,6 +75,7 @@ export function ProductsTableToolbar({
   hasActiveFiltersOnly = false,
   table,
   onCreateClick,
+  onImportClick,
 }: ProductsTableToolbarProps) {
   // Local state for search input to enable debouncing
   const [localSearchValue, setLocalSearchValue] = useState(searchValue);
@@ -79,6 +83,9 @@ export function ProductsTableToolbar({
   // Category state - dynamic loading from database
   const [categories, setCategories] = useState<string[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
+
+  // Template download loading state
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
 
   // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
@@ -121,6 +128,40 @@ export function ProductsTableToolbar({
   // Handle local search input change
   const handleLocalSearchChange = (value: string) => {
     setLocalSearchValue(value);
+  };
+
+  // Handle download template
+  const handleDownloadTemplate = async () => {
+    setIsDownloadingTemplate(true);
+    try {
+      const result = await generateProductImportTemplate();
+
+      if ('error' in result) {
+        toast.error(result.error);
+        return;
+      }
+
+      // Create blob and download
+      const blob = new Blob([result.buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Template_Import_Hang_Hoa_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Đã tải Template Import thành công');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Có lỗi xảy ra khi tải template');
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
   };
 
   // Build category options dynamically
@@ -190,20 +231,29 @@ export function ProductsTableToolbar({
             </Tooltip>
           </TooltipProvider>
 
-          {/* Import Button (Placeholder) */}
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" disabled>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Import
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Tính năng sẽ được bổ sung trong phiên bản tiếp theo</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          {/* Import Dropdown Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Upload className="mr-2 h-4 w-4" />
+                Import
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={handleDownloadTemplate}
+                disabled={isDownloadingTemplate}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {isDownloadingTemplate ? 'Đang tải...' : 'Tải Template Import'}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onImportClick}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Import từ File...
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Create Button */}
           <Button onClick={onCreateClick}>
