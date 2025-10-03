@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDebounce } from "use-debounce";
-import { Plus, Settings2, Upload, Download, FileDown } from "lucide-react";
+import { Plus, Settings2, FileUp, FileDown } from "lucide-react";
 import { Table } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -250,7 +250,7 @@ export function ProductsTableToolbar({
 
           {/* Import Button */}
           <Button variant="outline" onClick={onImportClick}>
-            <Upload className="mr-2 h-4 w-4" />
+            <FileUp className="mr-2 h-4 w-4" />
             Import
           </Button>
 
@@ -260,7 +260,7 @@ export function ProductsTableToolbar({
             onClick={handleExportProducts}
             disabled={isExporting}
           >
-            <Download className="mr-2 h-4 w-4" />
+            <FileDown className="mr-2 h-4 w-4" />
             {isExporting ? 'Đang xuất...' : 'Export'}
           </Button>
         </div>

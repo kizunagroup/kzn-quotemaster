@@ -228,25 +228,26 @@ export function ProductImportModal({
             <FileSpreadsheet className="h-5 w-5" />
             Import Hàng hóa từ Excel
           </DialogTitle>
-          <DialogDescription className="space-y-2">
-            <p>
-              Tải lên file Excel chứa danh sách hàng hóa. File phải có sheet "Danh
-              sách Hàng hóa" với các cột: Mã hàng, Tên hàng hóa, Quy cách, Đơn vị
-              tính, Nhóm hàng, Giá cơ sở, Số lượng cơ sở, Trạng thái.
-            </p>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              onClick={handleDownloadTemplate}
-              disabled={isDownloadingTemplate}
-              className="p-0 h-auto"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {isDownloadingTemplate ? 'Đang tải...' : 'Tải file mẫu'}
-            </Button>
+          <DialogDescription>
+            Tải lên file Excel chứa danh sách hàng hóa. File phải có sheet "Danh
+            sách Hàng hóa" với các cột: Mã hàng, Tên hàng hóa, Quy cách, Đơn vị
+            tính, Nhóm hàng, Giá cơ sở, Số lượng cơ sở, Trạng thái.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="px-6 pt-2">
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            onClick={handleDownloadTemplate}
+            disabled={isDownloadingTemplate}
+            className="p-0 h-auto"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            {isDownloadingTemplate ? 'Đang tải...' : 'Tải file mẫu'}
+          </Button>
+        </div>
 
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-6">
