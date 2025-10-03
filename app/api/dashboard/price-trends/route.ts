@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getUser } from '@/lib/db/queries';
+import { getUser, getUserWithTeams } from '@/lib/db/queries';
 import { db } from '@/lib/db/drizzle';
-import { priceHistory, products, suppliers, teamMembers, teams } from '@/lib/db/schema';
-import { eq, sql, and, isNull, desc, asc } from 'drizzle-orm';
+import { priceHistory, products, suppliers } from '@/lib/db/schema';
+import { eq, sql, and, isNull, desc } from 'drizzle-orm';
+import { getUserPermissions } from '@/lib/auth/permissions';
 
 /**
  * Price Trends API Route
@@ -42,27 +43,38 @@ export async function GET(request: Request) {
       );
     }
 
-    // 2. Get user's team membership and role for data filtering
-    const userTeamMemberships = await db
-      .select({
-        teamId: teamMembers.teamId,
-        role: teamMembers.role,
-      })
-      .from(teamMembers)
-      .innerJoin(teams, eq(teamMembers.teamId, teams.id))
-      .where(and(eq(teamMembers.userId, user.id), isNull(teams.deletedAt)));
+    // 2. Get user permissions using centralized permission utility (SINGLE SOURCE OF TRUTH)
+    const permissions = await getUserPermissions(user.id);
 
-    if (userTeamMemberships.length === 0) {
-      return NextResponse.json({
-        priceIncreases: [],
-        priceDecreases: [],
-      });
+    // 3. Determine data scope based on teamRestricted flag
+    let regionFilter: string | null = null;
+
+    if (permissions.teamRestricted) {
+      // Restricted users: Get their primary team's region for filtering
+      const userWithTeams = await getUserWithTeams(user.id);
+
+      if (!userWithTeams || userWithTeams.teams.length === 0) {
+        // User has no team assignment - return empty data
+        return NextResponse.json({
+          priceIncreases: [],
+          priceDecreases: [],
+        });
+      }
+
+      // Use the region from the user's first (primary) team
+      regionFilter = userWithTeams.teams[0].team.region;
+
+      // If no region is assigned to their team, return empty data
+      if (!regionFilter) {
+        return NextResponse.json({
+          priceIncreases: [],
+          priceDecreases: [],
+        });
+      }
     }
+    // If teamRestricted is false (Admin/Procurement roles), regionFilter stays null = see all data
 
-    const userRole = userTeamMemberships[0].role;
-    const isAdmin = userRole.startsWith('ADMIN_');
-
-    // 3. Find the two most recent distinct periods with approved prices
+    // 4. Find the two most recent distinct periods with approved prices
     const recentPeriods = await db
       .selectDistinct({ period: priceHistory.period })
       .from(priceHistory)
@@ -81,7 +93,7 @@ export async function GET(request: Request) {
     const currentPeriod = recentPeriods[0].period;
     const previousPeriod = recentPeriods[1].period;
 
-    // 4. Build the price comparison query with CTE
+    // 5. Build the price comparison query with CTE
     //
     // BUSINESS LOGIC EXPLANATION:
     // -------------------------------
@@ -100,60 +112,124 @@ export async function GET(request: Request) {
     //    each product in the previous period
     // 3. Main query: Join these CTEs to calculate price changes and percentage changes
     //
-    const priceTrendsQuery = sql`
-      WITH current_best_prices AS (
-        -- Get the best (minimum) approved price for each product in the current period
-        -- We use DISTINCT ON to pick one supplier when multiple suppliers offer the same best price
-        SELECT DISTINCT ON (ph.product_id)
-          ph.product_id,
-          ph.price::numeric as best_price,
-          s.name as supplier_name
-        FROM ${priceHistory} ph
-        INNER JOIN ${suppliers} s ON ph.supplier_id = s.id
-        WHERE ph.period = ${currentPeriod}
-          AND ph.price_type = 'approved'
-        ORDER BY ph.product_id, ph.price::numeric ASC, s.name ASC
-      ),
-      previous_best_prices AS (
-        -- Get the best (minimum) approved price for each product in the previous period
-        SELECT DISTINCT ON (ph.product_id)
-          ph.product_id,
-          ph.price::numeric as best_price
-        FROM ${priceHistory} ph
-        WHERE ph.period = ${previousPeriod}
-          AND ph.price_type = 'approved'
-        ORDER BY ph.product_id, ph.price::numeric ASC
-      ),
-      price_comparison AS (
-        -- Compare current best price vs previous best price for each product
-        SELECT
-          p.id as product_id,
-          p.product_code,
-          p.name as product_name,
-          cbp.supplier_name,
-          cbp.best_price as current_price,
-          pbp.best_price as previous_price,
-          (cbp.best_price - pbp.best_price) as price_change,
-          -- Calculate percentage change, avoiding division by zero
-          CASE
-            WHEN pbp.best_price > 0
-            THEN ((cbp.best_price - pbp.best_price) / pbp.best_price * 100)
-            ELSE 0
-          END as price_change_percentage
-        FROM ${products} p
-        INNER JOIN current_best_prices cbp ON p.id = cbp.product_id
-        INNER JOIN previous_best_prices pbp ON p.id = pbp.product_id
-        WHERE p.deleted_at IS NULL
-          -- Only include products where the price has actually changed
-          AND cbp.best_price != pbp.best_price
-      )
-      SELECT * FROM price_comparison
-      ORDER BY price_change_percentage DESC
-    `;
+    // RBAC DATA SCOPING (CRITICAL):
+    // - If regionFilter is set (teamRestricted = true): Filter products by region
+    // - If regionFilter is null (teamRestricted = false): No region filter = global view
+    //
+    const priceTrendsQuery = regionFilter
+      ? sql`
+          WITH current_best_prices AS (
+            -- Get the best (minimum) approved price for each product in the current period
+            -- FILTERED BY REGION for restricted users
+            SELECT DISTINCT ON (ph.product_id)
+              ph.product_id,
+              ph.price::numeric as best_price,
+              s.name as supplier_name
+            FROM ${priceHistory} ph
+            INNER JOIN ${suppliers} s ON ph.supplier_id = s.id
+            INNER JOIN ${products} p_filter ON ph.product_id = p_filter.id
+            WHERE ph.period = ${currentPeriod}
+              AND ph.price_type = 'approved'
+              AND p_filter.region = ${regionFilter}
+              AND p_filter.deleted_at IS NULL
+            ORDER BY ph.product_id, ph.price::numeric ASC, s.name ASC
+          ),
+          previous_best_prices AS (
+            -- Get the best (minimum) approved price for each product in the previous period
+            -- FILTERED BY REGION for restricted users
+            SELECT DISTINCT ON (ph.product_id)
+              ph.product_id,
+              ph.price::numeric as best_price
+            FROM ${priceHistory} ph
+            INNER JOIN ${products} p_filter ON ph.product_id = p_filter.id
+            WHERE ph.period = ${previousPeriod}
+              AND ph.price_type = 'approved'
+              AND p_filter.region = ${regionFilter}
+              AND p_filter.deleted_at IS NULL
+            ORDER BY ph.product_id, ph.price::numeric ASC
+          ),
+          price_comparison AS (
+            -- Compare current best price vs previous best price for each product
+            SELECT
+              p.id as product_id,
+              p.product_code,
+              p.name as product_name,
+              cbp.supplier_name,
+              cbp.best_price as current_price,
+              pbp.best_price as previous_price,
+              (cbp.best_price - pbp.best_price) as price_change,
+              -- Calculate percentage change, avoiding division by zero
+              CASE
+                WHEN pbp.best_price > 0
+                THEN ((cbp.best_price - pbp.best_price) / pbp.best_price * 100)
+                ELSE 0
+              END as price_change_percentage
+            FROM ${products} p
+            INNER JOIN current_best_prices cbp ON p.id = cbp.product_id
+            INNER JOIN previous_best_prices pbp ON p.id = pbp.product_id
+            WHERE p.deleted_at IS NULL
+              AND p.region = ${regionFilter}
+              -- Only include products where the price has actually changed
+              AND cbp.best_price != pbp.best_price
+          )
+          SELECT * FROM price_comparison
+          ORDER BY price_change_percentage DESC
+        `
+      : sql`
+          WITH current_best_prices AS (
+            -- Get the best (minimum) approved price for each product in the current period
+            -- NO REGION FILTER for unrestricted users (Admin/Procurement)
+            SELECT DISTINCT ON (ph.product_id)
+              ph.product_id,
+              ph.price::numeric as best_price,
+              s.name as supplier_name
+            FROM ${priceHistory} ph
+            INNER JOIN ${suppliers} s ON ph.supplier_id = s.id
+            WHERE ph.period = ${currentPeriod}
+              AND ph.price_type = 'approved'
+            ORDER BY ph.product_id, ph.price::numeric ASC, s.name ASC
+          ),
+          previous_best_prices AS (
+            -- Get the best (minimum) approved price for each product in the previous period
+            -- NO REGION FILTER for unrestricted users (Admin/Procurement)
+            SELECT DISTINCT ON (ph.product_id)
+              ph.product_id,
+              ph.price::numeric as best_price
+            FROM ${priceHistory} ph
+            WHERE ph.period = ${previousPeriod}
+              AND ph.price_type = 'approved'
+            ORDER BY ph.product_id, ph.price::numeric ASC
+          ),
+          price_comparison AS (
+            -- Compare current best price vs previous best price for each product
+            SELECT
+              p.id as product_id,
+              p.product_code,
+              p.name as product_name,
+              cbp.supplier_name,
+              cbp.best_price as current_price,
+              pbp.best_price as previous_price,
+              (cbp.best_price - pbp.best_price) as price_change,
+              -- Calculate percentage change, avoiding division by zero
+              CASE
+                WHEN pbp.best_price > 0
+                THEN ((cbp.best_price - pbp.best_price) / pbp.best_price * 100)
+                ELSE 0
+              END as price_change_percentage
+            FROM ${products} p
+            INNER JOIN current_best_prices cbp ON p.id = cbp.product_id
+            INNER JOIN previous_best_prices pbp ON p.id = pbp.product_id
+            WHERE p.deleted_at IS NULL
+              -- Only include products where the price has actually changed
+              AND cbp.best_price != pbp.best_price
+          )
+          SELECT * FROM price_comparison
+          ORDER BY price_change_percentage DESC
+        `;
 
     const allTrends = await db.execute(priceTrendsQuery);
 
-    // 5. Process query results and separate into increases vs decreases
+    // 6. Process query results and separate into increases vs decreases
     //
     // PROCESSING LOGIC:
     // -----------------
@@ -194,7 +270,7 @@ export async function GET(request: Request) {
       // Note: We skip items with 0% change (already filtered in WHERE clause)
     }
 
-    // 6. Sort and limit results
+    // 7. Sort and limit results
     //
     // SORTING LOGIC:
     // --------------
@@ -204,7 +280,7 @@ export async function GET(request: Request) {
     //
     decreases.sort((a, b) => a.priceChangePercentage - b.priceChangePercentage);
 
-    // 7. Return top 10 of each category for dashboard display
+    // 8. Return top 10 of each category for dashboard display
     const response: PriceTrendsResponse = {
       priceIncreases: increases.slice(0, 10), // Top 10 biggest price increases
       priceDecreases: decreases.slice(0, 10), // Top 10 biggest price decreases
