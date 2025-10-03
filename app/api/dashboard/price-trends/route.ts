@@ -151,24 +151,7 @@ export async function GET(request: Request) {
       ORDER BY price_change_percentage DESC
     `;
 
-    // DEBUG: Log the SQL query being executed
-    console.log('--- EXECUTING SQL QUERY ---');
-    console.log('Current Period:', currentPeriod);
-    console.log('Previous Period:', previousPeriod);
-    console.log('SQL Query:', priceTrendsQuery.sql);
-    console.log('Query Parameters:', priceTrendsQuery.params);
-    console.log('----------------------------');
-
     const allTrends = await db.execute(priceTrendsQuery);
-
-    // DEBUG: Log the raw database result
-    console.log('--- RAW DB RESULT ---');
-    console.log('Total rows returned:', allTrends.length);
-    console.log('First 3 rows:', allTrends.slice(0, 3));
-    if (allTrends.length > 0) {
-      console.log('Sample row structure:', Object.keys(allTrends[0]));
-    }
-    console.log('---------------------');
 
     // 5. Process query results and separate into increases vs decreases
     //
@@ -220,19 +203,6 @@ export async function GET(request: Request) {
     //   (most negative percentages first)
     //
     decreases.sort((a, b) => a.priceChangePercentage - b.priceChangePercentage);
-
-    // Debug logging to verify data separation
-    console.log('[Price Trends API] Total trends found:', allTrends.length);
-    console.log('[Price Trends API] Increases count:', increases.length);
-    console.log('[Price Trends API] Decreases count:', decreases.length);
-    if (decreases.length > 0) {
-      console.log('[Price Trends API] First decrease sample:', {
-        name: decreases[0].productName,
-        percentage: decreases[0].priceChangePercentage,
-        previous: decreases[0].previousPrice,
-        current: decreases[0].currentPrice
-      });
-    }
 
     // 7. Return top 10 of each category for dashboard display
     const response: PriceTrendsResponse = {

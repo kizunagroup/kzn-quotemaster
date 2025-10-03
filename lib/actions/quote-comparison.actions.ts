@@ -2018,6 +2018,64 @@ export async function approveMultipleQuotations(
       console.log(
         `[approveMultipleQuotations] STEP 2: Finalized approved prices for all quote items in ${quotationsToApprove.length} quotations`
       );
+
+      // STEP 3: Insert approved prices into price_history table for trend analysis
+      // This is CRITICAL for the Price Trends feature to work correctly
+      console.log(
+        `[approveMultipleQuotations] STEP 3: Inserting approved prices into price_history...`
+      );
+
+      // Get all quote items with their newly approved prices
+      const approvedItems = await tx
+        .select({
+          productId: quoteItems.productId,
+          quotationId: quoteItems.quotationId,
+          approvedPrice: quoteItems.approvedPrice,
+          negotiatedPrice: quoteItems.negotiatedPrice,
+          initialPrice: quoteItems.initialPrice,
+        })
+        .from(quoteItems)
+        .where(inArray(quoteItems.quotationId, validQuotationIds));
+
+      // Build price history records for batch insert
+      const priceHistoryRecords = [];
+      for (const item of approvedItems) {
+        // Get quotation details for this item
+        const quotation = quotationsToApprove.find(
+          (q) => q.id === item.quotationId
+        );
+
+        if (!quotation) continue;
+
+        // Calculate final approved price (same logic as STEP 2)
+        const finalPrice =
+          item.approvedPrice ||
+          item.negotiatedPrice ||
+          item.initialPrice;
+
+        if (finalPrice && Number(finalPrice) > 0) {
+          priceHistoryRecords.push({
+            productId: item.productId,
+            supplierId: quotation.supplierId,
+            period: quotation.period,
+            price: finalPrice,
+            priceType: "approved" as const,
+            region: quotation.region,
+          });
+        }
+      }
+
+      // Batch insert all price history records
+      if (priceHistoryRecords.length > 0) {
+        await tx.insert(priceHistory).values(priceHistoryRecords);
+        console.log(
+          `[approveMultipleQuotations] STEP 3: Inserted ${priceHistoryRecords.length} records into price_history`
+        );
+      } else {
+        console.log(
+          `[approveMultipleQuotations] STEP 3: No valid prices to insert into price_history`
+        );
+      }
     });
 
     console.log(
