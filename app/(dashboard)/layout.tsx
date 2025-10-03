@@ -9,6 +9,7 @@ import {
   SheetContent,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import Image from 'next/image';
 
 /**
  * Dashboard Layout
@@ -33,7 +34,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Mobile Header - Visible only on mobile */}
         <header className="lg:hidden border-b bg-white px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-lg font-bold text-gray-900">QuoteMaster</span>
+            <div className="relative h-8 w-24">
+              <Image
+                src="/logo.png"
+                alt="QuoteMaster Logo"
+                fill
+                className="object-contain object-center"
+              />
+            </div>
           </div>
 
           {/* Mobile Menu Toggle */}
