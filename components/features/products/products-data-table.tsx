@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { useProducts, type Product } from "@/lib/hooks/use-products";
 import { toggleProductStatus } from "@/lib/actions/product.actions";
 import { getStatusClassName, getStatusLabel } from "@/lib/utils/status-styles";
+import { formatNumber } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -49,13 +50,6 @@ const formatDate = (date: Date | string): string => {
   });
 };
 
-// Currency formatting helper
-const formatCurrency = (amount: string | null): string => {
-  if (!amount || amount.trim() === "") return "-";
-  const numAmount = Number(amount);
-  if (isNaN(numAmount)) return "-";
-  return numAmount.toLocaleString("vi-VN") + " VND";
-};
 
 export function ProductsDataTable() {
   // Modal states - SIMPLIFIED like Quotations pattern (no key-based reset for simple modals)
@@ -276,7 +270,7 @@ export function ProductsDataTable() {
       cell: ({ row }) => {
         const price = row.getValue("basePrice") as string;
         return (
-          <div className="text-right font-narrow text-sm">{formatCurrency(price)}</div>
+          <div className="text-right font-narrow text-sm">{formatNumber(price)}</div>
         );
       },
     },
