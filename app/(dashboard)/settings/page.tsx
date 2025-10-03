@@ -53,6 +53,8 @@ function GeneralTab() {
               placeholder="Nhập tên của bạn"
               defaultValue={state.name || user?.name || ''}
               required
+              disabled
+              className="opacity-60"
             />
           </div>
           <div>
@@ -66,6 +68,8 @@ function GeneralTab() {
               placeholder="Nhập email của bạn"
               defaultValue={user?.email || ''}
               required
+              disabled
+              className="opacity-60"
             />
           </div>
           {state.error && (
@@ -77,16 +81,9 @@ function GeneralTab() {
           <Button
             type="submit"
             className="bg-orange-500 hover:bg-orange-600 text-white"
-            disabled={isPending}
+            disabled
           >
-            {isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Đang lưu...
-              </>
-            ) : (
-              'Lưu thay đổi'
-            )}
+            Lưu thay đổi
           </Button>
         </form>
       </CardContent>
@@ -211,19 +208,10 @@ function SecurityTab() {
               type="submit"
               variant="destructive"
               className="bg-red-600 hover:bg-red-700"
-              disabled={isDeletePending}
+              disabled
             >
-              {isDeletePending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Đang xóa...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Xóa tài khoản
-                </>
-              )}
+              <Trash2 className="mr-2 h-4 w-4" />
+              Xóa tài khoản
             </Button>
           </form>
         </CardContent>
@@ -275,7 +263,7 @@ function TeamTab() {
                 </p>
               </div>
               <form action={customerPortalAction}>
-                <Button type="submit" variant="outline">
+                <Button type="submit" variant="outline" disabled>
                   Quản lý gói dịch vụ
                 </Button>
               </form>
@@ -318,9 +306,9 @@ function TeamTab() {
                         type="submit"
                         variant="outline"
                         size="sm"
-                        disabled={isRemovePending}
+                        disabled
                       >
-                        {isRemovePending ? 'Đang xóa...' : 'Xóa'}
+                        Xóa
                       </Button>
                     </form>
                   )}
@@ -411,7 +399,7 @@ function TeamTab() {
 export default function SettingsPage() {
   return (
     <section className="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Cài đặt</h1>
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Thông tin tài khoản</h1>
 
       <Tabs defaultValue="general" className="space-y-6">
         <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">

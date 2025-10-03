@@ -116,8 +116,10 @@ function KitchensLoading() {
 // Main page component with Suspense boundary
 export default function KitchensPage() {
   return (
-    <Suspense fallback={<KitchensLoading />}>
-      <KitchensContent />
-    </Suspense>
+    <div className="flex-1 space-y-6 p-6">
+      <Suspense fallback={<KitchensLoading />}>
+        <KitchensContent />
+      </Suspense>
+    </div>
   );
 }

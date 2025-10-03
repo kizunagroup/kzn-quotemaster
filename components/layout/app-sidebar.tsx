@@ -94,11 +94,16 @@ interface NavSectionProps {
 }
 
 function NavSection({ section, currentPath }: NavSectionProps) {
+  // Don't show section header for "TRANG CHỦ"
+  const showHeader = section.label !== 'TRANG CHỦ';
+
   return (
     <div className="space-y-1">
-      <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-        {section.label}
-      </h3>
+      {showHeader && (
+        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          {section.label}
+        </h3>
+      )}
       {section.items.map((item) => (
         <NavItem
           key={item.href}
@@ -148,25 +153,19 @@ export function AppSidebar() {
   return (
     <div className="flex h-full flex-col border-r bg-white">
       {/* Logo Section */}
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/trang-chu" className="flex items-center gap-2">
-          <div className="relative h-8 w-8">
-            <Image
-              src="/logo.svg"
-              alt="QuoteMaster Logo"
-              fill
-              className="object-contain"
-            />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold text-gray-900">QuoteMaster</span>
-            <span className="text-xs text-gray-500">Quản lý báo giá</span>
-          </div>
+      <div className="flex h-20 items-center px-6">
+        <Link href="/trang-chu" className="relative h-10 w-full">
+          <Image
+            src="/logo.png"
+            alt="QuoteMaster Logo"
+            fill
+            className="object-contain object-left"
+          />
         </Link>
       </div>
 
       {/* Navigation Sections */}
-      <nav className="flex-1 space-y-4 py-4 px-3 overflow-y-auto">
+      <nav className="flex-1 space-y-4 py-6 px-3 overflow-y-auto">
         {visibleSections.map((section, index) => (
           <div key={section.label}>
             {index > 0 && <Separator className="my-3" />}

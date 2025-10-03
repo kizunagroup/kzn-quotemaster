@@ -125,8 +125,10 @@ function TeamsLoading() {
 // Main page component with Suspense boundary
 export default function TeamsPage() {
   return (
-    <Suspense fallback={<TeamsLoading />}>
-      <TeamsContent />
-    </Suspense>
+    <div className="flex-1 space-y-6 p-6">
+      <Suspense fallback={<TeamsLoading />}>
+        <TeamsContent />
+      </Suspense>
+    </div>
   );
 }
