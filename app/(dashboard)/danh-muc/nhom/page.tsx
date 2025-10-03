@@ -1,12 +1,12 @@
-import { Suspense } from 'react';
-import { Metadata } from 'next';
-import { TeamsDataTable } from '@/components/features/teams/teams-data-table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Suspense } from "react";
+import { Metadata } from "next";
+import { TeamsDataTable } from "@/components/features/teams/teams-data-table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const metadata: Metadata = {
-  title: 'Quản lý Bếp | Kizuna',
-  description: 'Quản lý thông tin các nhóm làm việc trong hệ thống'
+  title: "Quản lý Nhóm | Kizuna",
+  description: "Quản lý thông tin các nhóm làm việc trong hệ thống",
 };
 
 // Main content component with teams data table
