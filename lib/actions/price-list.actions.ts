@@ -956,14 +956,14 @@ export async function exportPriceList(
       headerRow1.getCell(3).value = "Quy cách";
       headerRow1.getCell(4).value = "Đơn vị";
 
-      // Style product info headers
+      // Style product info headers - light gray background
       for (let i = 1; i <= productInfoColCount; i++) {
         const cell = headerRow1.getCell(i);
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.font = { bold: true, color: { argb: "FF000000" } };
         cell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF70AD47" },
+          fgColor: { argb: "FFD3D3D3" }, // Light gray
         };
         cell.alignment = { vertical: "middle", horizontal: "center" };
         cell.border = {
@@ -984,21 +984,26 @@ export async function exportPriceList(
       const headerRow2 = categorySheet.getRow(2);
       headerRow2.height = 20;
 
-      // Supplier headers (spanning 3 columns each)
+      // Supplier headers (spanning 3 columns each) with banded columns
       let currentCol = productInfoColCount + 1;
-      suppliers.forEach((supplier) => {
+      suppliers.forEach((supplier, supplierIndex) => {
         // Merge cells for supplier name (row 1, spanning 3 columns)
         const startCol = currentCol;
         const endCol = currentCol + 2;
 
+        // Determine banding color (alternating light gray and white)
+        const isEvenSupplier = supplierIndex % 2 === 0;
+        const bandColor = isEvenSupplier ? "FFF5F5F5" : "FFFFFFFF"; // Light gray or white
+        const headerBandColor = isEvenSupplier ? "FFD3D3D3" : "FFE8E8E8"; // Darker gray alternating
+
         categorySheet.mergeCells(1, startCol, 1, endCol);
         const supplierNameCell = headerRow1.getCell(startCol);
         supplierNameCell.value = supplier.name;
-        supplierNameCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        supplierNameCell.font = { bold: true, color: { argb: "FF000000" } };
         supplierNameCell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF4472C4" },
+          fgColor: { argb: headerBandColor },
         };
         supplierNameCell.alignment = { vertical: "middle", horizontal: "center" };
         supplierNameCell.border = {
@@ -1010,12 +1015,12 @@ export async function exportPriceList(
 
         // Sub-headers for this supplier (row 2)
         const priceCell = headerRow2.getCell(startCol);
-        priceCell.value = "Đơn giá";
-        priceCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        priceCell.value = "Giá chưa thuế";
+        priceCell.font = { bold: true, color: { argb: "FF000000" } };
         priceCell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF5B9BD5" },
+          fgColor: { argb: headerBandColor },
         };
         priceCell.alignment = { vertical: "middle", horizontal: "center" };
         priceCell.border = {
@@ -1026,12 +1031,12 @@ export async function exportPriceList(
         };
 
         const vatCell = headerRow2.getCell(startCol + 1);
-        vatCell.value = "VAT %";
-        vatCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        vatCell.value = "Thuế GTGT (%)";
+        vatCell.font = { bold: true, color: { argb: "FF000000" } };
         vatCell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF5B9BD5" },
+          fgColor: { argb: headerBandColor },
         };
         vatCell.alignment = { vertical: "middle", horizontal: "center" };
         vatCell.border = {
@@ -1042,12 +1047,12 @@ export async function exportPriceList(
         };
 
         const totalCell = headerRow2.getCell(startCol + 2);
-        totalCell.value = "Giá có VAT";
-        totalCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        totalCell.value = "Giá sau thuế";
+        totalCell.font = { bold: true, color: { argb: "FF000000" } };
         totalCell.fill = {
           type: "pattern",
           pattern: "solid",
-          fgColor: { argb: "FF5B9BD5" },
+          fgColor: { argb: headerBandColor },
         };
         totalCell.alignment = { vertical: "middle", horizontal: "center" };
         totalCell.border = {
@@ -1069,43 +1074,85 @@ export async function exportPriceList(
           product.unit,
         ]);
 
-        // Add supplier price data
-        suppliers.forEach((supplier) => {
+        // Add supplier price data with banded columns
+        suppliers.forEach((supplier, supplierIndex) => {
           const supplierData = product.suppliers[supplier.id];
+          const isEvenSupplier = supplierIndex % 2 === 0;
+          const bandColor = isEvenSupplier ? "FFF5F5F5" : "FFFFFFFF";
 
           if (supplierData) {
             // Has price data
-            dataRow.getCell(dataRow.cellCount + 1).value = supplierData.approvedPrice;
-            dataRow.getCell(dataRow.cellCount + 1).value = supplierData.vatRate;
-            dataRow.getCell(dataRow.cellCount + 1).value = supplierData.totalPriceWithVAT;
+            const priceCell = dataRow.getCell(dataRow.cellCount + 1);
+            const vatCell = dataRow.getCell(dataRow.cellCount + 1);
+            const totalCell = dataRow.getCell(dataRow.cellCount + 1);
 
-            // Highlight best price
+            priceCell.value = supplierData.approvedPrice;
+            vatCell.value = supplierData.vatRate;
+            totalCell.value = supplierData.totalPriceWithVAT;
+
+            // Apply best price styling (green text and green background)
             if (supplierData.hasBestPrice) {
-              const priceCell = dataRow.getCell(dataRow.cellCount - 2);
-              const vatCell = dataRow.getCell(dataRow.cellCount - 1);
-              const totalCell = dataRow.getCell(dataRow.cellCount);
-
+              priceCell.font = { color: { argb: "FF006100" }, bold: true }; // Dark green text
               priceCell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: "FFFFFF00" }, // Yellow highlight
+                fgColor: { argb: "FFC6EFCE" }, // Light green background
+              };
+              vatCell.font = { color: { argb: "FF006100" }, bold: true };
+              vatCell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFC6EFCE" },
+              };
+              totalCell.font = { color: { argb: "FF006100" }, bold: true };
+              totalCell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFC6EFCE" },
+              };
+            } else {
+              // Apply banded column color
+              priceCell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: bandColor },
               };
               vatCell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: "FFFFFF00" },
+                fgColor: { argb: bandColor },
               };
               totalCell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: "FFFFFF00" },
+                fgColor: { argb: bandColor },
               };
             }
           } else {
-            // No price data - empty cells
-            dataRow.getCell(dataRow.cellCount + 1).value = "";
-            dataRow.getCell(dataRow.cellCount + 1).value = "";
-            dataRow.getCell(dataRow.cellCount + 1).value = "";
+            // No price data - empty cells with banded color
+            const emptyCell1 = dataRow.getCell(dataRow.cellCount + 1);
+            const emptyCell2 = dataRow.getCell(dataRow.cellCount + 1);
+            const emptyCell3 = dataRow.getCell(dataRow.cellCount + 1);
+
+            emptyCell1.value = "";
+            emptyCell2.value = "";
+            emptyCell3.value = "";
+
+            emptyCell1.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: bandColor },
+            };
+            emptyCell2.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: bandColor },
+            };
+            emptyCell3.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: bandColor },
+            };
           }
         });
 

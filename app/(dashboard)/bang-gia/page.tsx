@@ -198,97 +198,100 @@ export default function PriceListPage() {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border p-6">
-        <div className="flex flex-col lg:flex-row lg:items-end gap-4">
-          {/* Region Select */}
-          <div className="lg:min-w-[200px]">
-            <Select
-              value={selectedRegion}
-              onValueChange={(value) => {
-                setSelectedRegion(value);
-                setPriceListData(null);
-              }}
-              disabled={loadingRegions}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={loadingRegions ? "Đang tải..." : "Khu vực..."} />
-              </SelectTrigger>
-              <SelectContent>
-                {regions.map((region) => (
-                  <SelectItem key={region} value={region}>
-                    {region}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+          {/* Left side: Filter Selects */}
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Region Select */}
+            <div className="lg:min-w-[200px]">
+              <Select
+                value={selectedRegion}
+                onValueChange={(value) => {
+                  setSelectedRegion(value);
+                  setPriceListData(null);
+                }}
+                disabled={loadingRegions}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={loadingRegions ? "Đang tải..." : "Khu vực..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {regions.map((region) => (
+                    <SelectItem key={region} value={region}>
+                      {region}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Kitchen Select */}
+            <div className="lg:min-w-[240px]">
+              <Select
+                value={selectedTeamId?.toString() || ""}
+                onValueChange={(value) => {
+                  setSelectedTeamId(Number(value));
+                  setPriceListData(null);
+                }}
+                disabled={!selectedRegion || loadingKitchens}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      !selectedRegion
+                        ? "Bếp (chọn khu vực trước)..."
+                        : loadingKitchens
+                        ? "Đang tải..."
+                        : kitchens.length === 0
+                        ? "Không có bếp"
+                        : "Bếp..."
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {kitchens.map((kitchen) => (
+                    <SelectItem key={kitchen.id} value={kitchen.id.toString()}>
+                      {kitchen.name} ({kitchen.kitchenCode})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Period Select */}
+            <div className="lg:min-w-[260px]">
+              <Select
+                value={selectedPeriod}
+                onValueChange={(value) => {
+                  setSelectedPeriod(value);
+                  setPriceListData(null);
+                }}
+                disabled={!selectedTeamId || loadingPeriods}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      !selectedTeamId
+                        ? "Kỳ báo giá (chọn bếp trước)..."
+                        : loadingPeriods
+                        ? "Đang tải..."
+                        : periods.length === 0
+                        ? "Không có kỳ báo giá"
+                        : "Kỳ báo giá..."
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {periods.map((period) => (
+                    <SelectItem key={period.period} value={period.period}>
+                      {period.period} ({period.approvedQuotations} báo giá)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {/* Kitchen Select */}
-          <div className="lg:min-w-[240px]">
-            <Select
-              value={selectedTeamId?.toString() || ""}
-              onValueChange={(value) => {
-                setSelectedTeamId(Number(value));
-                setPriceListData(null);
-              }}
-              disabled={!selectedRegion || loadingKitchens}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    !selectedRegion
-                      ? "Bếp (chọn khu vực trước)..."
-                      : loadingKitchens
-                      ? "Đang tải..."
-                      : kitchens.length === 0
-                      ? "Không có bếp"
-                      : "Bếp..."
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {kitchens.map((kitchen) => (
-                  <SelectItem key={kitchen.id} value={kitchen.id.toString()}>
-                    {kitchen.name} ({kitchen.kitchenCode})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Period Select */}
-          <div className="lg:min-w-[260px]">
-            <Select
-              value={selectedPeriod}
-              onValueChange={(value) => {
-                setSelectedPeriod(value);
-                setPriceListData(null);
-              }}
-              disabled={!selectedTeamId || loadingPeriods}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    !selectedTeamId
-                      ? "Kỳ báo giá (chọn bếp trước)..."
-                      : loadingPeriods
-                      ? "Đang tải..."
-                      : periods.length === 0
-                      ? "Không có kỳ báo giá"
-                      : "Kỳ báo giá..."
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {periods.map((period) => (
-                  <SelectItem key={period.period} value={period.period}>
-                    {period.period} ({period.approvedQuotations} báo giá)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Action Buttons */}
+          {/* Right side: Action Buttons */}
           <div className="flex gap-2">
             <Button
               onClick={handleViewPriceList}

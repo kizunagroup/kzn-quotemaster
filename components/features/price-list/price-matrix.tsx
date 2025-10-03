@@ -147,12 +147,12 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
               {showVAT ? (
                 <>
                   <EyeOff className="h-4 w-4 mr-2" />
-                  Ẩn giá VAT
+                  Hiện giá chưa thuế
                 </>
               ) : (
                 <>
                   <Eye className="h-4 w-4 mr-2" />
-                  Hiện giá VAT
+                  Hiện giá sau thuế
                 </>
               )}
             </Button>
@@ -282,7 +282,7 @@ export function PriceMatrix({ priceListData }: PriceMatrixProps) {
                                     {/* Conditionally show VAT percentage */}
                                     {showVAT && supplierPrice.vatRate > 0 && (
                                       <div className="text-xs text-muted-foreground">
-                                        VAT: {supplierPrice.vatRate}%
+                                        Thuế GTGT ({supplierPrice.vatRate}%)
                                       </div>
                                     )}
                                   </div>
