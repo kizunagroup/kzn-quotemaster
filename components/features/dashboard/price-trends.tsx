@@ -100,9 +100,9 @@ export function PriceTrends() {
             />
           ) : (
             <div className="space-y-2">
-              {priceIncreases.map((product) => (
+              {priceIncreases.map((product, index) => (
                 <div
-                  key={product.productId}
+                  key={`trend-increase-${product.productId}-${index}`}
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
@@ -152,9 +152,9 @@ export function PriceTrends() {
             />
           ) : (
             <div className="space-y-2">
-              {priceDecreases.map((product) => (
+              {priceDecreases.map((product, index) => (
                 <div
-                  key={product.productId}
+                  key={`trend-decrease-${product.productId}-${index}`}
                   className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">

@@ -82,31 +82,70 @@ export async function GET(request: Request) {
     const previousPeriod = recentPeriods[1].period;
 
     // 4. Build the price comparison query with CTE
+    //
+    // BUSINESS LOGIC EXPLANATION:
+    // -------------------------------
+    // For each product, we want to compare the BEST (minimum) approved price
+    // from the most recent period against the BEST approved price from the
+    // immediately preceding period.
+    //
+    // This approach helps identify:
+    // - Products where the best available price has increased (bad for buyers)
+    // - Products where the best available price has decreased (good for buyers)
+    //
+    // QUERY STRUCTURE:
+    // 1. First CTE (current_best_prices): Find the minimum approved price for
+    //    each product in the current period, along with one supplier offering that price
+    // 2. Second CTE (previous_best_prices): Find the minimum approved price for
+    //    each product in the previous period
+    // 3. Main query: Join these CTEs to calculate price changes and percentage changes
+    //
     const priceTrendsQuery = sql`
-      WITH price_comparison AS (
+      WITH current_best_prices AS (
+        -- Get the best (minimum) approved price for each product in the current period
+        -- We use DISTINCT ON to pick one supplier when multiple suppliers offer the same best price
+        SELECT DISTINCT ON (ph.product_id)
+          ph.product_id,
+          ph.price::numeric as best_price,
+          s.name as supplier_name
+        FROM ${priceHistory} ph
+        INNER JOIN ${suppliers} s ON ph.supplier_id = s.id
+        WHERE ph.period = ${currentPeriod}
+          AND ph.price_type = 'approved'
+        ORDER BY ph.product_id, ph.price::numeric ASC, s.name ASC
+      ),
+      previous_best_prices AS (
+        -- Get the best (minimum) approved price for each product in the previous period
+        SELECT DISTINCT ON (ph.product_id)
+          ph.product_id,
+          ph.price::numeric as best_price
+        FROM ${priceHistory} ph
+        WHERE ph.period = ${previousPeriod}
+          AND ph.price_type = 'approved'
+        ORDER BY ph.product_id, ph.price::numeric ASC
+      ),
+      price_comparison AS (
+        -- Compare current best price vs previous best price for each product
         SELECT
           p.id as product_id,
           p.product_code,
           p.name as product_name,
-          s.name as supplier_name,
-          current_ph.price::numeric as current_price,
-          previous_ph.price::numeric as previous_price,
-          (current_ph.price::numeric - previous_ph.price::numeric) as price_change,
+          cbp.supplier_name,
+          cbp.best_price as current_price,
+          pbp.best_price as previous_price,
+          (cbp.best_price - pbp.best_price) as price_change,
+          -- Calculate percentage change, avoiding division by zero
           CASE
-            WHEN previous_ph.price::numeric > 0
-            THEN ((current_ph.price::numeric - previous_ph.price::numeric) / previous_ph.price::numeric * 100)
+            WHEN pbp.best_price > 0
+            THEN ((cbp.best_price - pbp.best_price) / pbp.best_price * 100)
             ELSE 0
           END as price_change_percentage
         FROM ${products} p
-        INNER JOIN ${priceHistory} current_ph ON p.id = current_ph.product_id
-          AND current_ph.period = ${currentPeriod}
-          AND current_ph.price_type = 'approved'
-        INNER JOIN ${priceHistory} previous_ph ON p.id = previous_ph.product_id
-          AND previous_ph.period = ${previousPeriod}
-          AND previous_ph.price_type = 'approved'
-        INNER JOIN ${suppliers} s ON current_ph.supplier_id = s.id
+        INNER JOIN current_best_prices cbp ON p.id = cbp.product_id
+        INNER JOIN previous_best_prices pbp ON p.id = pbp.product_id
         WHERE p.deleted_at IS NULL
-          AND current_ph.price::numeric != previous_ph.price::numeric
+          -- Only include products where the price has actually changed
+          AND cbp.best_price != pbp.best_price
       )
       SELECT * FROM price_comparison
       ORDER BY price_change_percentage DESC
@@ -114,11 +153,22 @@ export async function GET(request: Request) {
 
     const allTrends = await db.execute(priceTrendsQuery);
 
-    // 5. Separate increases and decreases, take top 10 of each
+    // 5. Process query results and separate into increases vs decreases
+    //
+    // PROCESSING LOGIC:
+    // -----------------
+    // The query returns all products sorted by price_change_percentage (DESC),
+    // so positive changes (increases) come first, then negative changes (decreases).
+    //
+    // We separate them into two arrays:
+    // - increases: Products where best price went UP (positive percentage)
+    // - decreases: Products where best price went DOWN (negative percentage)
+    //
     const increases: ProductTrend[] = [];
     const decreases: ProductTrend[] = [];
 
     for (const row of allTrends) {
+      // Transform database row into typed ProductTrend object
       const trend: ProductTrend = {
         productId: Number(row.product_id),
         productCode: String(row.product_code),
@@ -127,24 +177,33 @@ export async function GET(request: Request) {
         previousPrice: Number(row.previous_price),
         priceChange: Number(row.price_change),
         priceChangePercentage: Number(row.price_change_percentage),
-        supplier: String(row.supplier_name),
+        supplier: String(row.supplier_name), // Supplier offering current best price
         period: currentPeriod,
       };
 
+      // Classify as increase or decrease based on percentage change sign
       if (trend.priceChangePercentage > 0) {
-        increases.push(trend);
+        increases.push(trend); // Price went up (bad for buyers)
       } else if (trend.priceChangePercentage < 0) {
-        decreases.push(trend);
+        decreases.push(trend); // Price went down (good for buyers)
       }
+      // Note: We skip items with 0% change (already filtered in WHERE clause)
     }
 
-    // Sort decreases by absolute value (most negative first)
+    // 6. Sort and limit results
+    //
+    // SORTING LOGIC:
+    // --------------
+    // - Increases are already sorted DESC by the query (biggest increases first)
+    // - Decreases need to be re-sorted ASC to show biggest decreases first
+    //   (most negative percentages first)
+    //
     decreases.sort((a, b) => a.priceChangePercentage - b.priceChangePercentage);
 
-    // 6. Return top 10 of each
+    // 7. Return top 10 of each category for dashboard display
     const response: PriceTrendsResponse = {
-      priceIncreases: increases.slice(0, 10),
-      priceDecreases: decreases.slice(0, 10),
+      priceIncreases: increases.slice(0, 10), // Top 10 biggest price increases
+      priceDecreases: decreases.slice(0, 10), // Top 10 biggest price decreases
     };
 
     return NextResponse.json(response);
