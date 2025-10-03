@@ -690,3 +690,199 @@ export async function importProductsFromExcel(
     };
   }
 }
+
+// Server Action: Export Products to Excel
+interface ExportFilters {
+  search?: string;
+  category?: string;
+  status?: string;
+}
+
+export async function exportProductsToExcel(
+  filters: ExportFilters = {}
+): Promise<{ success: true; base64: string } | { error: string }> {
+  try {
+    // 1. Authorization Check (CRITICAL FIRST STEP)
+    const user = await getUser();
+    if (!user) {
+      return { error: "Không có quyền truy cập" };
+    }
+
+    // Check if user has permission to manage products
+    const hasPermission = await checkPermission(user.id, "canManageProducts");
+    if (!hasPermission) {
+      return { error: "Bạn không có quyền xuất dữ liệu hàng hóa" };
+    }
+
+    // 2. Build query conditions based on filters
+    const conditions = [isNull(products.deletedAt)];
+
+    if (filters.search) {
+      conditions.push(
+        sql`(LOWER(${products.name}) LIKE LOWER(${"%" + filters.search + "%"}) OR LOWER(${products.productCode}) LIKE LOWER(${"%" + filters.search + "%"}))`
+      );
+    }
+
+    if (filters.category) {
+      conditions.push(eq(products.category, filters.category));
+    }
+
+    if (filters.status && filters.status !== "all") {
+      conditions.push(eq(products.status, filters.status));
+    }
+
+    // 3. Fetch products from database
+    const productList = await db
+      .select({
+        productCode: products.productCode,
+        name: products.name,
+        specification: products.specification,
+        unit: products.unit,
+        category: products.category,
+        basePrice: products.basePrice,
+        baseQuantity: products.baseQuantity,
+        status: products.status,
+      })
+      .from(products)
+      .where(and(...conditions))
+      .orderBy(asc(products.createdAt));
+
+    // 4. Create Excel workbook using ExcelJS
+    const ExcelJS = (await import("exceljs")).default;
+    const workbook = new ExcelJS.Workbook();
+
+    // 5. Fetch categories for validation sheet
+    const categoriesResult = await db
+      .selectDistinct({
+        category: products.category,
+      })
+      .from(products)
+      .where(
+        and(
+          isNull(products.deletedAt),
+          sql`${products.category} IS NOT NULL AND TRIM(${products.category}) != ''`
+        )
+      )
+      .orderBy(asc(products.category));
+
+    const categories = categoriesResult
+      .map((row) => row.category)
+      .filter(
+        (category): category is string => category !== null && category.trim() !== ""
+      );
+
+    // 6. Create hidden validation data sheet
+    const validationSheet = workbook.addWorksheet("data_validation");
+    validationSheet.state = "hidden";
+
+    // Populate categories in column A
+    categories.forEach((category, index) => {
+      validationSheet.getCell(`A${index + 1}`).value = category;
+    });
+
+    // Populate status values in column B
+    validationSheet.getCell("B1").value = "Hoạt động";
+    validationSheet.getCell("B2").value = "Tạm dừng";
+
+    // 7. Create main data sheet with EXACT same structure as import template
+    const mainSheet = workbook.addWorksheet("Danh sách Hàng hóa");
+
+    // Define headers (Vietnamese for UI) - MUST match import template
+    const headers = [
+      "Mã hàng",
+      "Tên hàng hóa",
+      "Quy cách",
+      "Đơn vị tính",
+      "Nhóm hàng",
+      "Giá cơ sở",
+      "Số lượng cơ sở",
+      "Trạng thái",
+    ];
+
+    mainSheet.addRow(headers);
+
+    // Style header row cells individually (row 1 only)
+    const headerRow = mainSheet.getRow(1);
+    headerRow.font = { bold: true };
+    headers.forEach((_, colIndex) => {
+      const cell = headerRow.getCell(colIndex + 1);
+      cell.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE0E0E0" },
+      };
+    });
+
+    // Set column widths - MUST match import template
+    mainSheet.columns = [
+      { key: "productCode", width: 15 },
+      { key: "name", width: 30 },
+      { key: "specification", width: 25 },
+      { key: "unit", width: 15 },
+      { key: "category", width: 20 },
+      { key: "basePrice", width: 15 },
+      { key: "baseQuantity", width: 18 },
+      { key: "status", width: 15 },
+    ];
+
+    // 8. Populate data rows
+    productList.forEach((product) => {
+      mainSheet.addRow([
+        product.productCode,
+        product.name,
+        product.specification || "",
+        product.unit,
+        product.category,
+        product.basePrice || "",
+        product.baseQuantity || "",
+        product.status === "active" ? "Hoạt động" : "Tạm dừng",
+      ]);
+    });
+
+    // 9. Apply data validation for "Nhóm hàng" column (column E, index 5)
+    if (categories.length > 0) {
+      const categoryValidation = {
+        type: "list" as const,
+        allowBlank: true,
+        formulae: [`data_validation!$A$1:$A$${categories.length}`],
+        showErrorMessage: true,
+        errorStyle: "warning",
+        errorTitle: "Tạo Nhóm hàng Mới?",
+        error:
+          "Giá trị bạn nhập không có trong danh sách. Bạn có chắc muốn tạo một nhóm hàng mới không?",
+      };
+
+      // Apply validation starting from row 2 to last data row + 1000 buffer
+      const lastRow = productList.length + 1 + 1000;
+      for (let row = 2; row <= lastRow; row++) {
+        mainSheet.getCell(`E${row}`).dataValidation = categoryValidation;
+      }
+    }
+
+    // 10. Apply data validation for "Trạng thái" column (column H, index 8)
+    const statusValidation = {
+      type: "list" as const,
+      allowBlank: true,
+      formulae: [`data_validation!$B$1:$B$2`],
+      showErrorMessage: true,
+      errorStyle: "stop",
+      errorTitle: "Giá trị không hợp lệ",
+      error:
+        "Vui lòng chọn một giá trị từ danh sách: Hoạt động hoặc Tạm dừng",
+    };
+
+    const lastRow = productList.length + 1 + 1000;
+    for (let row = 2; row <= lastRow; row++) {
+      mainSheet.getCell(`H${row}`).dataValidation = statusValidation;
+    }
+
+    // 11. Generate buffer and convert to Base64
+    const buffer = await workbook.xlsx.writeBuffer();
+    const base64 = Buffer.from(buffer).toString("base64");
+
+    return { success: true, base64 };
+  } catch (error) {
+    console.error("Error exporting products to Excel:", error);
+    return { error: "Có lỗi xảy ra khi xuất file Excel. Vui lòng thử lại." };
+  }
+}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useDebounce } from "use-debounce";
-import { Plus, Settings2, Upload, Download, FileSpreadsheet } from "lucide-react";
+import { Plus, Settings2, Upload, Download, FileSpreadsheet, FileDown } from "lucide-react";
 import { Table } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar";
-import { getProductCategories, generateProductImportTemplate } from "@/lib/actions/product.actions";
+import { getProductCategories, generateProductImportTemplate, exportProductsToExcel } from "@/lib/actions/product.actions";
 import type { Product } from "@/lib/hooks/use-products";
 
 // Single source of truth for status options - STANDARDIZED
@@ -86,6 +86,9 @@ export function ProductsTableToolbar({
 
   // Template download loading state
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
+
+  // Export loading state
+  const [isExporting, setIsExporting] = useState(false);
 
   // Debounce the search value to prevent API calls on every keystroke
   const [debouncedSearchValue] = useDebounce(localSearchValue, 300);
@@ -164,6 +167,51 @@ export function ProductsTableToolbar({
     }
   };
 
+  // Handle export products
+  const handleExportProducts = async () => {
+    setIsExporting(true);
+    try {
+      // Get current filter state
+      const filters = {
+        search: searchValue || undefined,
+        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+        status: selectedStatus !== 'all' ? selectedStatus : undefined,
+      };
+
+      const result = await exportProductsToExcel(filters);
+
+      if ('error' in result) {
+        toast.error(result.error);
+        return;
+      }
+
+      // Convert Base64 string back to Blob
+      const blob = await (await fetch(
+        `data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,${result.base64}`
+      )).blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Generate filename with filters info
+      const filterSuffix = hasActiveFilters ? '_Filtered' : '';
+      link.download = `Danh_Sach_Hang_Hoa${filterSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast.success('Đã xuất dữ liệu thành công');
+    } catch (error) {
+      console.error('Error exporting products:', error);
+      toast.error('Có lỗi xảy ra khi xuất dữ liệu');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Build category options dynamically
   const categoryOptions = [
     { value: "all", label: "Tất cả nhóm hàng" },
@@ -230,6 +278,17 @@ export function ProductsTableToolbar({
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+
+          {/* Export Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportProducts}
+            disabled={isExporting}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            {isExporting ? 'Đang xuất...' : 'Export'}
+          </Button>
 
           {/* Import Dropdown Menu */}
           <DropdownMenu>
