@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -14,7 +15,6 @@ import {
 import useSWR, { mutate } from 'swr';
 import { User } from '@/lib/db/schema';
 import { signOut } from '@/app/(login)/actions';
-import { useRouter } from 'next/navigation';
 import {
   Home,
   Upload,
@@ -36,6 +36,7 @@ import {
   NavigationItem,
 } from '@/lib/config/navigation';
 import { filterNavigationSections } from '@/lib/permissions/navigation';
+import { getCurrentUserRole } from '@/lib/actions/user.actions';
 
 /**
  * App Sidebar Component
@@ -115,19 +116,63 @@ function NavSection({ section, currentPath }: NavSectionProps) {
   );
 }
 
+/**
+ * Sidebar Loading Skeleton
+ *
+ * Displayed while user role is being fetched from the server
+ */
+function SidebarSkeleton() {
+  return (
+    <div className="flex h-full flex-col border-r bg-white">
+      {/* Logo Section */}
+      <div className="flex h-20 items-center justify-center px-6">
+        <div className="relative h-10 w-32 bg-gray-200 rounded animate-pulse" />
+      </div>
+
+      {/* Navigation Skeleton */}
+      <nav className="flex-1 space-y-4 py-6 px-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <div key={i} className="h-10 bg-gray-200 rounded animate-pulse" />
+        ))}
+      </nav>
+
+      {/* User Profile Skeleton */}
+      <div className="border-t p-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-full bg-gray-200 animate-pulse" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 bg-gray-200 rounded animate-pulse" />
+            <div className="h-2 bg-gray-200 rounded w-2/3 animate-pulse" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppSidebar() {
+  // ✅ ALL HOOKS AT THE TOP LEVEL - BEFORE ANY CONDITIONAL RETURNS
   const pathname = usePathname();
   const router = useRouter();
   const { data: user } = useSWR<User>('/api/user', fetcher);
 
-  // Get user's role from team membership
-  // Note: For now, we'll use a simplified approach
-  // In production, this should fetch the user's role from team_members table
-  const userRole = user ? 'ADMIN_SUPER_ADMIN' : null; // TODO: Get actual role from team_members
+  // Fetch user role through the secure Server Action bridge
+  const { data: userRole, error: roleError, isLoading: roleLoading } = useSWR<string | null>(
+    'current-user-role',
+    getCurrentUserRole,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      dedupingInterval: 60000, // Cache for 1 minute
+    }
+  );
 
-  // Filter navigation sections based on user role
+  // Filter navigation sections based on user role (using useMemo for performance)
   const allSections = getNavigationSections();
-  const visibleSections = filterNavigationSections(allSections, userRole);
+  const visibleSections = useMemo(
+    () => filterNavigationSections(allSections, userRole),
+    [userRole]
+  );
 
   // Get user display name
   const getUserDisplayName = () => {
@@ -148,6 +193,17 @@ export function AppSidebar() {
     await signOut();
     mutate('/api/user');
     router.push('/sign-in');
+  }
+
+  // ✅ CONDITIONAL RETURN AFTER ALL HOOKS
+  // Handle loading state while role is being fetched
+  if (roleLoading) {
+    return <SidebarSkeleton />;
+  }
+
+  // Handle error state (getCurrentUserRole() will redirect, but this is a fallback)
+  if (roleError) {
+    return null;
   }
 
   return (
