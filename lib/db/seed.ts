@@ -17,7 +17,7 @@ import {
 } from "./schema";
 import { hashPassword } from "@/lib/auth/session";
 import { sql } from "drizzle-orm";
-import { Department } from "@/lib/auth/permissions";
+import { Department } from "@/lib/config/roles";
 
 // Helper function to generate random Vietnamese names
 const firstNames = [

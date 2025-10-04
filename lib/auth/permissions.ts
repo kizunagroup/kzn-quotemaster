@@ -1,622 +1,49 @@
+/**
+ * Server-Only Permission Utilities
+ *
+ * ⚠️ WARNING: This file is SERVER-ONLY. Do NOT import this file in Client Components.
+ *
+ * This file contains functions that require server-side database access.
+ * For client-safe role definitions and utilities, import from:
+ * @/lib/config/roles
+ */
+
 import { getUserWithTeams, getUserTeams } from '@/lib/db/queries';
+import {
+  Department,
+  Level,
+  ROLE_PERMISSIONS,
+  PermissionSet,
+  Role,
+  mergePermissions,
+  parseRole
+} from '@/lib/config/roles';
 
-// Enhanced role definitions
-export enum Department {
-  ADMIN = 'ADMIN',
-  PROCUREMENT = 'PROCUREMENT',
-  ACCOUNTING = 'ACCOUNTING',
-  HR = 'HR',
-  PRODUCTION = 'PRODUCTION',
-  GENERAL_AFFAIRS = 'GENERAL_AFFAIRS',
-  LOGISTICS = 'LOGISTICS',
-  BUSINESS_DEVELOPMENT = 'BUSINESS_DEVELOPMENT',
-  KITCHEN = 'KITCHEN',
-  OPERATIONS = 'OPERATIONS' // Keep for backward compatibility
-}
+// Re-export client-safe types and utilities for convenience
+export {
+  Department,
+  Level,
+  ROLE_PERMISSIONS,
+  type PermissionSet,
+  type Role,
+  type QuoteMasterRole,
+  type TemplateRole,
+  mergePermissions,
+  parseRole,
+  isValidRole,
+  getRolesForDepartment,
+  getHighestRoleInDepartment,
+  hasPermission,
+  isAdmin,
+  hasProcurementAccess
+} from '@/lib/config/roles';
 
-export enum Level {
-  SUPER_ADMIN = 'SUPER_ADMIN',
-  MANAGER = 'MANAGER',
-  STAFF = 'STAFF',
-  VIEWER = 'VIEWER'
-}
-
-// Role type definitions
-export type QuoteMasterRole = `${Department}_${Level}`;
-export type TemplateRole = 'owner' | 'member';
-export type Role = QuoteMasterRole | TemplateRole;
-
-// Permission interface
-export interface PermissionSet {
-  canViewQuotes: boolean;
-  canCreateQuotes: boolean;
-  canApproveQuotes: boolean;
-  canNegotiateQuotes: boolean;
-  canManageProducts: boolean;
-  canManageSuppliers: boolean;
-  canManageKitchens: boolean;
-  canManageStaff: boolean;
-  canViewAnalytics: boolean;
-  canExportData: boolean;
-  teamRestricted: boolean; // Can only access data from assigned teams
-}
-
-// Complete role permissions mapping
-export const ROLE_PERMISSIONS: Record<Role, PermissionSet> = {
-  // Template roles (backward compatibility)
-  'owner': {
-    canViewQuotes: true,
-    canCreateQuotes: true,
-    canApproveQuotes: true,
-    canNegotiateQuotes: true,
-    canManageProducts: true,
-    canManageSuppliers: true,
-    canManageKitchens: true,
-    canManageStaff: true,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'member': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // QuoteMaster enhanced roles - ADMIN department
-  'ADMIN_SUPER_ADMIN': {
-    canViewQuotes: true,
-    canCreateQuotes: true,
-    canApproveQuotes: true,
-    canNegotiateQuotes: true,
-    canManageProducts: true,
-    canManageSuppliers: true,
-    canManageKitchens: true,
-    canManageStaff: true,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'ADMIN_MANAGER': {
-    canViewQuotes: true,
-    canCreateQuotes: true,
-    canApproveQuotes: true,
-    canNegotiateQuotes: true,
-    canManageProducts: true,
-    canManageSuppliers: true,
-    canManageKitchens: true,
-    canManageStaff: true,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'ADMIN_STAFF': {
-    canViewQuotes: true,
-    canCreateQuotes: true,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'ADMIN_VIEWER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: false,
-    teamRestricted: false,
-  },
-
-  // PROCUREMENT department roles
-  'PROCUREMENT_SUPER_ADMIN': {
-    canViewQuotes: true,
-    canCreateQuotes: true,
-    canApproveQuotes: true,
-    canNegotiateQuotes: true,
-    canManageProducts: true,
-    canManageSuppliers: true,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'PROCUREMENT_MANAGER': {
-    canViewQuotes: true,
-    canCreateQuotes: true,
-    canApproveQuotes: true,
-    canNegotiateQuotes: true,
-    canManageProducts: true,
-    canManageSuppliers: true,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'PROCUREMENT_STAFF': {
-    canViewQuotes: true,
-    canCreateQuotes: true,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'PROCUREMENT_VIEWER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: false,
-    teamRestricted: false,
-  },
-
-  // KITCHEN department roles
-  'KITCHEN_SUPER_ADMIN': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: true,
-  },
-  'KITCHEN_MANAGER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: true,
-  },
-  'KITCHEN_STAFF': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'KITCHEN_VIEWER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // ACCOUNTING department roles
-  'ACCOUNTING_SUPER_ADMIN': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'ACCOUNTING_MANAGER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'ACCOUNTING_STAFF': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'ACCOUNTING_VIEWER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // OPERATIONS department roles (kept for backward compatibility)
-  'OPERATIONS_SUPER_ADMIN': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'OPERATIONS_MANAGER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: true,
-    canExportData: true,
-    teamRestricted: false,
-  },
-  'OPERATIONS_STAFF': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'OPERATIONS_VIEWER': {
-    canViewQuotes: true,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // HR department roles (placeholder - to be configured)
-  'HR_SUPER_ADMIN': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'HR_MANAGER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'HR_STAFF': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'HR_VIEWER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // PRODUCTION department roles (placeholder - to be configured)
-  'PRODUCTION_SUPER_ADMIN': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'PRODUCTION_MANAGER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'PRODUCTION_STAFF': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'PRODUCTION_VIEWER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // GENERAL_AFFAIRS department roles (placeholder - to be configured)
-  'GENERAL_AFFAIRS_SUPER_ADMIN': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'GENERAL_AFFAIRS_MANAGER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'GENERAL_AFFAIRS_STAFF': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'GENERAL_AFFAIRS_VIEWER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // LOGISTICS department roles (placeholder - to be configured)
-  'LOGISTICS_SUPER_ADMIN': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'LOGISTICS_MANAGER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'LOGISTICS_STAFF': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'LOGISTICS_VIEWER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-
-  // BUSINESS_DEVELOPMENT department roles (placeholder - to be configured)
-  'BUSINESS_DEVELOPMENT_SUPER_ADMIN': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'BUSINESS_DEVELOPMENT_MANAGER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'BUSINESS_DEVELOPMENT_STAFF': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-  'BUSINESS_DEVELOPMENT_VIEWER': {
-    canViewQuotes: false,
-    canCreateQuotes: false,
-    canApproveQuotes: false,
-    canNegotiateQuotes: false,
-    canManageProducts: false,
-    canManageSuppliers: false,
-    canManageKitchens: false,
-    canManageStaff: false,
-    canViewAnalytics: false,
-    canExportData: false,
-    teamRestricted: true,
-  },
-};
-
-// Import client-safe utility functions
-import { mergePermissions, parseRole } from './utils';
-
-// Authorization utility functions
-
+/**
+ * SERVER-ONLY: Get user permissions based on their team memberships
+ *
+ * This function queries the database to get all teams the user belongs to,
+ * then merges the permissions from all their roles.
+ */
 export async function getUserPermissions(userId: number): Promise<PermissionSet> {
   try {
     const userWithTeams = await getUserWithTeams(userId);
@@ -651,6 +78,11 @@ export async function getUserPermissions(userId: number): Promise<PermissionSet>
   }
 }
 
+/**
+ * SERVER-ONLY: Check if user has a specific permission
+ *
+ * Optionally verifies team membership if the action requires team restriction.
+ */
 export async function checkPermission(
   userId: number,
   action: keyof PermissionSet,
@@ -667,7 +99,7 @@ export async function checkPermission(
     // If action requires team restriction, verify user has access to team
     if (userPermissions.teamRestricted && teamId) {
       const userTeams = await getUserTeams(userId);
-      return userTeams.some(team => team.id === teamId);
+      return userTeams.some(team => team.teamId === teamId);
     }
 
     // If not team restricted or no specific team required, allow access
@@ -678,10 +110,9 @@ export async function checkPermission(
   }
 }
 
-// Export client-safe utility functions from utils.ts
-export { parseRole, isValidRole, getRolesForDepartment, getHighestRoleInDepartment } from './utils';
-
-// Helper function to check if user has any role in a department
+/**
+ * SERVER-ONLY: Check if user has any role in a department
+ */
 export async function userHasRoleInDepartment(userId: number, department: Department): Promise<boolean> {
   try {
     const userWithTeams = await getUserWithTeams(userId);
@@ -697,7 +128,9 @@ export async function userHasRoleInDepartment(userId: number, department: Depart
   }
 }
 
-// Helper function to get user's highest level in a department
+/**
+ * SERVER-ONLY: Get user's highest level in a department
+ */
 export async function getUserHighestLevelInDepartment(userId: number, department: Department): Promise<Level | null> {
   try {
     const userWithTeams = await getUserWithTeams(userId);

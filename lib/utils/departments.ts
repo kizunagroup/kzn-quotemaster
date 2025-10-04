@@ -1,10 +1,10 @@
 /**
  * Client-safe department utilities
  * This file provides centralized department display logic.
- * SINGLE SOURCE OF TRUTH: Department enum is imported from permissions.ts
+ * SINGLE SOURCE OF TRUTH: Department enum is imported from roles.ts
  */
 
-import { Department } from '@/lib/auth/permissions';
+import { Department } from '@/lib/config/roles';
 
 // Department labels in Vietnamese
 export const DEPARTMENT_LABELS: Record<Department, string> = {

@@ -53,7 +53,7 @@ import {
 } from '@/lib/schemas/staff.schemas';
 import type { Staff } from '@/lib/hooks/use-staff';
 import { DepartmentCombobox } from './department-combobox';
-import { Department } from '@/lib/auth/permissions';
+import { Department } from '@/lib/config/roles';
 
 interface StaffFormModalProps {
   isOpen: boolean;

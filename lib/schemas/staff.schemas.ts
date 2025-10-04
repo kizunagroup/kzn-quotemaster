@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Department } from '@/lib/auth/permissions';
+import { Department } from '@/lib/config/roles';
 
 // Task 2.1.1: Zod Schemas for Staff Management with Vietnamese error messages
 export const createStaffSchema = z.object({

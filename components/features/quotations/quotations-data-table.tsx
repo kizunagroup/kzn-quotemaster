@@ -46,7 +46,7 @@ import {
   getAvailableSuppliers,
   getAvailableCategories,
 } from "@/lib/actions/quotations.actions";
-import { type PermissionSet } from "@/lib/auth/permissions";
+import { type PermissionSet } from "@/lib/config/roles";
 import { ImportExcelModal } from "./import-excel-modal";
 import { QuoteDetailsModal } from "./quote-details-modal";
 import {
