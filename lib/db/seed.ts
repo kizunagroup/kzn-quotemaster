@@ -17,6 +17,7 @@ import {
 } from "./schema";
 import { hashPassword } from "@/lib/auth/session";
 import { sql } from "drizzle-orm";
+import { Department } from "@/lib/auth/permissions";
 
 // Helper function to generate random Vietnamese names
 const firstNames = [
@@ -119,9 +120,9 @@ const regions = [
   "Quy Nhon",
 ];
 
-// V3.2 Enhanced department structure
+// V3.2 Enhanced department structure (using Department enum as keys)
 const departmentStructure = {
-  ADMIN: {
+  [Department.ADMIN]: {
     roles: ["ADMIN_SUPER_ADMIN", "ADMIN_MANAGER", "ADMIN_STAFF"],
     count: 8,
     jobTitles: [
@@ -135,7 +136,7 @@ const departmentStructure = {
       "IT Support",
     ],
   },
-  PROCUREMENT: {
+  [Department.PROCUREMENT]: {
     roles: [
       "PROCUREMENT_SUPER_ADMIN",
       "PROCUREMENT_MANAGER",
@@ -157,7 +158,7 @@ const departmentStructure = {
       "Compliance Officer",
     ],
   },
-  KITCHEN: {
+  [Department.KITCHEN]: {
     roles: ["KITCHEN_MANAGER", "KITCHEN_STAFF", "KITCHEN_VIEWER"],
     count: 25,
     jobTitles: [
@@ -169,7 +170,7 @@ const departmentStructure = {
       "Nhân viên phục vụ",
     ],
   },
-  ACCOUNTING: {
+  [Department.ACCOUNTING]: {
     roles: ["ACCOUNTING_MANAGER", "ACCOUNTING_STAFF"],
     count: 6,
     jobTitles: [
@@ -355,7 +356,7 @@ export async function seedDatabase() {
         passwordHash: await hashPassword("admin123!"),
         employeeCode: "HM000001",
         phone: generatePhone(),
-        department: "ADMIN",
+        department: Department.ADMIN,
         jobTitle: "System Administrator",
         hireDate: generateHireDate(),
         status: "active",
@@ -406,7 +407,7 @@ export async function seedDatabase() {
     }
 
     // Create teams based on department type
-    if (departmentName === "KITCHEN") {
+    if (departmentName === Department.KITCHEN) {
       // Create multiple kitchen teams (15 teams)
       for (let kitchenIndex = 1; kitchenIndex <= 15; kitchenIndex++) {
         const manager =

@@ -53,6 +53,7 @@ import {
 } from '@/lib/schemas/staff.schemas';
 import type { Staff } from '@/lib/hooks/use-staff';
 import { DepartmentCombobox } from './department-combobox';
+import { Department } from '@/lib/auth/permissions';
 
 interface StaffFormModalProps {
   isOpen: boolean;
@@ -82,7 +83,7 @@ export function StaffFormModal({
       email: '',
       phone: '',
       jobTitle: '',
-      department: '',
+      department: Department.ADMIN, // Default to ADMIN department
       hireDate: '',
       ...(isEditMode && staff && {
         id: staff.id,
@@ -109,7 +110,7 @@ export function StaffFormModal({
           email: staff.email || '',
           phone: staff.phone || '',
           jobTitle: staff.jobTitle || '',
-          department: staff.department || '',
+          department: (staff.department as Department) || Department.ADMIN,
           hireDate: hireDateString,
         });
       } else {
@@ -120,7 +121,7 @@ export function StaffFormModal({
           email: '',
           phone: '',
           jobTitle: '',
-          department: '',
+          department: Department.ADMIN,
           hireDate: '',
         });
       }

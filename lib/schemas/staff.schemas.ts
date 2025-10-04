@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Department } from '@/lib/auth/permissions';
 
 // Task 2.1.1: Zod Schemas for Staff Management with Vietnamese error messages
 export const createStaffSchema = z.object({
@@ -26,19 +27,9 @@ export const createStaffSchema = z.object({
     .string()
     .max(100, 'Chức danh không được vượt quá 100 ký tự')
     .optional(),
-  department: z
-    .enum([
-      'ADMIN',
-      'NHAN_SU',
-      'KE_TOAN',
-      'SAN_XUAT',
-      'TONG_VU',
-      'KINH_DOANH',
-      'PHAT_TRIEN_KINH_DOANH',
-      'BEP'
-    ], {
-      errorMap: () => ({ message: 'Vui lòng chọn một phòng ban hợp lệ' })
-    }),
+  department: z.nativeEnum(Department, {
+    errorMap: () => ({ message: 'Vui lòng chọn một phòng ban hợp lệ' })
+  }),
   hireDate: z
     .string()
     .optional()
