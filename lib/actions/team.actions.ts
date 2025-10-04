@@ -98,9 +98,15 @@ async function manageTeamManagerMembership(
   previousManagerId?: number
 ): Promise<void> {
   try {
+    console.log(`[manageTeamManagerMembership] Starting for managerId: ${managerId}, teamId: ${teamId}, teamType: ${teamType}, action: ${action}`);
+
     // Determine role based on team type
+    // KITCHEN teams use KITCHEN_MANAGER role
+    // OFFICE teams use ADMIN_MANAGER as the default management role for office teams
     const managerRole =
-      teamType === "KITCHEN" ? "KITCHEN_MANAGER" : "OFFICE_MANAGER";
+      teamType === "KITCHEN" ? "KITCHEN_MANAGER" : "ADMIN_MANAGER";
+
+    console.log(`[manageTeamManagerMembership] Assigning role: ${managerRole}`);
 
     // Remove previous manager from team if updating and manager changed
     if (
@@ -108,6 +114,7 @@ async function manageTeamManagerMembership(
       previousManagerId &&
       previousManagerId !== managerId
     ) {
+      console.log(`[manageTeamManagerMembership] Removing previous manager ${previousManagerId} from team`);
       await db
         .delete(teamMembers)
         .where(
@@ -117,9 +124,11 @@ async function manageTeamManagerMembership(
             eq(teamMembers.role, managerRole)
           )
         );
+      console.log(`[manageTeamManagerMembership] Previous manager removed successfully`);
     }
 
     // Check if new manager is already a member of this team
+    console.log(`[manageTeamManagerMembership] Checking existing membership for user ${managerId}`);
     const existingMembership = await db
       .select({ id: teamMembers.id, role: teamMembers.role })
       .from(teamMembers)
@@ -129,6 +138,7 @@ async function manageTeamManagerMembership(
       .limit(1);
 
     if (existingMembership.length > 0) {
+      console.log(`[manageTeamManagerMembership] Updating existing membership to ${managerRole}`);
       // Update existing membership to manager role
       await db
         .update(teamMembers)
@@ -137,7 +147,9 @@ async function manageTeamManagerMembership(
           joinedAt: new Date(), // Update join time for role change
         })
         .where(eq(teamMembers.id, existingMembership[0].id));
+      console.log(`[manageTeamManagerMembership] Membership updated successfully`);
     } else {
+      console.log(`[manageTeamManagerMembership] Creating new membership with role ${managerRole}`);
       // Create new team membership with manager role
       await db.insert(teamMembers).values({
         userId: managerId,
@@ -145,9 +157,17 @@ async function manageTeamManagerMembership(
         role: managerRole,
         joinedAt: new Date(),
       });
+      console.log(`[manageTeamManagerMembership] Membership created successfully`);
     }
+
+    console.log(`[manageTeamManagerMembership] Completed successfully`);
   } catch (error) {
-    console.error("Error managing team manager membership:", error);
+    console.error("[manageTeamManagerMembership] Error managing team manager membership:", error);
+    // Log the full error details for debugging
+    if (error instanceof Error) {
+      console.error("[manageTeamManagerMembership] Error message:", error.message);
+      console.error("[manageTeamManagerMembership] Error stack:", error.stack);
+    }
     throw new Error("Lỗi khi cập nhật quyền quản lý nhóm");
   }
 }
@@ -306,17 +326,23 @@ export async function getTeamTypes(): Promise<string[] | { error: string }> {
 // Server action to create a new team (ENHANCED with team member management)
 export async function createTeam(data: CreateTeamInput) {
   try {
+    console.log("[createTeam] Starting team creation with data:", JSON.stringify(data, null, 2));
+
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
+      console.error("[createTeam] Authorization failed: No user found");
       return { error: "Không có quyền thực hiện thao tác này" };
     }
+    console.log(`[createTeam] User authenticated: ${user.id}`);
 
     // 2. Check team management permission (canManageKitchens covers all team types)
     const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
+      console.error("[createTeam] Permission check failed");
       return { error: "Không có quyền tạo nhóm mới" };
     }
+    console.log("[createTeam] Permission check passed");
 
     // 3. Validate input data
     const validationResult = createTeamSchema.safeParse(data);
@@ -324,10 +350,12 @@ export async function createTeam(data: CreateTeamInput) {
       const errors = validationResult.error.errors
         .map((err) => err.message)
         .join(", ");
+      console.error("[createTeam] Validation failed:", errors);
       return { error: `Dữ liệu không hợp lệ: ${errors}` };
     }
 
     const validatedData = validationResult.data;
+    console.log("[createTeam] Data validated successfully");
 
     // 4. Validate manager exists and has permissions
     const managerValidation = await validateManager(validatedData.managerId);
@@ -377,22 +405,30 @@ export async function createTeam(data: CreateTeamInput) {
     const team = newTeam[0];
 
     // 7. ENHANCED: Automatically create team membership for manager
+    console.log("[createTeam] Creating team membership for manager");
     await manageTeamManagerMembership(
       validatedData.managerId,
       team.id,
       validatedData.teamType,
       "create"
     );
+    console.log("[createTeam] Team membership created successfully");
 
     // 8. Revalidate cache and return success
     revalidatePath("/danh-muc/nhom");
+    console.log(`[createTeam] Team created successfully: ${team.name} (ID: ${team.id})`);
     return {
       success: `Nhóm "${team.name}" (${
         team.teamCode || "No Code"
       }) đã được tạo thành công và quản lý đã được phân quyền`,
     };
   } catch (error) {
-    console.error("Create team error:", error);
+    console.error("[createTeam] FATAL ERROR:", error);
+    // Log detailed error information
+    if (error instanceof Error) {
+      console.error("[createTeam] Error message:", error.message);
+      console.error("[createTeam] Error stack:", error.stack);
+    }
     return { error: "Có lỗi xảy ra khi tạo nhóm. Vui lòng thử lại." };
   }
 }
@@ -400,17 +436,23 @@ export async function createTeam(data: CreateTeamInput) {
 // Server action to update an existing team (ENHANCED with team member management)
 export async function updateTeam(data: UpdateTeamInput) {
   try {
+    console.log("[updateTeam] Starting team update with data:", JSON.stringify(data, null, 2));
+
     // 1. Authorization check
     const user = await getUser();
     if (!user) {
+      console.error("[updateTeam] Authorization failed: No user found");
       return { error: "Không có quyền thực hiện thao tác này" };
     }
+    console.log(`[updateTeam] User authenticated: ${user.id}`);
 
     // 2. Check team management permission (canManageKitchens covers all team types)
     const canManageTeams = await checkPermission(user.id, "canManageKitchens");
     if (!canManageTeams) {
+      console.error("[updateTeam] Permission check failed");
       return { error: "Không có quyền cập nhật nhóm" };
     }
+    console.log("[updateTeam] Permission check passed");
 
     // 3. Validate input data
     const validationResult = updateTeamSchema.safeParse(data);
@@ -512,6 +554,7 @@ export async function updateTeam(data: UpdateTeamInput) {
       validatedData.managerId &&
       validatedData.managerId !== currentTeam.managerId
     ) {
+      console.log("[updateTeam] Manager changed, updating team membership");
       await manageTeamManagerMembership(
         validatedData.managerId,
         team.id,
@@ -519,10 +562,12 @@ export async function updateTeam(data: UpdateTeamInput) {
         "update",
         currentTeam.managerId || undefined
       );
+      console.log("[updateTeam] Team membership updated successfully");
     }
 
     // 9. Revalidate cache and return success
     revalidatePath("/danh-muc/nhom");
+    console.log(`[updateTeam] Team updated successfully: ${team.name} (ID: ${team.id})`);
     return {
       success: `Nhóm "${team.name}" (${
         team.teamCode || "No Code"
@@ -533,7 +578,12 @@ export async function updateTeam(data: UpdateTeamInput) {
       }`,
     };
   } catch (error) {
-    console.error("Update team error:", error);
+    console.error("[updateTeam] FATAL ERROR:", error);
+    // Log detailed error information
+    if (error instanceof Error) {
+      console.error("[updateTeam] Error message:", error.message);
+      console.error("[updateTeam] Error stack:", error.stack);
+    }
     return { error: "Có lỗi xảy ra khi cập nhật nhóm. Vui lòng thử lại." };
   }
 }
